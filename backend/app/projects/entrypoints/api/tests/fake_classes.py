@@ -9,6 +9,7 @@ from app.projects.domain.model import (
     project,
     project_account,
     project_assignment,
+    service_client_assignment,
     technology,
     user,
 )
@@ -24,6 +25,11 @@ from app.shared.adapters.boto import paging_utils
 class FakeProjectsQueryService(projects_query_service.ProjectsQueryService):
     def __init__(self):
         pass
+
+    def get_service_client_assignment(
+        self, project_id: str, client_id: str
+    ) -> service_client_assignment.ServiceClientAssignment | None:
+        return None
 
     def list_projects_by_user(
         self, user_id: str, page_size: int, next_token: Any

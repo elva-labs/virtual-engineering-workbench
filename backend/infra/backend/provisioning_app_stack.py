@@ -398,7 +398,7 @@ class ProvisioningAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                     ],
                     reserved_concurrency=app_config.component_specific["api-lambda-reserved-concurrency"],
                     provisioned_concurrency=app_config.component_specific["api-lambda-provisioned-concurrency"],
-                    timeout=aws_cdk.Duration.seconds(10),
+                    timeout=aws_cdk.Duration.seconds(30),
                     memory_size=1792,
                     cross_bc_api_access={
                         bounded_contexts.BoundedContext.PROJECTS: [

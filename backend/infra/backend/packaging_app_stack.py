@@ -155,7 +155,12 @@ class PackagingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
         )
 
         # DynamoDB
-        self._storage = backend_app_storage.BackendAppStorage(self, "PackagingAppStorage", app_config)
+        self._storage = backend_app_storage.BackendAppStorage(
+            self,
+            "PackagingAppStorage",
+            app_config,
+            enable_ttl=True,
+        )
 
         self._storage.table.add_global_secondary_index(
             index_name=GSI_NAME_CUSTOM_QUERY_BY_BUILD_VERSION_ARN,

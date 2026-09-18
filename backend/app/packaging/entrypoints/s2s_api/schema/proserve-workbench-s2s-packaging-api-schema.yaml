@@ -899,6 +899,31 @@ components:
           type: "string"
       required: ["componentId","componentVersionId","componentVersionDescription","componentVersionName","softwareVendor","softwareVersion","status","createDate","createdBy","lastUpdateDate","lastUpdatedBy"]
       type: "object"
+    ComponentConstant:
+      additionalProperties: false
+      properties:
+        type:
+          type: "string"
+          enum: ["string"]
+        value:
+          type: "string"
+          nullable: true
+      required: ["type"]
+      type: "object"
+    ComponentParameter:
+      additionalProperties: false
+      properties:
+        type:
+          type: "string"
+          enum: ["string"]
+        default:
+          type: "string"
+          nullable: true
+        description:
+          type: "string"
+          nullable: true
+      required: ["type"]
+      type: "object"
     ComponentDefinition:
       additionalProperties: false
       properties:
@@ -911,11 +936,17 @@ components:
         schemaVersion:
           type: "string"
         constants:
-          items: {}
+          items:
+            type: "object"
+            additionalProperties:
+              $ref: "#/components/schemas/ComponentConstant"
           type: "array"
           nullable: true
         parameters:
-          items: {}
+          items:
+            type: "object"
+            additionalProperties:
+              $ref: "#/components/schemas/ComponentParameter"
           type: "array"
           nullable: true
         phases:
@@ -959,6 +990,11 @@ components:
           default: 1
           nullable: true
         inputs:
+          oneOf:
+            - type: "object"
+              additionalProperties: true
+            - type: "array"
+              items: {}
           nullable: true
       required: ["name","action"]
       type: "object"

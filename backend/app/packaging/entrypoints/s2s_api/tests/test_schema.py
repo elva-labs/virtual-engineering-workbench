@@ -17,6 +17,29 @@ def test_schema_uses_structured_component_definitions(api_schema):
     assert "yaml_definition_b64" not in response["properties"]
 
 
+def test_schema_constrains_component_definition_json_shapes(api_schema):
+    schemas = api_schema["components"]["schemas"]
+    step_inputs = schemas["ComponentStep"]["properties"]["inputs"]
+    assert step_inputs["oneOf"] == [
+        {"type": "object", "additionalProperties": True},
+        {"type": "array", "items": {}},
+    ]
+
+    definition = schemas["ComponentDefinition"]
+    constants = definition["properties"]["constants"]["items"]
+    parameters = definition["properties"]["parameters"]["items"]
+    assert constants["type"] == "object"
+    assert (
+        constants["additionalProperties"]["$ref"]
+        == "#/components/schemas/ComponentConstant"
+    )
+    assert parameters["type"] == "object"
+    assert (
+        parameters["additionalProperties"]["$ref"]
+        == "#/components/schemas/ComponentParameter"
+    )
+
+
 def test_method_responses_use_explicit_status_codes_for_api_gateway(api_schema):
     for path, methods in api_schema["paths"].items():
         for method, operation in methods.items():

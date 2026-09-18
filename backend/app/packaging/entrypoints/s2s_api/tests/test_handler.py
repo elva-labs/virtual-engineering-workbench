@@ -1,7 +1,9 @@
 import importlib
 import json
+from copy import deepcopy
 from unittest import mock
 
+import pytest
 import yaml
 
 from aws_lambda_powertools.event_handler.exceptions import NotFoundError
@@ -90,6 +92,66 @@ def test_create_component_version_serializes_structured_definition(
         ]
         == "build"
     )
+
+
+@pytest.mark.parametrize(
+    "definition_update",
+    [
+        {"inputs": "scalar"},
+        {"constants": [{"Agent": {"type": "number"}}]},
+        {"parameters": [{"Agent": {"type": "number"}}]},
+    ],
+)
+def test_create_component_version_rejects_malformed_structured_definition(
+    monkeypatch,
+    mocked_dependencies,
+    lambda_context,
+    client_event,
+    version_body,
+    definition_update,
+):
+    body = deepcopy(version_body)
+    body["componentVersionDefinition"].update(definition_update)
+    response = load_handler(monkeypatch, mocked_dependencies).handler(
+        client_event(
+            "POST",
+            "/projects/proj-1/components/comp-1/versions",
+            body,
+            scopes=["clients/packaging/component.write"],
+        ),
+        lambda_context,
+    )
+    assert response["statusCode"] == 400
+    mocked_dependencies.command_bus.handle.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "inputs",
+    [{"commands": ["install-agent"]}, [{"source": "s3://bucket/agent"}]],
+)
+def test_create_component_version_accepts_object_or_array_inputs(
+    monkeypatch,
+    mocked_dependencies,
+    lambda_context,
+    client_event,
+    version_body,
+    inputs,
+):
+    mocked_dependencies.command_bus.handle.return_value = {
+        "componentVersionId": "vers-1"
+    }
+    body = deepcopy(version_body)
+    body["componentVersionDefinition"]["phases"][0]["steps"][0]["inputs"] = inputs
+    response = load_handler(monkeypatch, mocked_dependencies).handler(
+        client_event(
+            "POST",
+            "/projects/proj-1/components/comp-1/versions",
+            body,
+            scopes=["clients/packaging/component.write"],
+        ),
+        lambda_context,
+    )
+    assert response["statusCode"] == 202
 
 
 def test_component_version_requires_parent_project_membership_before_looking_up_version(

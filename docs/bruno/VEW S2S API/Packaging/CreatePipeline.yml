@@ -11,6 +11,8 @@ http:
   headers:
     - name: Authorization
       value: "{{apiKey}}"
+    - name: Idempotency-Key
+      value: 7b60fdad-c26b-4189-abf8-30c7bb901e72
   params:
     - name: projectId
       value: ""
@@ -49,6 +51,8 @@ examples:
       headers:
         - name: Authorization
           value: "{{apiKey}}"
+        - name: Idempotency-Key
+          value: 7b60fdad-c26b-4189-abf8-30c7bb901e72
       params:
         - name: projectId
           value: ""
@@ -71,6 +75,8 @@ examples:
       headers:
         - name: Content-Type
           value: application/json
+        - name: Retry-After
+          value: "5"
       body:
         type: json
         data: |-
@@ -85,6 +91,8 @@ examples:
       headers:
         - name: Authorization
           value: "{{apiKey}}"
+        - name: Idempotency-Key
+          value: 7b60fdad-c26b-4189-abf8-30c7bb901e72
       params:
         - name: projectId
           value: ""

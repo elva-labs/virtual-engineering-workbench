@@ -48,6 +48,12 @@ Send the token as `Authorization: Bearer $ACCESS_TOKEN` on every API request.
 For recipes and pipelines, request the explicitly granted scopes described below.
 Poll each resource's GET endpoint for lifecycle status.
 
+Lifecycle status values are explicit in the OpenAPI contract: components and
+recipes use `CREATED`/`ARCHIVED`; component and recipe versions use
+`CREATING`, `CREATED`, `TESTING`, `VALIDATED`, `UPDATING`, `RELEASED`, `RETIRED`,
+or `FAILED`; pipelines use `CREATING`, `CREATED`, `UPDATING`, `RETIRED`, or
+`FAILED`; images use `CREATED`, `CREATING`, `FAILED`, `RETIRED`, or `DELETED`.
+
 ## Assign the client to a project
 
 Use a management client with `clients/projects/client_assignment.write` to create or reactivate the assignment. The `clientId` path value is the client ID contained in the Packaging access token.
@@ -92,6 +98,11 @@ requests. `PUT /components/{componentId}` accepts only `componentDescription`.
 Update and archive return `200` with `{}`. GET returns `{component: ...}`; list
 returns `{components: [...]}`.
 
+Every managed create (`POST /components`, component versions, recipes, recipe
+versions, and pipelines) requires an RFC4122 `Idempotency-Key` header. Reusing
+the same key with the same request replays the stored result; missing or malformed
+keys return the stable `INVALID_IDEMPOTENCY_KEY` problem.
+
 Create a version with `POST /components/{componentId}/versions` using the existing
 UI fields:
 
@@ -99,7 +110,21 @@ UI fields:
 {
   "componentVersionDescription": "Install the build agent",
   "componentVersionReleaseType": "MAJOR",
-  "componentVersionYamlDefinition": "<valid Image Builder component YAML>",
+  "componentVersionDefinition": {
+    "schemaVersion": "1.0",
+    "phases": [
+      {
+        "name": "build",
+        "steps": [
+          {
+            "name": "install",
+            "action": "ExecuteBash",
+            "inputs": {"commands": ["echo hello"]}
+          }
+        ]
+      }
+    ]
+  },
   "componentVersionDependencies": [],
   "softwareVendor": "Example Corp",
   "softwareVersion": "1.0.0"
@@ -115,8 +140,8 @@ authorized project.
 Create/update/retire returns `202` with `componentVersionId` and `Retry-After: 5`.
 Poll the version GET and inspect `component_version.status`: wait for
 `VALIDATED` or `FAILED` after create/update, or `RETIRED` or `FAILED` after
-retirement. The response includes `yaml_definition` and `yaml_definition_b64`
-when a stored definition is available. Version lists return `{component_versions: [...]}`.
+retirement. The response includes `componentVersionDefinition` when a stored
+definition is available. Version lists return `{component_versions: [...]}`.
 
 Version update accepts the same fields except `componentVersionReleaseType`,
 which is creation-only. Once validated, send a bodyless POST to the release
@@ -125,10 +150,10 @@ workflow assigns the final semantic version. Released content is immutable:
 create a new version for further edits. DELETE archives the base or retires a
 version through the existing lifecycle; it does not physically delete records.
 
-Component POST requests are non-idempotent. If a response is lost, inspect the
-component/version lists before retrying. There are no external-ID, conditional
-update, or reconciliation deduplication guarantees in this POC. No existing
-component/version IDs need migration.
+The idempotency key applies to component and component-version creates only; updates,
+archives, releases, and retires retain their existing synchronous/asynchronous
+lifecycle semantics. There are no external-ID or conditional-update guarantees in
+this POC. No existing component/version IDs need migration.
 
 ## Recipe POC
 
@@ -157,7 +182,7 @@ Recipe creation uses the UI fields `recipeName`, `recipeDescription`,
 `recipePlatform`, `recipeArchitecture`, and `recipeOsVersion`. Version requests use
 the UI fields `recipeVersionDescription`, `recipeVersionReleaseType`,
 `recipeVersionVolumeSize`, `recipeVersionIntegrations`, and
-`recipeComponentsVersions`; each component entry must include the internal IDs,
+`configuredComponentsVersions`; each component entry must include the internal IDs,
 the UI names, `componentVersionType`, and `order`:
 
 ```json
@@ -166,7 +191,7 @@ the UI names, `componentVersionType`, and `order`:
   "recipeVersionReleaseType": "MINOR",
   "recipeVersionVolumeSize": "30",
   "recipeVersionIntegrations": [],
-  "recipeComponentsVersions": [
+  "configuredComponentsVersions": [
     {
       "componentId": "comp-0001",
       "componentName": "build-agent",
@@ -178,6 +203,10 @@ the UI names, `componentVersionType`, and `order`:
   ]
 }
 ```
+
+Recipe-version reads expose both views: `configuredComponentsVersions` is the
+client-supplied selection, while `effectiveComponentsVersions` is the resolved
+selection after mandatory components and ordering have been applied.
 
 Components are sorted by `order`; existing mandatory components are added by the
 domain workflow. `recipeVersionReleaseType` is accepted only when the
@@ -195,11 +224,10 @@ whose component versions are all released, and returns the `recipeVersionId`
 synchronously. Released content is immutable. This POC reuses the existing build
 and test workflows without adding a separate recipe operation reconciler.
 
-Retry caveat: recipe `POST` requests are non-idempotent. If the response is lost,
-check the recipe/version list first and inspect the returned internal IDs before
-submitting another create. There are no external IDs, ETags, or operation-reconciler
-deduplication guarantees for recipes in this POC. Use the stable problem `code` and
-`retryable` fields for errors, but do not blindly replay a non-idempotent create.
+Recipe and recipe-version creates require `Idempotency-Key`; replaying a request
+with the same key returns the original result. There are no external IDs, ETags,
+or operation-reconciler deduplication guarantees for recipes in this POC. Use the
+stable problem `code` and `retryable` fields for errors.
 
 ## Pipeline and image-build POC
 
@@ -238,28 +266,27 @@ recipe architecture. The schedule is a six-field expression, without a `cron(...
 wrapper, matching the UI. Optional `productId` retains the UI's automatic product
 version association behavior.
 
-Create/update/retire returns `202` with `pipelineId`. Poll the pipeline GET until
+Create/update/retire returns `202` with `pipelineId` and `Retry-After: 5`. Poll the pipeline GET until
 `pipeline.status` is `CREATED` or `FAILED` after create/update, or `RETIRED` or
 `FAILED` after retirement. Updates accept `buildInstanceTypes`, `pipelineSchedule`,
 `recipeVersionId`, and `productId`; the recipe itself, pipeline name, and description
 are not mutable through the existing command. As in the UI, omitting `productId`
 on update clears the product association.
 
-Once the pipeline is `CREATED`, send this to `POST /images`:
+Pipeline creates require `Idempotency-Key`. Once the pipeline is `CREATED`, send this to `POST /images`:
 
 ```json
 {"pipelineId": "pipe-example"}
 ```
 
-The response is `202` with the existing internal `imageId`. Poll `GET /images/{imageId}`
+The response is `202` with the existing internal `imageId`. Image-build POST is
+intentionally not idempotent and is explicitly outside Terraform scope; repeating
+it can launch another billable build. Poll `GET /images/{imageId}`
 with `pipeline.read` until `image.status` becomes `CREATED` or `FAILED`.
 `image.imageUpstreamId` is the resulting AMI ID when available. Builds still run
 through the existing Image Builder and event-processing workflow.
 
-Pipeline creates and image-build requests are not deduplicated. After a lost response,
-inspect the project pipeline/image lists before retrying; repeating `POST /images`
-can launch another billable build. No deployment or live build has been performed
-as part of local verification.
+No deployment or live build has been performed as part of local verification.
 
 ## Errors
 

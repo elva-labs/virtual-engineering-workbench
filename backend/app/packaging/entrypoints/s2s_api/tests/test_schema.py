@@ -9,12 +9,78 @@ def test_schema_uses_structured_component_definitions(api_schema):
     schemas = api_schema["components"]["schemas"]
     create = schemas["CreateComponentVersionRequest"]
     response = schemas["ComponentVersionResponse"]
-    assert create["properties"]["componentVersionDefinition"]["$ref"] == (
-        "#/components/schemas/ComponentDefinition"
-    )
+    assert create["properties"]["componentVersionDefinition"]["$ref"] == ("#/components/schemas/ComponentDefinition")
     assert "componentVersionYamlDefinition" not in create["properties"]
     assert "yaml_definition" not in response["properties"]
     assert "yaml_definition_b64" not in response["properties"]
+
+
+def test_schema_requires_idempotency_for_managed_creates(api_schema):
+    paths = api_schema["paths"]
+    creates = [
+        ("/projects/{projectId}/components", "post"),
+        ("/projects/{projectId}/components/{componentId}/versions", "post"),
+        ("/projects/{projectId}/recipes", "post"),
+        ("/projects/{projectId}/recipes/{recipeId}/versions", "post"),
+        ("/projects/{projectId}/pipelines", "post"),
+    ]
+    reference = {"$ref": "#/components/parameters/IdempotencyKey"}
+    for path, method in creates:
+        assert reference in paths[path][method]["parameters"]
+        assert paths[path][method]["x-amazon-apigateway-request-validator"] == "body-only"
+    assert reference not in paths["/projects/{projectId}/images"]["post"]["parameters"]
+
+
+def test_schema_enumerates_resource_statuses(api_schema):
+    schemas = api_schema["components"]["schemas"]
+    assert schemas["ComponentVersionStatus"]["enum"] == [
+        "CREATING",
+        "CREATED",
+        "TESTING",
+        "VALIDATED",
+        "UPDATING",
+        "RELEASED",
+        "RETIRED",
+        "FAILED",
+    ]
+    assert schemas["PipelineStatus"]["enum"] == [
+        "CREATING",
+        "CREATED",
+        "UPDATING",
+        "RETIRED",
+        "FAILED",
+    ]
+
+
+def test_schema_declares_retry_after_for_async_mutations_only(api_schema):
+    paths = api_schema["paths"]
+    async_mutations = [
+        ("/projects/{projectId}/components/{componentId}/versions", "post"),
+        ("/projects/{projectId}/components/{componentId}/versions/{versionId}", "put"),
+        ("/projects/{projectId}/components/{componentId}/versions/{versionId}", "delete"),
+        ("/projects/{projectId}/recipes/{recipeId}/versions", "post"),
+        ("/projects/{projectId}/recipes/{recipeId}/versions/{versionId}", "put"),
+        ("/projects/{projectId}/recipes/{recipeId}/versions/{versionId}", "delete"),
+        ("/projects/{projectId}/pipelines", "post"),
+        ("/projects/{projectId}/pipelines/{pipelineId}", "put"),
+        ("/projects/{projectId}/pipelines/{pipelineId}", "delete"),
+    ]
+    responses = api_schema["components"]["responses"]
+    for path, method in async_mutations:
+        operation = paths[path][method]
+        response_ref = operation["responses"]["202"]["$ref"]
+        response = responses[response_ref.rsplit("/", 1)[-1]]
+        assert response["headers"]["Retry-After"]["schema"]["default"] == "5"
+
+    for path, method in [
+        ("/projects/{projectId}/components/{componentId}/versions/{versionId}/release", "post"),
+        ("/projects/{projectId}/recipes/{recipeId}/versions/{versionId}/release", "post"),
+    ]:
+        operation = paths[path][method]
+        assert "202" not in operation["responses"]
+        response_ref = operation["responses"]["200"]["$ref"]
+        response = responses[response_ref.rsplit("/", 1)[-1]]
+        assert "Retry-After" not in response.get("headers", {})
 
 
 def test_schema_constrains_component_definition_json_shapes(api_schema):
@@ -29,15 +95,9 @@ def test_schema_constrains_component_definition_json_shapes(api_schema):
     constants = definition["properties"]["constants"]["items"]
     parameters = definition["properties"]["parameters"]["items"]
     assert constants["type"] == "object"
-    assert (
-        constants["additionalProperties"]["$ref"]
-        == "#/components/schemas/ComponentConstant"
-    )
+    assert constants["additionalProperties"]["$ref"] == "#/components/schemas/ComponentConstant"
     assert parameters["type"] == "object"
-    assert (
-        parameters["additionalProperties"]["$ref"]
-        == "#/components/schemas/ComponentParameter"
-    )
+    assert parameters["additionalProperties"]["$ref"] == "#/components/schemas/ComponentParameter"
 
 
 def test_schema_separates_recipe_component_views(api_schema):
@@ -81,27 +141,17 @@ def test_schema_exposes_component_and_recipe_slices(api_schema):
         "/projects/{projectId}/images",
         "/projects/{projectId}/images/{imageId}",
     }
-    assert set(
-        api_schema["paths"]["/projects/{projectId}/components/{componentId}"]
-    ) >= {
+    assert set(api_schema["paths"]["/projects/{projectId}/components/{componentId}"]) >= {
         "put",
         "get",
         "delete",
     }
-    assert set(
-        api_schema["paths"][
-            "/projects/{projectId}/components/{componentId}/versions/{versionId}"
-        ]
-    ) >= {
+    assert set(api_schema["paths"]["/projects/{projectId}/components/{componentId}/versions/{versionId}"]) >= {
         "put",
         "get",
         "delete",
     }
-    assert set(
-        api_schema["paths"][
-            "/projects/{projectId}/recipes/{recipeId}/versions/{versionId}"
-        ]
-    ) >= {
+    assert set(api_schema["paths"]["/projects/{projectId}/recipes/{recipeId}/versions/{versionId}"]) >= {
         "get",
         "put",
         "delete",
@@ -113,15 +163,9 @@ def test_schema_applies_component_and_recipe_scopes(api_schema):
     assert paths["/projects/{projectId}/components"]["get"]["security"] == [
         {"ClientCredentials": ["clients/packaging/component.read"]}
     ]
-    version_put = paths[
-        "/projects/{projectId}/components/{componentId}/versions/{versionId}"
-    ]["put"]
-    assert version_put["security"] == [
-        {"ClientCredentials": ["clients/packaging/component.write"]}
-    ]
-    assert paths[
-        "/projects/{projectId}/components/{componentId}/versions/{versionId}/release"
-    ]["post"]["security"] == [
+    version_put = paths["/projects/{projectId}/components/{componentId}/versions/{versionId}"]["put"]
+    assert version_put["security"] == [{"ClientCredentials": ["clients/packaging/component.write"]}]
+    assert paths["/projects/{projectId}/components/{componentId}/versions/{versionId}/release"]["post"]["security"] == [
         {"ClientCredentials": ["clients/packaging/component.release"]}
     ]
     assert paths["/projects/{projectId}/recipes"]["get"]["security"] == [
@@ -130,9 +174,7 @@ def test_schema_applies_component_and_recipe_scopes(api_schema):
     assert paths["/projects/{projectId}/recipes"]["post"]["security"] == [
         {"ClientCredentials": ["clients/packaging/recipe.write"]}
     ]
-    assert paths[
-        "/projects/{projectId}/recipes/{recipeId}/versions/{versionId}/release"
-    ]["post"]["security"] == [
+    assert paths["/projects/{projectId}/recipes/{recipeId}/versions/{versionId}/release"]["post"]["security"] == [
         {"ClientCredentials": ["clients/packaging/recipe.release"]}
     ]
 
@@ -146,15 +188,9 @@ def test_schema_applies_pipeline_and_image_scopes(api_schema):
         {"ClientCredentials": ["clients/packaging/pipeline.write"]}
     ]
     pipeline = paths["/projects/{projectId}/pipelines/{pipelineId}"]
-    assert pipeline["get"]["security"] == [
-        {"ClientCredentials": ["clients/packaging/pipeline.read"]}
-    ]
-    assert pipeline["put"]["security"] == [
-        {"ClientCredentials": ["clients/packaging/pipeline.write"]}
-    ]
-    assert pipeline["delete"]["security"] == [
-        {"ClientCredentials": ["clients/packaging/pipeline.write"]}
-    ]
+    assert pipeline["get"]["security"] == [{"ClientCredentials": ["clients/packaging/pipeline.read"]}]
+    assert pipeline["put"]["security"] == [{"ClientCredentials": ["clients/packaging/pipeline.write"]}]
+    assert pipeline["delete"]["security"] == [{"ClientCredentials": ["clients/packaging/pipeline.write"]}]
     assert paths["/projects/{projectId}/images"]["get"]["security"] == [
         {"ClientCredentials": ["clients/packaging/pipeline.read"]}
     ]
@@ -199,9 +235,7 @@ def test_schema_uses_async_mutation_responses(api_schema):
         ("/projects/{projectId}/images", "post"),
     ]:
         response_ref = paths[path][method]["responses"]["202"]["$ref"]
-        response = api_schema["components"]["responses"][
-            response_ref.rsplit("/", 1)[-1]
-        ]
+        response = api_schema["components"]["responses"][response_ref.rsplit("/", 1)[-1]]
         assert response["headers"]["Retry-After"]["schema"]["default"] == "5"
     pipeline_action = api_schema["components"]["responses"]["PipelineAction"]
     image_action = api_schema["components"]["responses"]["ImageAction"]
@@ -209,10 +243,7 @@ def test_schema_uses_async_mutation_responses(api_schema):
         pipeline_action["content"]["application/json"]["schema"]["$ref"]
         == "#/components/schemas/PipelineActionResponse"
     )
-    assert (
-        image_action["content"]["application/json"]["schema"]["$ref"]
-        == "#/components/schemas/CreateImageResponse"
-    )
+    assert image_action["content"]["application/json"]["schema"]["$ref"] == "#/components/schemas/CreateImageResponse"
 
 
 def test_gateway_errors_use_problem_details(api_schema):
@@ -224,9 +255,7 @@ def test_gateway_errors_use_problem_details(api_schema):
         "BAD_REQUEST_PARAMETERS",
     } <= set(responses)
     for response in responses.values():
-        assert response["responseParameters"][
-            "gatewayresponse.header.Content-Type"
-        ] == ("'application/problem+json'")
+        assert response["responseParameters"]["gatewayresponse.header.Content-Type"] == ("'application/problem+json'")
         assert "application/problem+json" in response["responseTemplates"]
 
 
@@ -234,9 +263,7 @@ def test_components_use_generated_internal_ids_without_operation_resources(api_s
     paths = api_schema["paths"]
     assert "post" in paths["/projects/{projectId}/components"]
     assert "post" in paths["/projects/{projectId}/components/{componentId}/versions"]
-    assert not any(
-        "/operations" in path or "external" in path.lower() for path in paths
-    )
+    assert not any("/operations" in path or "external" in path.lower() for path in paths)
     parameters = api_schema["components"]["parameters"]
     assert parameters["ComponentId"]["name"] == "componentId"
     assert parameters["ComponentVersionId"]["name"] == "versionId"

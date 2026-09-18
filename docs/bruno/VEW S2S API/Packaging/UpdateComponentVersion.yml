@@ -37,7 +37,21 @@ http:
             "position": ""
           }
         ],
-        "componentVersionYamlDefinition": "",
+        "componentVersionDefinition": {
+          "schemaVersion": "1.0",
+          "phases": [
+            {
+              "name": "build",
+              "steps": [
+                {
+                  "name": "install",
+                  "action": "ExecuteBash",
+                  "inputs": {"commands": ["echo hello"]}
+                }
+              ]
+            }
+          ]
+        },
         "softwareVendor": "",
         "softwareVersion": "",
         "licenseDashboard": "",
@@ -91,7 +105,21 @@ examples:
                 "position": ""
               }
             ],
-            "componentVersionYamlDefinition": "",
+            "componentVersionDefinition": {
+              "schemaVersion": "1.0",
+              "phases": [
+                {
+                  "name": "build",
+                  "steps": [
+                    {
+                      "name": "install",
+                      "action": "ExecuteBash",
+                      "inputs": {"commands": ["echo hello"]}
+                    }
+                  ]
+                }
+              ]
+            },
             "softwareVendor": "",
             "softwareVersion": "",
             "licenseDashboard": "",
@@ -103,6 +131,8 @@ examples:
       headers:
         - name: Content-Type
           value: application/json
+        - name: Retry-After
+          value: "5"
       body:
         type: json
         data: |-
@@ -143,7 +173,21 @@ examples:
                 "position": ""
               }
             ],
-            "componentVersionYamlDefinition": "",
+            "componentVersionDefinition": {
+              "schemaVersion": "1.0",
+              "phases": [
+                {
+                  "name": "build",
+                  "steps": [
+                    {
+                      "name": "install",
+                      "action": "ExecuteBash",
+                      "inputs": {"commands": ["echo hello"]}
+                    }
+                  ]
+                }
+              ]
+            },
             "softwareVendor": "",
             "softwareVersion": "",
             "licenseDashboard": "",

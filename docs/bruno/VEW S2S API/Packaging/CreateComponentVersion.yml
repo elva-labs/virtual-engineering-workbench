@@ -11,6 +11,8 @@ http:
   headers:
     - name: Authorization
       value: "{{apiKey}}"
+    - name: Idempotency-Key
+      value: 7b60fdad-c26b-4189-abf8-30c7bb901e72
   params:
     - name: projectId
       value: ""
@@ -35,7 +37,21 @@ http:
           }
         ],
         "componentVersionReleaseType": "",
-        "componentVersionYamlDefinition": "",
+        "componentVersionDefinition": {
+          "schemaVersion": "1.0",
+          "phases": [
+            {
+              "name": "build",
+              "steps": [
+                {
+                  "name": "install",
+                  "action": "ExecuteBash",
+                  "inputs": {"commands": ["echo hello"]}
+                }
+              ]
+            }
+          ]
+        },
         "softwareVendor": "",
         "softwareVersion": "",
         "licenseDashboard": "",
@@ -63,6 +79,8 @@ examples:
       headers:
         - name: Authorization
           value: "{{apiKey}}"
+        - name: Idempotency-Key
+          value: 7b60fdad-c26b-4189-abf8-30c7bb901e72
       params:
         - name: projectId
           value: ""
@@ -87,7 +105,21 @@ examples:
               }
             ],
             "componentVersionReleaseType": "",
-            "componentVersionYamlDefinition": "",
+            "componentVersionDefinition": {
+              "schemaVersion": "1.0",
+              "phases": [
+                {
+                  "name": "build",
+                  "steps": [
+                    {
+                      "name": "install",
+                      "action": "ExecuteBash",
+                      "inputs": {"commands": ["echo hello"]}
+                    }
+                  ]
+                }
+              ]
+            },
             "softwareVendor": "",
             "softwareVersion": "",
             "licenseDashboard": "",
@@ -99,6 +131,8 @@ examples:
       headers:
         - name: Content-Type
           value: application/json
+        - name: Retry-After
+          value: "5"
       body:
         type: json
         data: |-
@@ -113,6 +147,8 @@ examples:
       headers:
         - name: Authorization
           value: "{{apiKey}}"
+        - name: Idempotency-Key
+          value: 7b60fdad-c26b-4189-abf8-30c7bb901e72
       params:
         - name: projectId
           value: ""
@@ -137,7 +173,21 @@ examples:
               }
             ],
             "componentVersionReleaseType": "",
-            "componentVersionYamlDefinition": "",
+            "componentVersionDefinition": {
+              "schemaVersion": "1.0",
+              "phases": [
+                {
+                  "name": "build",
+                  "steps": [
+                    {
+                      "name": "install",
+                      "action": "ExecuteBash",
+                      "inputs": {"commands": ["echo hello"]}
+                    }
+                  ]
+                }
+              ]
+            },
             "softwareVendor": "",
             "softwareVersion": "",
             "licenseDashboard": "",

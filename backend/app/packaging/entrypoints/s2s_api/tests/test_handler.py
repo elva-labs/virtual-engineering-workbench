@@ -9,7 +9,6 @@ import yaml
 from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 
 from app.packaging.domain.exceptions.s2s_exception import ProjectAccessDenied
-from app.packaging.entrypoints.s2s_api.routers import recipes
 
 
 def load_handler(monkeypatch, dependencies):
@@ -45,6 +44,8 @@ def test_create_component_generates_an_internal_id_and_uses_service_actor(
 
 
 def test_recipe_version_model_omits_unavailable_legacy_configured_list():
+    from app.packaging.entrypoints.s2s_api.routers import recipes
+
     version = mock.Mock()
     version.model_dump.return_value = {
         "recipeId": "reci-1",

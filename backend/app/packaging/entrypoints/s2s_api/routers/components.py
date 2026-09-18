@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from http import HTTPStatus
 
 from aws_lambda_powertools import Tracer
@@ -8,6 +9,7 @@ from app.packaging.domain.commands.component import (
     create_component_command,
     update_component_command,
 )
+from app.packaging.domain.model.component import component
 from app.packaging.domain.value_objects.component import (
     component_description_value_object,
     component_id_value_object,
@@ -15,7 +17,7 @@ from app.packaging.domain.value_objects.component import (
     component_system_configuration_value_object,
 )
 from app.packaging.domain.value_objects.shared import project_id_value_object, user_id_value_object
-from app.packaging.entrypoints.s2s_api import bootstrapper
+from app.packaging.entrypoints.s2s_api import bootstrapper, idempotency
 from app.packaging.entrypoints.s2s_api.model import api_model
 from app.packaging.entrypoints.s2s_api.routers import common
 
@@ -44,23 +46,27 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
     def create_component(project_id: str, request: api_model.CreateComponentRequest):
         client_id = authorize(project_id, WRITE_SCOPE)
         component_id = component_id_value_object.generate_component_id()
-        dependencies.command_bus.handle(
-            create_component_command.CreateComponentCommand(
-                projectId=project_id_value_object.from_str(project_id),
-                componentId=component_id_value_object.from_str(component_id),
-                componentName=component_name_value_object.from_str(request.componentName),
-                componentDescription=component_description_value_object.from_str(request.componentDescription),
-                componentSystemConfiguration=component_system_configuration_value_object.from_attrs(
-                    platform=request.componentPlatform,
-                    supported_architectures=request.componentSupportedArchitectures,
-                    supported_os_versions=request.componentSupportedOsVersions,
-                ),
-                createdBy=user_id_value_object.from_str(f"service:{client_id}"),
+        scope = common.idempotency_scope(router, client_id, project_id, "CREATE_COMPONENT")
+        result = idempotency.execute_create(
+            service=dependencies.idempotency_service,
+            scope=scope,
+            request=request,
+            resource_id=component_id,
+            resource_exists=lambda resource_id: dependencies.component_domain_qry_srv.get_component(
+                component_id_value_object.from_str(resource_id)
             )
+            is not None,
+            response_for_id=lambda resource_id: idempotency.StoredCreateResponse(
+                HTTPStatus.CREATED, {"componentId": resource_id}
+            ),
+            create=lambda resource_id: create_component_response(
+                dependencies, project_id, client_id, request, resource_id
+            ),
+            now=datetime.now(timezone.utc),
         )
         return api_gateway.Response(
-            status_code=HTTPStatus.CREATED,
-            body=api_model.CreateComponentResponse(componentId=component_id),
+            status_code=result.status_code,
+            body=result.body,
             headers=common.NO_STORE,
             content_type=content_types.APPLICATION_JSON,
         )
@@ -103,6 +109,9 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
     def archive_component(project_id: str, component_id: str):
         client_id = authorize(project_id, WRITE_SCOPE)
         require_component(project_id, component_id)
+        existing = dependencies.component_domain_qry_srv.get_component(component_id_value_object.from_str(component_id))
+        if existing.status == component.ComponentStatus.Archived:
+            return api_gateway.Response(status_code=HTTPStatus.OK, body={}, headers=common.NO_STORE)
         dependencies.command_bus.handle(
             archive_component_command.ArchiveComponentCommand(
                 projectId=project_id_value_object.from_str(project_id),
@@ -113,3 +122,27 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
         return api_gateway.Response(status_code=HTTPStatus.OK, body={}, headers=common.NO_STORE)
 
     return router
+
+
+def create_component_response(
+    dependencies: bootstrapper.Dependencies,
+    project_id: str,
+    client_id: str,
+    request: api_model.CreateComponentRequest,
+    component_id: str,
+) -> idempotency.StoredCreateResponse:
+    dependencies.command_bus.handle(
+        create_component_command.CreateComponentCommand(
+            projectId=project_id_value_object.from_str(project_id),
+            componentId=component_id_value_object.from_str(component_id),
+            componentName=component_name_value_object.from_str(request.componentName),
+            componentDescription=component_description_value_object.from_str(request.componentDescription),
+            componentSystemConfiguration=component_system_configuration_value_object.from_attrs(
+                platform=request.componentPlatform,
+                supported_architectures=request.componentSupportedArchitectures,
+                supported_os_versions=request.componentSupportedOsVersions,
+            ),
+            createdBy=user_id_value_object.from_str(f"service:{client_id}"),
+        )
+    )
+    return idempotency.StoredCreateResponse(HTTPStatus.CREATED, {"componentId": component_id})

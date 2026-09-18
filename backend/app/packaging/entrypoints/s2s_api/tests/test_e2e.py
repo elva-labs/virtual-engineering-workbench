@@ -16,6 +16,7 @@ from app.packaging.adapters.query_services.dynamodb_recipe_version_query_service
     DynamoDBRecipeVersionQueryService,
 )
 from app.packaging.adapters.repository import dynamo_entity_config
+from app.packaging.adapters.services.dynamodb_idempotency_service import DynamoDBIdempotencyService
 from app.packaging.domain.command_handlers.component import (
     create_component_command_handler,
     create_component_version_command_handler,
@@ -135,8 +136,12 @@ def e2e_runtime(monkeypatch):
             recipe_version_domain_qry_srv=RecipeVersionDomainQueryService(recipe_query, recipe_version_query),
             pipeline_domain_qry_srv=mock.create_autospec(PipelineDomainQueryService, instance=True),
             image_domain_qry_srv=mock.create_autospec(ImageDomainQueryService, instance=True),
+            idempotency_service=DynamoDBIdempotencyService(PACKAGING_TABLE, client),
         )
-        yield SimpleNamespace(handler=load_handler(monkeypatch, dependencies))
+        yield SimpleNamespace(
+            handler=load_handler(monkeypatch, dependencies),
+            component_query=component_query,
+        )
 
 
 def call(runtime, event, context):
@@ -149,7 +154,11 @@ def test_component_create_read_and_version_command_round_trip(
     created = call(
         e2e_runtime,
         client_event(
-            "POST", "/projects/proj-1/components", component_body, scopes=["clients/packaging/component.write"]
+            "POST",
+            "/projects/proj-1/components",
+            component_body,
+            headers={"Idempotency-Key": "b39cdd55-774d-4bc3-81a8-70f23a03c485"},
+            scopes=["clients/packaging/component.write"],
         ),
         lambda_context,
     )
@@ -165,6 +174,7 @@ def test_component_create_read_and_version_command_round_trip(
             "POST",
             f"/projects/proj-1/components/{component_id}/versions",
             version_body,
+            headers={"Idempotency-Key": "2676b69a-e94f-4c2a-8d39-aed5fb209546"},
             scopes=["clients/packaging/component.write"],
         ),
         lambda_context,
@@ -179,7 +189,13 @@ def test_component_create_read_and_version_command_round_trip(
 def test_recipe_create_and_read_round_trip_uses_internal_id(e2e_runtime, client_event, lambda_context, recipe_body):
     created = call(
         e2e_runtime,
-        client_event("POST", "/projects/proj-1/recipes", recipe_body, scopes=["clients/packaging/recipe.write"]),
+        client_event(
+            "POST",
+            "/projects/proj-1/recipes",
+            recipe_body,
+            headers={"Idempotency-Key": "b39cdd55-774d-4bc3-81a8-70f23a03c485"},
+            scopes=["clients/packaging/recipe.write"],
+        ),
         lambda_context,
     )
     recipe_id = json.loads(created["body"])["recipeId"]
@@ -192,3 +208,23 @@ def test_recipe_create_and_read_round_trip_uses_internal_id(e2e_runtime, client_
     assert created["statusCode"] == 201
     assert recipe_id.startswith("reci-")
     assert json.loads(read["body"])["recipe"]["recipeId"] == recipe_id
+
+
+def test_component_create_exact_retry_returns_same_id_and_creates_one_resource(
+    e2e_runtime, client_event, lambda_context, component_body
+):
+    headers = {"Idempotency-Key": "b39cdd55-774d-4bc3-81a8-70f23a03c485"}
+    event = client_event(
+        "POST",
+        "/projects/proj-1/components",
+        component_body,
+        headers=headers,
+        scopes=["clients/packaging/component.write"],
+    )
+
+    first = call(e2e_runtime, event, lambda_context)
+    second = call(e2e_runtime, event, lambda_context)
+
+    assert first["statusCode"] == second["statusCode"] == 201
+    assert json.loads(first["body"])["componentId"] == json.loads(second["body"])["componentId"]
+    assert len(e2e_runtime.component_query.get_components("proj-1")) == 1

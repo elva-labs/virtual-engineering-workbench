@@ -36,7 +36,14 @@ app.include_router(pipelines.init(dependencies))
 
 @app.exception_handler(RequestValidationError)
 def handle_validation_error(error: RequestValidationError):
-    logger.info("Packaging S2S request validation failed", errors=error.errors())
+    errors = error.errors()
+    logger.info("Packaging S2S request validation failed")
+    if any("componentVersionDefinition" in item.get("loc", ()) for item in errors):
+        common.api_metrics.add_metric(
+            name="StructuredDefinitionValidationFailures",
+            unit=MetricUnit.Count,
+            value=1,
+        )
     return problem_details.api_response(
         HTTPStatus.BAD_REQUEST,
         detail="The request does not match the API contract.",
@@ -90,7 +97,7 @@ def add_cors(response: dict, event: dict) -> dict:
 def handler(event: dict, context: typing.LambdaContext):
     common.api_metrics.add_metric(name="APIRequests", unit=MetricUnit.Count, value=1)
     append_correlation_fields(event)
-    logger.info(clear_auth_headers(event))
+    logger.info(clear_auth_headers(event, mask_body=True))
     try:
         resolved = app.resolve(event, context)
         if "headers" not in resolved and "multiValueHeaders" in resolved:

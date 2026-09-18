@@ -5,9 +5,8 @@ from unittest import mock
 import pytest
 from openapi_spec_validator.readers import read_from_filename
 
-from app.packaging.domain.ports.service_client_project_access_service import (
-    ServiceClientProjectAccessService,
-)
+from app.packaging.domain.ports.idempotency_service import Reservation, ReservationOutcome
+from app.packaging.domain.ports.service_client_project_access_service import ServiceClientProjectAccessService
 from app.shared.api import secrets_manager_api
 
 
@@ -58,9 +57,7 @@ def client_event():
             "path": path,
             "httpMethod": method,
             "headers": request_headers,
-            "multiValueHeaders": {
-                key: [value] for key, value in request_headers.items()
-            },
+            "multiValueHeaders": {key: [value] for key, value in request_headers.items()},
             "queryStringParameters": query,
             "multiValueQueryStringParameters": None,
             "pathParameters": {},
@@ -95,7 +92,7 @@ def client_event():
 
 @pytest.fixture()
 def mocked_dependencies():
-    return SimpleNamespace(
+    dependencies = SimpleNamespace(
         project_access_service=mock.create_autospec(ServiceClientProjectAccessService),
         command_bus=mock.Mock(),
         recipe_domain_qry_srv=mock.Mock(),
@@ -105,7 +102,12 @@ def mocked_dependencies():
         component_domain_qry_srv=mock.Mock(),
         component_version_domain_qry_srv=mock.Mock(),
         component_version_qry_srv=mock.Mock(),
+        idempotency_service=mock.Mock(),
     )
+    dependencies.idempotency_service.reserve.side_effect = lambda scope, request_hash, resource_id, now: Reservation(
+        ReservationOutcome.ACQUIRED, resource_id
+    )
+    return dependencies
 
 
 @pytest.fixture()
@@ -169,9 +171,17 @@ def pipeline_body():
 
 
 @pytest.fixture()
+def recipe_version_body():
+    return {
+        "configuredComponentsVersions": [],
+        "recipeVersionDescription": "build image",
+        "recipeVersionReleaseType": "MAJOR",
+        "recipeVersionVolumeSize": "8",
+    }
+
+
+@pytest.fixture()
 def api_schema():
-    schema_path = __file__.replace(
-        "tests/conftest.py", "schema/proserve-workbench-s2s-packaging-api-schema.yaml"
-    )
+    schema_path = __file__.replace("tests/conftest.py", "schema/proserve-workbench-s2s-packaging-api-schema.yaml")
     specification, _ = read_from_filename(schema_path)
     return specification

@@ -18,6 +18,7 @@ from app.packaging.adapters.query_services import (
 from app.packaging.adapters.repository import dynamo_entity_config
 from app.packaging.adapters.services import (
     aws_component_definition_service,
+    dynamodb_idempotency_service,
     ec2_image_builder_pipeline_service,
     parameter_service,
 )
@@ -70,6 +71,7 @@ from app.packaging.domain.commands.recipe import (
     retire_recipe_version_command,
     update_recipe_version_command,
 )
+from app.packaging.domain.ports.idempotency_service import IdempotencyService
 from app.packaging.domain.ports.service_client_project_access_service import ServiceClientProjectAccessService
 from app.packaging.domain.query_services import (
     component_domain_query_service,
@@ -92,6 +94,22 @@ from app.shared.instrumentation import power_tools_metrics
 from app.shared.logging import boto_logger
 
 
+class S2SCommandLogger:
+    """Keep command names and errors while preventing command bodies from being logged."""
+
+    def __init__(self, logger: logging.Logger) -> None:
+        self._logger = logger
+
+    def info(self, message: Any) -> None:
+        self._logger.info(message)
+
+    def debug(self, message: Any) -> None:
+        return None
+
+    def error(self, message: Any) -> None:
+        self._logger.error("Packaging S2S command failed")
+
+
 class Dependencies(BaseModel):
     project_access_service: ServiceClientProjectAccessService
     command_bus: Any
@@ -102,6 +120,7 @@ class Dependencies(BaseModel):
     component_domain_qry_srv: component_domain_query_service.ComponentDomainQueryService
     component_version_domain_qry_srv: component_version_domain_query_service.ComponentVersionDomainQueryService
     component_version_qry_srv: Any
+    idempotency_service: IdempotencyService
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -109,6 +128,9 @@ def bootstrap(app_config: config.AppConfig, logger: logging.Logger) -> Dependenc
     session = boto_logger.loggable_session(boto3.session.Session(), logger)
     dynamodb = session.resource("dynamodb", region_name=app_config.get_default_region())
     dynamodb_client = dynamodb.meta.client
+    idempotency_srv = dynamodb_idempotency_service.DynamoDBIdempotencyService(
+        app_config.get_table_name(), dynamodb_client
+    )
     uow = dynamodb_unit_of_work.DynamoDBUnitOfWork(
         table_name=app_config.get_table_name(),
         dynamodb_client=dynamodb_client,
@@ -354,7 +376,7 @@ def bootstrap(app_config: config.AppConfig, logger: logging.Logger) -> Dependenc
         )
 
     command_bus = command_bus_metrics.CommandBusMetrics(
-        inner=in_memory_command_bus.InMemoryCommandBus(logger=logger),
+        inner=in_memory_command_bus.InMemoryCommandBus(logger=S2SCommandLogger(logger)),
         metrics_client=metrics_client,
     )
     command_bus.register_handler(create_component_command.CreateComponentCommand, create_component).register_handler(
@@ -418,4 +440,5 @@ def bootstrap(app_config: config.AppConfig, logger: logging.Logger) -> Dependenc
             component_version_definition_srv=component_definition_service,
         ),
         component_version_qry_srv=component_version_query_service,
+        idempotency_service=idempotency_srv,
     )

@@ -1,0 +1,131 @@
+info:
+  name: ListComponentVersions
+  type: http
+  seq: 6
+  tags:
+    - ALL
+
+http:
+  method: GET
+  url: "{{baseUrl}}/projects/:projectId/components/:componentId/versions"
+  headers:
+    - name: Authorization
+      value: "{{apiKey}}"
+  params:
+    - name: projectId
+      value: "{{projectId}}"
+      type: path
+    - name: componentId
+      value: comp-bupifrxj
+      type: path
+  auth:
+    type: apikey
+    key: Authorization
+    value: "{{apiKey}}"
+    placement: header
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 200 Response
+    description: Component versions.
+    request:
+      url: "{{baseUrl}}/projects/:projectId/components/:componentId/versions"
+      method: GET
+      headers:
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+        - name: componentId
+          value: ""
+          type: path
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "component_versions": [
+              {
+                "componentId": "",
+                "componentVersionId": "",
+                "componentVersionDescription": "",
+                "componentVersionName": "",
+                "componentVersionDependencies": [
+                  {
+                    "componentId": "",
+                    "componentName": "",
+                    "componentVersionId": "",
+                    "componentVersionName": "",
+                    "componentVersionType": "",
+                    "order": 0,
+                    "position": ""
+                  }
+                ],
+                "associatedComponentsVersions": [
+                  {
+                    "componentId": "",
+                    "componentName": "",
+                    "componentVersionId": "",
+                    "componentVersionName": "",
+                    "componentVersionType": "",
+                    "order": 0,
+                    "position": ""
+                  }
+                ],
+                "associatedRecipesVersions": [],
+                "softwareVendor": "",
+                "softwareVersion": "",
+                "licenseDashboard": "",
+                "notes": "",
+                "status": "",
+                "createDate": "",
+                "createdBy": "",
+                "lastUpdateDate": "",
+                "lastUpdatedBy": ""
+              }
+            ]
+          }
+  - name: default Response
+    description: RFC problem response.
+    request:
+      url: "{{baseUrl}}/projects/:projectId/components/:componentId/versions"
+      method: GET
+      headers:
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+        - name: componentId
+          value: ""
+          type: path
+    response:
+      headers:
+        - name: Content-Type
+          value: application/problem+json
+      body:
+        type: json
+        data: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "detail": "",
+            "code": "",
+            "requestId": "",
+            "retryable": false
+          }

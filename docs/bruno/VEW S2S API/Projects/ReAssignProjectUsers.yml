@@ -1,0 +1,70 @@
+info:
+  name: ReAssignProjectUsers
+  type: http
+  seq: 1
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/projects/:projectId/users"
+  headers:
+    - name: Authorization
+      value: ""
+    - name: Authorization
+      value: "{{apiKey}}"
+  params:
+    - name: projectId
+      value: ""
+      type: path
+  body:
+    type: json
+    data: |-
+      {
+        "roles": [],
+        "userIds": []
+      }
+  auth:
+    type: apikey
+    key: Authorization
+    value: "{{apiKey}}"
+    placement: header
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 200 Response
+    description: 200 response
+    request:
+      url: "{{baseUrl}}/projects/:projectId/users"
+      method: PUT
+      headers:
+        - name: Authorization
+          value: ""
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+      body:
+        type: json
+        data: |-
+          {
+            "roles": [],
+            "userIds": []
+          }
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: "{}"
+
+docs: Reassign users to different roles for a specific project

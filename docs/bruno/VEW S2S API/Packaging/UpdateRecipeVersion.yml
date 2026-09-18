@@ -1,0 +1,155 @@
+info:
+  name: UpdateRecipeVersion
+  type: http
+  seq: 19
+  tags:
+    - ALL
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/projects/:projectId/recipes/:recipeId/versions/:versionId"
+  headers:
+    - name: Authorization
+      value: "{{apiKey}}"
+  params:
+    - name: projectId
+      value: ""
+      type: path
+    - name: recipeId
+      value: ""
+      type: path
+    - name: versionId
+      value: ""
+      type: path
+  body:
+    type: json
+    data: |-
+      {
+        "recipeComponentsVersions": [
+          {
+            "componentId": "",
+            "componentName": "",
+            "componentVersionId": "",
+            "componentVersionName": "",
+            "componentVersionType": "",
+            "order": 0
+          }
+        ],
+        "recipeVersionDescription": "",
+        "recipeVersionVolumeSize": "",
+        "recipeVersionIntegrations": []
+      }
+  auth:
+    type: apikey
+    key: Authorization
+    value: "{{apiKey}}"
+    placement: header
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 202 Response
+    description: Accepted recipe-version action; poll the version resource for status.
+    request:
+      url: "{{baseUrl}}/projects/:projectId/recipes/:recipeId/versions/:versionId"
+      method: PUT
+      headers:
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+        - name: recipeId
+          value: ""
+          type: path
+        - name: versionId
+          value: ""
+          type: path
+      body:
+        type: json
+        data: |-
+          {
+            "recipeComponentsVersions": [
+              {
+                "componentId": "",
+                "componentName": "",
+                "componentVersionId": "",
+                "componentVersionName": "",
+                "componentVersionType": "",
+                "order": 0
+              }
+            ],
+            "recipeVersionDescription": "",
+            "recipeVersionVolumeSize": "",
+            "recipeVersionIntegrations": []
+          }
+    response:
+      status: 202
+      statusText: Accepted
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "recipeVersionId": ""
+          }
+  - name: default Response
+    description: RFC problem response.
+    request:
+      url: "{{baseUrl}}/projects/:projectId/recipes/:recipeId/versions/:versionId"
+      method: PUT
+      headers:
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+        - name: recipeId
+          value: ""
+          type: path
+        - name: versionId
+          value: ""
+          type: path
+      body:
+        type: json
+        data: |-
+          {
+            "recipeComponentsVersions": [
+              {
+                "componentId": "",
+                "componentName": "",
+                "componentVersionId": "",
+                "componentVersionName": "",
+                "componentVersionType": "",
+                "order": 0
+              }
+            ],
+            "recipeVersionDescription": "",
+            "recipeVersionVolumeSize": "",
+            "recipeVersionIntegrations": []
+          }
+    response:
+      headers:
+        - name: Content-Type
+          value: application/problem+json
+      body:
+        type: json
+        data: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "detail": "",
+            "code": "",
+            "requestId": "",
+            "retryable": false
+          }

@@ -1,0 +1,107 @@
+info:
+  name: GetImage
+  type: http
+  seq: 29
+  tags:
+    - ALL
+
+http:
+  method: GET
+  url: "{{baseUrl}}/projects/:projectId/images/:imageId"
+  headers:
+    - name: Authorization
+      value: "{{apiKey}}"
+  params:
+    - name: projectId
+      value: ""
+      type: path
+    - name: imageId
+      value: ""
+      type: path
+  auth:
+    type: apikey
+    key: Authorization
+    value: "{{apiKey}}"
+    placement: header
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 200 Response
+    description: Image.
+    request:
+      url: "{{baseUrl}}/projects/:projectId/images/:imageId"
+      method: GET
+      headers:
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+        - name: imageId
+          value: ""
+          type: path
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "image": {
+              "projectId": "",
+              "imageId": "",
+              "imageBuildVersion": "",
+              "imageBuildVersionArn": "",
+              "pipelineId": "",
+              "pipelineName": "",
+              "recipeId": "",
+              "recipeName": "",
+              "recipeVersionId": "",
+              "recipeVersionName": "",
+              "status": "",
+              "imageUpstreamId": "",
+              "createDate": "",
+              "lastUpdateDate": ""
+            }
+          }
+  - name: default Response
+    description: RFC problem response.
+    request:
+      url: "{{baseUrl}}/projects/:projectId/images/:imageId"
+      method: GET
+      headers:
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+        - name: imageId
+          value: ""
+          type: path
+    response:
+      headers:
+        - name: Content-Type
+          value: application/problem+json
+      body:
+        type: json
+        data: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "detail": "",
+            "code": "",
+            "requestId": "",
+            "retryable": false
+          }

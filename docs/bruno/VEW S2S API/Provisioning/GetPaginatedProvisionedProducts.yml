@@ -1,0 +1,209 @@
+info:
+  name: GetPaginatedProvisionedProducts
+  type: http
+  seq: 4
+  tags:
+    - ALL
+
+http:
+  method: GET
+  url: "{{baseUrl}}/projects/:projectId/products/provisioned"
+  headers:
+    - name: Authorization
+      value: ""
+    - name: Authorization
+      value: "{{apiKey}}"
+  params:
+    - name: projectId
+      value: ""
+      type: path
+    - name: pageSize
+      value: ""
+      type: query
+      disabled: true
+    - name: pagingKey
+      value: ""
+      type: query
+      disabled: true
+    - name: productName
+      value: ""
+      type: query
+      disabled: true
+    - name: versionName
+      value: ""
+      type: query
+      disabled: true
+    - name: productType
+      value: ""
+      type: query
+      disabled: true
+    - name: owner
+      value: ""
+      type: query
+      disabled: true
+    - name: status
+      value: ""
+      type: query
+      disabled: true
+    - name: stage
+      value: ""
+      type: query
+      disabled: true
+    - name: experimental
+      value: ""
+      type: query
+      disabled: true
+  auth:
+    type: apikey
+    key: Authorization
+    value: "{{apiKey}}"
+    placement: header
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 200 Response
+    description: 200 response
+    request:
+      url: "{{baseUrl}}/projects/:projectId/products/provisioned"
+      method: GET
+      headers:
+        - name: Authorization
+          value: ""
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+        - name: pageSize
+          value: ""
+          type: query
+          disabled: true
+        - name: pagingKey
+          value: ""
+          type: query
+          disabled: true
+        - name: productName
+          value: ""
+          type: query
+          disabled: true
+        - name: versionName
+          value: ""
+          type: query
+          disabled: true
+        - name: productType
+          value: ""
+          type: query
+          disabled: true
+        - name: owner
+          value: ""
+          type: query
+          disabled: true
+        - name: status
+          value: ""
+          type: query
+          disabled: true
+        - name: stage
+          value: ""
+          type: query
+          disabled: true
+        - name: experimental
+          value: ""
+          type: query
+          disabled: true
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "pagingKey": "",
+            "provisionedProducts": [
+              {
+                "projectId": "",
+                "provisionedProductId": "",
+                "provisionedProductName": "",
+                "provisionedProductType": "",
+                "userId": "",
+                "status": "",
+                "statusReason": "",
+                "productId": "",
+                "productName": "",
+                "productDescription": "",
+                "versionId": "",
+                "versionName": "",
+                "versionDescription": "",
+                "stage": "",
+                "region": "",
+                "provisioningParameters": [
+                  {
+                    "key": "",
+                    "value": ""
+                  }
+                ],
+                "outputs": [
+                  {
+                    "outputKey": "",
+                    "outputValue": "",
+                    "description": "",
+                    "outputType": ""
+                  }
+                ],
+                "instanceId": "",
+                "privateIp": "",
+                "publicIp": "",
+                "sshEnabled": false,
+                "usernamePasswordLoginEnabled": false,
+                "upgradeAvailable": false,
+                "isVersionRetired": false,
+                "upgradeSchedulerGuidId": "",
+                "versionRetiredDate": "",
+                "newVersionName": "",
+                "newVersionId": "",
+                "createDate": "",
+                "lastUpdateDate": "",
+                "instanceRecommendationReason": "",
+                "recommendedInstanceType": "",
+                "additionalConfigurations": [
+                  {
+                    "type": "",
+                    "parameters": [
+                      {
+                        "key": "",
+                        "value": ""
+                      }
+                    ]
+                  }
+                ],
+                "experimental": false,
+                "componentVersionDetails": [
+                  {
+                    "componentName": "",
+                    "componentVersionType": "",
+                    "softwareVendor": "",
+                    "softwareVersion": "",
+                    "licenseDashboard": "",
+                    "notes": ""
+                  }
+                ],
+                "osVersion": "",
+                "awsAccountId": "",
+                "containerClusterName": "",
+                "containerName": "",
+                "containerTaskArn": "",
+                "provisionedCompoundProductId": ""
+              }
+            ]
+          }
+
+docs: Get paginated provisioned products for a project

@@ -1,0 +1,15 @@
+name: Elva
+variables:
+  - name: baseUrl
+    value: "{{Host}}"
+    description: ""
+  - name: Host
+    value: https://dev.api.workbench.elva.land
+    description: ""
+  - name: cognitoDomain
+    value: elva-wb-ui-dev-login-c0956.auth.us-east-1.amazoncognito.com
+    description: ""
+  - secret: true
+    name: clientId
+  - secret: true
+    name: clientSecret

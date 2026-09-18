@@ -1,0 +1,10 @@
+info:
+  name: Provisioning
+  type: folder
+  seq: 4
+
+request:
+  auth: inherit
+  variables:
+    - name: baseUrl
+      value: "{{Host}}/clients/provisioning/v1"

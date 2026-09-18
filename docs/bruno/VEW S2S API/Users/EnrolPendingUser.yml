@@ -1,0 +1,72 @@
+info:
+  name: EnrolPendingUser
+  type: http
+  seq: 2
+  tags:
+    - ALL
+
+http:
+  method: POST
+  url: "{{baseUrl}}/projects/:projectId/enrolments/pending"
+  headers:
+    - name: Authorization
+      value: "{{apiKey}}"
+  params:
+    - name: projectId
+      value: ""
+      type: path
+  body:
+    type: json
+    data: |-
+      {
+        "userId": "",
+        "userEmail": "",
+        "approverId": "",
+        "source": ""
+      }
+  auth:
+    type: apikey
+    key: Authorization
+    value: "{{apiKey}}"
+    placement: header
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 201 Response
+    description: 201 response
+    request:
+      url: "{{baseUrl}}/projects/:projectId/enrolments/pending"
+      method: POST
+      headers:
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+      body:
+        type: json
+        data: |-
+          {
+            "userId": "",
+            "userEmail": "",
+            "approverId": "",
+            "source": ""
+          }
+    response:
+      status: 201
+      statusText: Created
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: "{}"
+
+docs: Request to enrol a user without approving him automatically

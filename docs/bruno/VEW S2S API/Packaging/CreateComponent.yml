@@ -1,0 +1,113 @@
+info:
+  name: CreateComponent
+  type: http
+  seq: 2
+  tags:
+    - ALL
+
+http:
+  method: POST
+  url: "{{baseUrl}}/projects/:projectId/components"
+  headers:
+    - name: Authorization
+      value: "{{apiKey}}"
+  params:
+    - name: projectId
+      value: ""
+      type: path
+  body:
+    type: json
+    data: |-
+      {
+        "componentName": "",
+        "componentDescription": "",
+        "componentPlatform": "",
+        "componentSupportedArchitectures": [],
+        "componentSupportedOsVersions": []
+      }
+  auth:
+    type: apikey
+    key: Authorization
+    value: "{{apiKey}}"
+    placement: header
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 201 Response
+    description: Created component identifier.
+    request:
+      url: "{{baseUrl}}/projects/:projectId/components"
+      method: POST
+      headers:
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+      body:
+        type: json
+        data: |-
+          {
+            "componentName": "",
+            "componentDescription": "",
+            "componentPlatform": "",
+            "componentSupportedArchitectures": [],
+            "componentSupportedOsVersions": []
+          }
+    response:
+      status: 201
+      statusText: Created
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "componentId": ""
+          }
+  - name: default Response
+    description: RFC problem response.
+    request:
+      url: "{{baseUrl}}/projects/:projectId/components"
+      method: POST
+      headers:
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+      body:
+        type: json
+        data: |-
+          {
+            "componentName": "",
+            "componentDescription": "",
+            "componentPlatform": "",
+            "componentSupportedArchitectures": [],
+            "componentSupportedOsVersions": []
+          }
+    response:
+      headers:
+        - name: Content-Type
+          value: application/problem+json
+      body:
+        type: json
+        data: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "detail": "",
+            "code": "",
+            "requestId": "",
+            "retryable": false
+          }

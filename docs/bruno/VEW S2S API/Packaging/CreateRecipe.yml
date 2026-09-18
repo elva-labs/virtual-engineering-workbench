@@ -1,0 +1,113 @@
+info:
+  name: CreateRecipe
+  type: http
+  seq: 12
+  tags:
+    - ALL
+
+http:
+  method: POST
+  url: "{{baseUrl}}/projects/:projectId/recipes"
+  headers:
+    - name: Authorization
+      value: "{{apiKey}}"
+  params:
+    - name: projectId
+      value: ""
+      type: path
+  body:
+    type: json
+    data: |-
+      {
+        "recipeDescription": "",
+        "recipeName": "",
+        "recipePlatform": "",
+        "recipeArchitecture": "",
+        "recipeOsVersion": ""
+      }
+  auth:
+    type: apikey
+    key: Authorization
+    value: "{{apiKey}}"
+    placement: header
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 201 Response
+    description: Created recipe identifier.
+    request:
+      url: "{{baseUrl}}/projects/:projectId/recipes"
+      method: POST
+      headers:
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+      body:
+        type: json
+        data: |-
+          {
+            "recipeDescription": "",
+            "recipeName": "",
+            "recipePlatform": "",
+            "recipeArchitecture": "",
+            "recipeOsVersion": ""
+          }
+    response:
+      status: 201
+      statusText: Created
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "recipeId": ""
+          }
+  - name: default Response
+    description: RFC problem response.
+    request:
+      url: "{{baseUrl}}/projects/:projectId/recipes"
+      method: POST
+      headers:
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+      body:
+        type: json
+        data: |-
+          {
+            "recipeDescription": "",
+            "recipeName": "",
+            "recipePlatform": "",
+            "recipeArchitecture": "",
+            "recipeOsVersion": ""
+          }
+    response:
+      headers:
+        - name: Content-Type
+          value: application/problem+json
+      body:
+        type: json
+        data: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "detail": "",
+            "code": "",
+            "requestId": "",
+            "retryable": false
+          }

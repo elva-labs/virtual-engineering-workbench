@@ -150,10 +150,11 @@ workflow assigns the final semantic version. Released content is immutable:
 create a new version for further edits. DELETE archives the base or retires a
 version through the existing lifecycle; it does not physically delete records.
 
-The idempotency key applies to component and component-version creates only; updates,
-archives, releases, and retires retain their existing synchronous/asynchronous
-lifecycle semantics. There are no external-ID or conditional-update guarantees in
-this POC. No existing component/version IDs need migration.
+All five managed creates—component, component version, recipe, recipe version, and
+pipeline—require the `Idempotency-Key`. Updates, archives, releases, and retirements
+do not require it and retain their existing synchronous/asynchronous lifecycle
+semantics. There are no external-ID or conditional-update guarantees in this POC.
+No existing component/version IDs need migration.
 
 ## Recipe POC
 

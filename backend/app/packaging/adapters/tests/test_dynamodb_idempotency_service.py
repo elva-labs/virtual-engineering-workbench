@@ -133,6 +133,49 @@ def test_expired_lease_takeover_has_one_recover_winner_and_subsequent_caller_is_
     assert service._take_expired_lease(scope, "request-hash", stale_item, NOW + timedelta(seconds=60)) is False
 
 
+def test_recovering_an_active_lease_refreshes_ttl_before_the_prior_expiry(service, backend_app_table, scope):
+    service.reserve(scope, "request-hash", "component-456", NOW)
+    key = {
+        "PK": "IDEMPOTENCY#client-123#project-123",
+        "SK": "create-component#component-123#12345678-1234-5678-1234-567812345678",
+    }
+    backend_app_table.update_item(
+        Key=key,
+        UpdateExpression="SET ExpireDate = :expiry",
+        ExpressionAttributeValues={":expiry": int((NOW + timedelta(seconds=61)).timestamp())},
+    )
+
+    reservation = service.reserve(scope, "request-hash", "unused-id", NOW + timedelta(seconds=60))
+
+    assert reservation.outcome == ReservationOutcome.RECOVER
+    item = backend_app_table.get_item(Key=key)["Item"]
+    assert item["leaseExpiresAt"] == int((NOW + timedelta(seconds=120)).timestamp())
+    assert item["ExpireDate"] == int((NOW + timedelta(hours=24, seconds=60)).timestamp())
+
+
+def test_logically_expired_in_progress_record_is_replaced_with_current_reservation(service, backend_app_table, scope):
+    service.reserve(scope, "request-hash", "component-456", NOW)
+    key = {
+        "PK": "IDEMPOTENCY#client-123#project-123",
+        "SK": "create-component#component-123#12345678-1234-5678-1234-567812345678",
+    }
+    backend_app_table.update_item(
+        Key=key,
+        UpdateExpression="SET ExpireDate = :expiry",
+        ExpressionAttributeValues={":expiry": int(NOW.timestamp())},
+    )
+
+    reservation = service.reserve(scope, "new-hash", "component-789", NOW + timedelta(seconds=1))
+
+    assert reservation.outcome == ReservationOutcome.ACQUIRED
+    assert reservation.resource_id == "component-789"
+    assert reservation.replaced_expired is True
+    item = backend_app_table.get_item(Key=key)["Item"]
+    assert item["status"] == "IN_PROGRESS"
+    assert item["generatedResourceId"] == "component-789"
+    assert item["ExpireDate"] == int((NOW + timedelta(hours=24, seconds=1)).timestamp())
+
+
 def test_complete_persists_replay_response_and_24_hour_logical_expiry(service, backend_app_table, scope):
     service.reserve(scope, "request-hash", "component-456", NOW)
 

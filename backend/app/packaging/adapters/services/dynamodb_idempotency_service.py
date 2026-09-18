@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
-
-from mypy_boto3_dynamodb import client
+from typing import Any, Protocol
 
 from app.packaging.domain.ports import idempotency_service
 
@@ -8,8 +7,52 @@ LEASE_DURATION = timedelta(seconds=60)
 COMPLETED_RECORD_DURATION = timedelta(hours=24)
 
 
+class DynamoDBDocumentClientExceptions(Protocol):
+    ConditionalCheckFailedException: type[Exception]
+
+
+class DynamoDBDocumentClient(Protocol):
+    """Resource-enhanced DynamoDB client that accepts and returns Python document values.
+
+    This is the interface provided by ``boto3.resource("dynamodb").meta.client``.
+    A raw ``boto3.client("dynamodb")`` instead requires AttributeValue maps and
+    must not be passed to this adapter.
+    """
+
+    exceptions: DynamoDBDocumentClientExceptions
+
+    def put_item(
+        self,
+        *,
+        TableName: str,
+        Item: dict[str, Any],
+        ConditionExpression: str,
+        ExpressionAttributeNames: dict[str, str] | None = None,
+        ExpressionAttributeValues: dict[str, Any] | None = None,
+    ) -> dict[str, Any]: ...
+
+    def get_item(
+        self,
+        *,
+        TableName: str,
+        Key: dict[str, Any],
+        ConsistentRead: bool,
+    ) -> dict[str, Any]: ...
+
+    def update_item(
+        self,
+        *,
+        TableName: str,
+        Key: dict[str, Any],
+        UpdateExpression: str,
+        ConditionExpression: str,
+        ExpressionAttributeNames: dict[str, str] | None = None,
+        ExpressionAttributeValues: dict[str, Any] | None = None,
+    ) -> dict[str, Any]: ...
+
+
 class DynamoDBIdempotencyService(idempotency_service.IdempotencyService):
-    def __init__(self, table_name: str, dynamodb_client: client.DynamoDBClient):
+    def __init__(self, table_name: str, dynamodb_client: DynamoDBDocumentClient):
         self._table_name = table_name
         self._client = dynamodb_client
 
@@ -71,8 +114,8 @@ class DynamoDBIdempotencyService(idempotency_service.IdempotencyService):
         if item is None:
             return self.reserve(scope, request_hash, resource_id, now)
 
-        if item["status"] == "COMPLETED" and self._is_logically_expired(item, now):
-            if self._replace_expired_completed(scope, request_hash, resource_id, now, item):
+        if self._is_logically_expired(item, now):
+            if self._replace_expired(scope, request_hash, resource_id, now, item):
                 return idempotency_service.Reservation(
                     idempotency_service.ReservationOutcome.ACQUIRED,
                     resource_id,
@@ -107,7 +150,7 @@ class DynamoDBIdempotencyService(idempotency_service.IdempotencyService):
             item["generatedResourceId"],
         )
 
-    def _replace_expired_completed(
+    def _replace_expired(
         self,
         scope: idempotency_service.IdempotencyScope,
         request_hash: str,
@@ -119,9 +162,8 @@ class DynamoDBIdempotencyService(idempotency_service.IdempotencyService):
             self._client.put_item(
                 TableName=self._table_name,
                 Item=self._new_item(scope, request_hash, resource_id, now),
-                ConditionExpression="#status = :completed AND ExpireDate = :observed_expiry",
-                ExpressionAttributeNames={"#status": "status"},
-                ExpressionAttributeValues={":completed": "COMPLETED", ":observed_expiry": item["ExpireDate"]},
+                ConditionExpression="ExpireDate = :observed_expiry",
+                ExpressionAttributeValues={":observed_expiry": item["ExpireDate"]},
             )
         except self._client.exceptions.ConditionalCheckFailedException:
             return False
@@ -138,12 +180,13 @@ class DynamoDBIdempotencyService(idempotency_service.IdempotencyService):
             self._client.update_item(
                 TableName=self._table_name,
                 Key=self._key(scope),
-                UpdateExpression="SET leaseExpiresAt = :new_lease, lastUpdateAt = :now",
+                UpdateExpression="SET leaseExpiresAt = :new_lease, lastUpdateAt = :now, ExpireDate = :expiry",
                 ConditionExpression="#status = :in_progress AND requestHash = :hash AND leaseExpiresAt = :observed_lease",
                 ExpressionAttributeNames={"#status": "status"},
                 ExpressionAttributeValues={
                     ":new_lease": self._timestamp(now + LEASE_DURATION),
                     ":now": self._timestamp(now),
+                    ":expiry": self._timestamp(now + COMPLETED_RECORD_DURATION),
                     ":in_progress": "IN_PROGRESS",
                     ":hash": request_hash,
                     ":observed_lease": item["leaseExpiresAt"],

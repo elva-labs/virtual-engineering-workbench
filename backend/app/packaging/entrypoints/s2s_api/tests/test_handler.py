@@ -17,6 +17,106 @@ from app.packaging.entrypoints.s2s_api import idempotency
 from app.packaging.entrypoints.s2s_api.model import api_model
 
 IDEMPOTENCY_KEY = "b39cdd55-774d-4bc3-81a8-70f23a03c485"
+MANAGED_CREATE_FIELDS = (
+    "path, body_fixture, scope, operation, parent_resource_id, resource_id, "
+    "response_field, success_status, query_service_name, query_method_name, command_id_field"
+)
+
+MANAGED_CREATE_CASES = [
+    pytest.param(
+        "/projects/proj-1/components",
+        "component_body",
+        "clients/packaging/component.write",
+        "CREATE_COMPONENT",
+        None,
+        "comp-fixed",
+        "componentId",
+        201,
+        "component_domain_qry_srv",
+        "get_component",
+        "componentId",
+        id="component",
+    ),
+    pytest.param(
+        "/projects/proj-1/components/comp-1/versions",
+        "version_body",
+        "clients/packaging/component.write",
+        "CREATE_COMPONENT_VERSION",
+        "comp-1",
+        "vers-fixed",
+        "componentVersionId",
+        202,
+        "component_version_qry_srv",
+        "get_component_version",
+        "componentVersionId",
+        id="component-version",
+    ),
+    pytest.param(
+        "/projects/proj-1/recipes",
+        "recipe_body",
+        "clients/packaging/recipe.write",
+        "CREATE_RECIPE",
+        None,
+        "reci-fixed",
+        "recipeId",
+        201,
+        "recipe_domain_qry_srv",
+        "get_recipe",
+        "recipeId",
+        id="recipe",
+    ),
+    pytest.param(
+        "/projects/proj-1/recipes/reci-1/versions",
+        "recipe_version_body",
+        "clients/packaging/recipe.write",
+        "CREATE_RECIPE_VERSION",
+        "reci-1",
+        "vers-fixed",
+        "recipeVersionId",
+        202,
+        "recipe_version_domain_qry_srv",
+        "get_recipe_version",
+        "recipeVersionId",
+        id="recipe-version",
+    ),
+    pytest.param(
+        "/projects/proj-1/pipelines",
+        "pipeline_body",
+        "clients/packaging/pipeline.write",
+        "CREATE_PIPELINE",
+        None,
+        "pipe-fixed",
+        "pipelineId",
+        202,
+        "pipeline_domain_qry_srv",
+        "get_pipeline",
+        "pipelineId",
+        id="pipeline",
+    ),
+]
+
+
+def invoke_managed_create(
+    *,
+    monkeypatch,
+    request,
+    mocked_dependencies,
+    lambda_context,
+    client_event,
+    path,
+    body_fixture,
+    scope,
+):
+    return load_handler(monkeypatch, mocked_dependencies).handler(
+        client_event(
+            "POST",
+            path,
+            request.getfixturevalue(body_fixture),
+            headers={"Idempotency-Key": IDEMPOTENCY_KEY},
+            scopes=[scope],
+        ),
+        lambda_context,
+    )
 
 
 def load_handler(monkeypatch, dependencies):
@@ -26,6 +126,396 @@ def load_handler(monkeypatch, dependencies):
     from app.packaging.entrypoints.s2s_api import handler
 
     return importlib.reload(handler)
+
+
+def test_unhandled_exception_log_contains_classification_but_not_message_or_cause(
+    monkeypatch,
+    mocked_dependencies,
+    lambda_context,
+    client_event,
+    component_body,
+):
+    cause = ValueError("TOP_SECRET_CHAINED_CAUSE")
+    error = RuntimeError("TOP_SECRET_EXCEPTION_MESSAGE")
+    error.__cause__ = cause
+    mocked_dependencies.project_access_service.require_access.side_effect = error
+    handler = load_handler(monkeypatch, mocked_dependencies)
+    safe_error_log = mock.Mock()
+    unsafe_exception_log = mock.Mock()
+    monkeypatch.setattr(handler.logger, "error", safe_error_log)
+    monkeypatch.setattr(handler.logger, "exception", unsafe_exception_log)
+
+    response = handler.handler(
+        client_event(
+            "POST",
+            "/projects/proj-1/components",
+            component_body,
+            headers={"Idempotency-Key": IDEMPOTENCY_KEY},
+            scopes=["clients/packaging/component.write"],
+        ),
+        lambda_context,
+    )
+
+    assert response["statusCode"] == 500
+    safe_error_log.assert_called_once_with(
+        "Unhandled Packaging S2S API error",
+        exceptionClass="RuntimeError",
+    )
+    unsafe_exception_log.assert_not_called()
+    rendered = str(safe_error_log.mock_calls)
+    assert "TOP_SECRET_EXCEPTION_MESSAGE" not in rendered
+    assert "TOP_SECRET_CHAINED_CAUSE" not in rendered
+
+
+@pytest.mark.parametrize(MANAGED_CREATE_FIELDS, MANAGED_CREATE_CASES)
+def test_managed_create_routes_replay_success_without_dispatch(
+    monkeypatch,
+    request,
+    mocked_dependencies,
+    lambda_context,
+    client_event,
+    path,
+    body_fixture,
+    scope,
+    operation,
+    parent_resource_id,
+    resource_id,
+    response_field,
+    success_status,
+    query_service_name,
+    query_method_name,
+    command_id_field,
+):
+    mocked_dependencies.idempotency_service.reserve.side_effect = None
+    mocked_dependencies.idempotency_service.reserve.return_value = Reservation(
+        ReservationOutcome.REPLAY,
+        resource_id,
+        success_status,
+        {response_field: resource_id},
+    )
+
+    response = invoke_managed_create(
+        monkeypatch=monkeypatch,
+        request=request,
+        mocked_dependencies=mocked_dependencies,
+        lambda_context=lambda_context,
+        client_event=client_event,
+        path=path,
+        body_fixture=body_fixture,
+        scope=scope,
+    )
+
+    assert response["statusCode"] == success_status
+    assert json.loads(response["body"]) == {response_field: resource_id}
+    mocked_dependencies.command_bus.handle.assert_not_called()
+
+
+@pytest.mark.parametrize(MANAGED_CREATE_FIELDS, MANAGED_CREATE_CASES)
+@pytest.mark.parametrize(
+    ("outcome", "expected_code", "retry_after"),
+    [
+        (ReservationOutcome.CONFLICT, "IDEMPOTENCY_KEY_REUSED", None),
+        (ReservationOutcome.IN_PROGRESS, "IDEMPOTENCY_REQUEST_IN_PROGRESS", "5"),
+    ],
+)
+def test_managed_create_routes_reject_unavailable_reservations(
+    monkeypatch,
+    request,
+    mocked_dependencies,
+    lambda_context,
+    client_event,
+    path,
+    body_fixture,
+    scope,
+    operation,
+    parent_resource_id,
+    resource_id,
+    response_field,
+    success_status,
+    query_service_name,
+    query_method_name,
+    command_id_field,
+    outcome,
+    expected_code,
+    retry_after,
+):
+    mocked_dependencies.idempotency_service.reserve.side_effect = None
+    mocked_dependencies.idempotency_service.reserve.return_value = Reservation(outcome, resource_id)
+
+    response = invoke_managed_create(
+        monkeypatch=monkeypatch,
+        request=request,
+        mocked_dependencies=mocked_dependencies,
+        lambda_context=lambda_context,
+        client_event=client_event,
+        path=path,
+        body_fixture=body_fixture,
+        scope=scope,
+    )
+
+    assert response["statusCode"] == 409
+    assert json.loads(response["body"])["code"] == expected_code
+    assert response["headers"].get("Retry-After") == retry_after
+    mocked_dependencies.command_bus.handle.assert_not_called()
+
+
+@pytest.mark.parametrize(MANAGED_CREATE_FIELDS, MANAGED_CREATE_CASES)
+def test_managed_create_routes_replay_deterministic_failure_without_dispatch(
+    monkeypatch,
+    request,
+    mocked_dependencies,
+    lambda_context,
+    client_event,
+    path,
+    body_fixture,
+    scope,
+    operation,
+    parent_resource_id,
+    resource_id,
+    response_field,
+    success_status,
+    query_service_name,
+    query_method_name,
+    command_id_field,
+):
+    mocked_dependencies.idempotency_service.reserve.side_effect = None
+    mocked_dependencies.idempotency_service.reserve.return_value = Reservation(
+        ReservationOutcome.REPLAY,
+        resource_id,
+        422,
+        {
+            "detail": "Stable domain failure.",
+            "code": "DOMAIN_VALIDATION_FAILED",
+            "retryable": False,
+        },
+    )
+
+    response = invoke_managed_create(
+        monkeypatch=monkeypatch,
+        request=request,
+        mocked_dependencies=mocked_dependencies,
+        lambda_context=lambda_context,
+        client_event=client_event,
+        path=path,
+        body_fixture=body_fixture,
+        scope=scope,
+    )
+
+    body = json.loads(response["body"])
+    assert response["statusCode"] == 422
+    assert body["detail"] == "Stable domain failure."
+    assert body["requestId"] == "api-request-1"
+    mocked_dependencies.command_bus.handle.assert_not_called()
+
+
+@pytest.mark.parametrize(MANAGED_CREATE_FIELDS, MANAGED_CREATE_CASES)
+def test_managed_create_routes_complete_deterministic_failure(
+    monkeypatch,
+    request,
+    mocked_dependencies,
+    lambda_context,
+    client_event,
+    path,
+    body_fixture,
+    scope,
+    operation,
+    parent_resource_id,
+    resource_id,
+    response_field,
+    success_status,
+    query_service_name,
+    query_method_name,
+    command_id_field,
+):
+    mocked_dependencies.idempotency_service.reserve.side_effect = None
+    mocked_dependencies.idempotency_service.reserve.return_value = Reservation(ReservationOutcome.ACQUIRED, resource_id)
+    mocked_dependencies.command_bus.handle.side_effect = domain_exception.DomainException("Stable domain failure.")
+
+    response = invoke_managed_create(
+        monkeypatch=monkeypatch,
+        request=request,
+        mocked_dependencies=mocked_dependencies,
+        lambda_context=lambda_context,
+        client_event=client_event,
+        path=path,
+        body_fixture=body_fixture,
+        scope=scope,
+    )
+
+    assert response["statusCode"] == 422
+    completed = mocked_dependencies.idempotency_service.complete.call_args.args
+    assert completed[2:5] == (
+        resource_id,
+        422,
+        {
+            "detail": "Stable domain failure.",
+            "code": "DOMAIN_VALIDATION_FAILED",
+            "retryable": False,
+        },
+    )
+
+
+@pytest.mark.parametrize(MANAGED_CREATE_FIELDS, MANAGED_CREATE_CASES)
+def test_managed_create_routes_recover_existing_resource_without_dispatch(
+    monkeypatch,
+    request,
+    mocked_dependencies,
+    lambda_context,
+    client_event,
+    path,
+    body_fixture,
+    scope,
+    operation,
+    parent_resource_id,
+    resource_id,
+    response_field,
+    success_status,
+    query_service_name,
+    query_method_name,
+    command_id_field,
+):
+    mocked_dependencies.idempotency_service.reserve.side_effect = None
+    mocked_dependencies.idempotency_service.reserve.return_value = Reservation(ReservationOutcome.RECOVER, resource_id)
+    query_method = getattr(getattr(mocked_dependencies, query_service_name), query_method_name)
+    query_method.return_value = object()
+
+    response = invoke_managed_create(
+        monkeypatch=monkeypatch,
+        request=request,
+        mocked_dependencies=mocked_dependencies,
+        lambda_context=lambda_context,
+        client_event=client_event,
+        path=path,
+        body_fixture=body_fixture,
+        scope=scope,
+    )
+
+    assert response["statusCode"] == success_status
+    assert json.loads(response["body"]) == {response_field: resource_id}
+    mocked_dependencies.command_bus.handle.assert_not_called()
+    mocked_dependencies.idempotency_service.complete.assert_called_once()
+
+
+@pytest.mark.parametrize(MANAGED_CREATE_FIELDS, MANAGED_CREATE_CASES)
+def test_managed_create_routes_recover_missing_resource_with_reserved_id_once(
+    monkeypatch,
+    request,
+    mocked_dependencies,
+    lambda_context,
+    client_event,
+    path,
+    body_fixture,
+    scope,
+    operation,
+    parent_resource_id,
+    resource_id,
+    response_field,
+    success_status,
+    query_service_name,
+    query_method_name,
+    command_id_field,
+):
+    mocked_dependencies.idempotency_service.reserve.side_effect = None
+    mocked_dependencies.idempotency_service.reserve.return_value = Reservation(ReservationOutcome.RECOVER, resource_id)
+    query_method = getattr(getattr(mocked_dependencies, query_service_name), query_method_name)
+    query_method.return_value = None
+
+    response = invoke_managed_create(
+        monkeypatch=monkeypatch,
+        request=request,
+        mocked_dependencies=mocked_dependencies,
+        lambda_context=lambda_context,
+        client_event=client_event,
+        path=path,
+        body_fixture=body_fixture,
+        scope=scope,
+    )
+
+    assert response["statusCode"] == success_status
+    assert json.loads(response["body"]) == {response_field: resource_id}
+    mocked_dependencies.command_bus.handle.assert_called_once()
+    command = mocked_dependencies.command_bus.handle.call_args.args[0]
+    assert getattr(command, command_id_field).value == resource_id
+    mocked_dependencies.idempotency_service.complete.assert_called_once()
+
+
+@pytest.mark.parametrize(MANAGED_CREATE_FIELDS, MANAGED_CREATE_CASES)
+def test_managed_create_routes_leave_retryable_infrastructure_failure_recoverable(
+    monkeypatch,
+    request,
+    mocked_dependencies,
+    lambda_context,
+    client_event,
+    path,
+    body_fixture,
+    scope,
+    operation,
+    parent_resource_id,
+    resource_id,
+    response_field,
+    success_status,
+    query_service_name,
+    query_method_name,
+    command_id_field,
+):
+    mocked_dependencies.idempotency_service.reserve.side_effect = None
+    mocked_dependencies.idempotency_service.reserve.return_value = Reservation(ReservationOutcome.ACQUIRED, resource_id)
+    mocked_dependencies.command_bus.handle.side_effect = RuntimeError("transient infrastructure failure")
+
+    response = invoke_managed_create(
+        monkeypatch=monkeypatch,
+        request=request,
+        mocked_dependencies=mocked_dependencies,
+        lambda_context=lambda_context,
+        client_event=client_event,
+        path=path,
+        body_fixture=body_fixture,
+        scope=scope,
+    )
+
+    assert response["statusCode"] == 500
+    mocked_dependencies.idempotency_service.complete.assert_not_called()
+
+
+@pytest.mark.parametrize(MANAGED_CREATE_FIELDS, MANAGED_CREATE_CASES)
+def test_managed_create_route_scope_isolates_client_project_operation_and_parent(
+    monkeypatch,
+    request,
+    mocked_dependencies,
+    lambda_context,
+    client_event,
+    path,
+    body_fixture,
+    scope,
+    operation,
+    parent_resource_id,
+    resource_id,
+    response_field,
+    success_status,
+    query_service_name,
+    query_method_name,
+    command_id_field,
+):
+    mocked_dependencies.idempotency_service.reserve.side_effect = None
+    mocked_dependencies.idempotency_service.reserve.return_value = Reservation(ReservationOutcome.ACQUIRED, resource_id)
+
+    invoke_managed_create(
+        monkeypatch=monkeypatch,
+        request=request,
+        mocked_dependencies=mocked_dependencies,
+        lambda_context=lambda_context,
+        client_event=client_event,
+        path=path,
+        body_fixture=body_fixture,
+        scope=scope,
+    )
+
+    reserved_scope = mocked_dependencies.idempotency_service.reserve.call_args.args[0]
+    assert reserved_scope.client_id == "client-1"
+    assert reserved_scope.project_id == "proj-1"
+    assert reserved_scope.operation == operation
+    assert reserved_scope.parent_resource_id == parent_resource_id
+    assert str(reserved_scope.key) == IDEMPOTENCY_KEY
 
 
 def test_create_component_generates_an_internal_id_and_uses_service_actor(

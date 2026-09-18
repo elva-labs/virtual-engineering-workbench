@@ -130,8 +130,11 @@ def handler(event: dict, context: typing.LambdaContext):
             ),
             event,
         )
-    except Exception:
-        logger.exception("Unhandled Packaging S2S API error")
+    except Exception as error:
+        logger.error(
+            "Unhandled Packaging S2S API error",
+            exceptionClass=type(error).__name__,
+        )
         return add_cors(
             problem_details.response(
                 HTTPStatus.INTERNAL_SERVER_ERROR,

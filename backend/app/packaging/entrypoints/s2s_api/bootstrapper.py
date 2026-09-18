@@ -1,4 +1,5 @@
 import json
+import logging as stdlib_logging
 from typing import Any
 
 import boto3
@@ -94,20 +95,32 @@ from app.shared.instrumentation import power_tools_metrics
 from app.shared.logging import boto_logger
 
 
-class S2SCommandLogger:
-    """Keep command names and errors while preventing command bodies from being logged."""
+class S2SSafeLogger:
+    """Keep operational metadata while suppressing S2S payloads and unsafe errors."""
 
     def __init__(self, logger: logging.Logger) -> None:
         self._logger = logger
 
-    def info(self, message: Any) -> None:
-        self._logger.info(message)
+    @property
+    def log_level(self) -> int:
+        # The shared boto hook includes request params at DEBUG. For S2S, force its
+        # metadata-only branch even when the Lambda logger itself runs at DEBUG.
+        return stdlib_logging.INFO
 
-    def debug(self, message: Any) -> None:
+    def info(self, message: Any, *args: Any, **kwargs: Any) -> None:
+        self._logger.info(message, *args, **kwargs)
+
+    def debug(self, message: Any, *args: Any, **kwargs: Any) -> None:
         return None
 
-    def error(self, message: Any) -> None:
-        self._logger.error("Packaging S2S command failed")
+    def warning(self, message: Any, *args: Any, **kwargs: Any) -> None:
+        self._logger.warning("Packaging S2S operation warning")
+
+    def error(self, message: Any, *args: Any, **kwargs: Any) -> None:
+        self._logger.error("Packaging S2S operation failed")
+
+    def exception(self, message: Any, *args: Any, **kwargs: Any) -> None:
+        self._logger.error("Packaging S2S logging failed")
 
 
 class Dependencies(BaseModel):
@@ -125,7 +138,8 @@ class Dependencies(BaseModel):
 
 
 def bootstrap(app_config: config.AppConfig, logger: logging.Logger) -> Dependencies:  # noqa: C901
-    session = boto_logger.loggable_session(boto3.session.Session(), logger)
+    safe_logger = S2SSafeLogger(logger)
+    session = boto_logger.loggable_session(boto3.session.Session(), safe_logger)
     dynamodb = session.resource("dynamodb", region_name=app_config.get_default_region())
     dynamodb_client = dynamodb.meta.client
     idempotency_srv = dynamodb_idempotency_service.DynamoDBIdempotencyService(
@@ -135,7 +149,7 @@ def bootstrap(app_config: config.AppConfig, logger: logging.Logger) -> Dependenc
         table_name=app_config.get_table_name(),
         dynamodb_client=dynamodb_client,
         repo_factories=dynamo_entity_config.EntityConfigurator(table_name=app_config.get_table_name()).repo_factories(),
-        logger=logger,
+        logger=safe_logger,
     )
 
     metrics_client = power_tools_metrics.PowerToolsMetrics()
@@ -147,10 +161,10 @@ def bootstrap(app_config: config.AppConfig, logger: logging.Logger) -> Dependenc
             events_api=events_api,
             event_bus_name=app_config.get_domain_event_bus_name(),
             bounded_context_name=app_config.get_bounded_context_name(),
-            logger=logger,
+            logger=safe_logger,
         ),
         metrics_client=metrics_client,
-        logger=logger,
+        logger=safe_logger,
     )
 
     component_query_service = dynamodb_component_query_service.DynamoDBComponentQueryService(
@@ -376,7 +390,7 @@ def bootstrap(app_config: config.AppConfig, logger: logging.Logger) -> Dependenc
         )
 
     command_bus = command_bus_metrics.CommandBusMetrics(
-        inner=in_memory_command_bus.InMemoryCommandBus(logger=S2SCommandLogger(logger)),
+        inner=in_memory_command_bus.InMemoryCommandBus(logger=safe_logger),
         metrics_client=metrics_client,
     )
     command_bus.register_handler(create_component_command.CreateComponentCommand, create_component).register_handler(
@@ -414,7 +428,7 @@ def bootstrap(app_config: config.AppConfig, logger: logging.Logger) -> Dependenc
     registry = service_registry.ServiceRegistry.from_config(
         app_config=app_config,
         ssm_client=session.client("ssm", region_name=app_config.get_default_region()),
-        logger=logger,
+        logger=safe_logger,
     )
     project_access_service = ProjectsApiServiceClientProjectAccessService(
         api=registry.api_for(bounded_contexts.BoundedContext.PROJECTS)

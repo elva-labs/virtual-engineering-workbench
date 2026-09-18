@@ -15,7 +15,39 @@ from app.packaging.domain.value_objects.component_version import (
     component_version_description_value_object,
     component_version_release_type_value_object,
     component_version_status_value_object,
+    component_version_yaml_definition_value_object,
 )
+
+
+def test_component_definition_dict_round_trips_with_defaults():
+    definition = {
+        "schemaVersion": "1.0",
+        "phases": [
+            {
+                "name": "build",
+                "steps": [
+                    {
+                        "name": "InstallAgent",
+                        "action": "ExecuteBash",
+                        "inputs": {"commands": ["install-agent"]},
+                    }
+                ],
+            }
+        ],
+    }
+    encoded = component_version_yaml_definition_value_object.from_dict(definition)
+    decoded = component_version_yaml_definition_value_object.to_dict(encoded.value)
+    step = decoded["phases"][0]["steps"][0]
+    assert step["timeoutSeconds"] == 7200
+    assert step["onFailure"] == "Abort"
+    assert step["maxAttempts"] == 1
+
+
+def test_component_definition_rejects_empty_phases():
+    with pytest.raises(DomainException):
+        component_version_yaml_definition_value_object.from_dict(
+            {"schemaVersion": "1.0", "phases": []}
+        )
 
 
 def test_component_version_dependencies_value_object_should_parse_dependencies():
@@ -135,8 +167,13 @@ def test_component_version_description_value_object_should_raise_if_too_long():
     # ARRANGE
     description = ""
     for _ in range(16):
-        description = description + "This is an invalid description as it is more than 1024 characters."
-    expected_exception_message = "Component version description should be between 0 and 1024 characters."
+        description = (
+            description
+            + "This is an invalid description as it is more than 1024 characters."
+        )
+    expected_exception_message = (
+        "Component version description should be between 0 and 1024 characters."
+    )
 
     # ACT
     with pytest.raises(DomainException) as e:
@@ -200,7 +237,9 @@ def test_component_version_status_value_object_should_parse_status():
 def test_component_version_status_value_object_should_raise_if_invalid_status():
     # ARRANGE
     status = "TEST_STATUS_INVALID"
-    expected_exception_message = "Component version status should be in ['TEST_STATUS_1', 'TEST_STATUS_2']."
+    expected_exception_message = (
+        "Component version status should be in ['TEST_STATUS_1', 'TEST_STATUS_2']."
+    )
 
     # ACT
     with pytest.raises(DomainException) as e:
@@ -249,7 +288,9 @@ def test_component_license_dashboard_url_value_object_should_parse_license_dashb
     license_dashboard_url,
 ):
     # ACT
-    license_dashboard = component_license_dashboard_url_value_object.from_str(license_dashboard_url)
+    license_dashboard = component_license_dashboard_url_value_object.from_str(
+        license_dashboard_url
+    )
 
     # ASSERT
     assertpy.assert_that(license_dashboard.value).is_equal_to(license_dashboard_url)

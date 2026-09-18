@@ -5,7 +5,9 @@ from unittest import mock
 import pytest
 from openapi_spec_validator.readers import read_from_filename
 
-from app.packaging.domain.ports.service_client_project_access_service import ServiceClientProjectAccessService
+from app.packaging.domain.ports.service_client_project_access_service import (
+    ServiceClientProjectAccessService,
+)
 from app.shared.api import secrets_manager_api
 
 
@@ -18,7 +20,11 @@ def runtime_environment(monkeypatch):
     monkeypatch.setenv("AUDIT_LOGGING_KEY_NAME", "audit-key")
     monkeypatch.setenv("POWERTOOLS_METRICS_NAMESPACE", "Tests")
     monkeypatch.setenv("POWERTOOLS_SERVICE_NAME", "Packaging")
-    monkeypatch.setattr(secrets_manager_api.SecretsManagerAPI, "get_secret_value", lambda self, secret_id: "key")
+    monkeypatch.setattr(
+        secrets_manager_api.SecretsManagerAPI,
+        "get_secret_value",
+        lambda self, secret_id: "key",
+    )
 
 
 @pytest.fixture()
@@ -33,14 +39,28 @@ def lambda_context():
 
 @pytest.fixture()
 def client_event():
-    def build(method, path, body=None, headers=None, query=None, client_id="client-1", scopes=None):
-        request_headers = {"Accept": "application/json", "Content-Type": "application/json", **(headers or {})}
+    def build(
+        method,
+        path,
+        body=None,
+        headers=None,
+        query=None,
+        client_id="client-1",
+        scopes=None,
+    ):
+        request_headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            **(headers or {}),
+        }
         return {
             "resource": path,
             "path": path,
             "httpMethod": method,
             "headers": request_headers,
-            "multiValueHeaders": {key: [value] for key, value in request_headers.items()},
+            "multiValueHeaders": {
+                key: [value] for key, value in request_headers.items()
+            },
             "queryStringParameters": query,
             "multiValueQueryStringParameters": None,
             "pathParameters": {},
@@ -103,7 +123,21 @@ def component_body():
 def version_body():
     return {
         "componentVersionDescription": "install agent",
-        "componentVersionYamlDefinition": "schemaVersion: 1\nphases: []\n",
+        "componentVersionDefinition": {
+            "schemaVersion": "1.0",
+            "phases": [
+                {
+                    "name": "build",
+                    "steps": [
+                        {
+                            "name": "InstallAgent",
+                            "action": "ExecuteBash",
+                            "inputs": {"commands": ["install-agent"]},
+                        }
+                    ],
+                }
+            ],
+        },
         "componentVersionReleaseType": "MAJOR",
         "componentVersionDependencies": [],
         "softwareVendor": "Example",
@@ -136,6 +170,8 @@ def pipeline_body():
 
 @pytest.fixture()
 def api_schema():
-    schema_path = __file__.replace("tests/conftest.py", "schema/proserve-workbench-s2s-packaging-api-schema.yaml")
+    schema_path = __file__.replace(
+        "tests/conftest.py", "schema/proserve-workbench-s2s-packaging-api-schema.yaml"
+    )
     specification, _ = read_from_filename(schema_path)
     return specification

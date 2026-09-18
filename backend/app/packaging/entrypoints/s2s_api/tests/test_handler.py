@@ -2,6 +2,8 @@ import importlib
 import json
 from unittest import mock
 
+import yaml
+
 from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 
 from app.packaging.domain.exceptions.s2s_exception import ProjectAccessDenied
@@ -42,7 +44,9 @@ def test_create_component_generates_an_internal_id_and_uses_service_actor(
 def test_create_component_version_returns_the_handler_generated_id(
     monkeypatch, mocked_dependencies, lambda_context, client_event, version_body
 ):
-    mocked_dependencies.command_bus.handle.return_value = {"componentVersionId": "vers-1"}
+    mocked_dependencies.command_bus.handle.return_value = {
+        "componentVersionId": "vers-1"
+    }
     handler = load_handler(monkeypatch, mocked_dependencies)
 
     response = handler.handler(
@@ -61,6 +65,31 @@ def test_create_component_version_returns_the_handler_generated_id(
     assert command.componentId.value == "comp-1"
     assert command.createdBy.value == "service:client-1"
     assert "componentVersionId" not in command.model_dump()
+
+
+def test_create_component_version_serializes_structured_definition(
+    monkeypatch, mocked_dependencies, lambda_context, client_event, version_body
+):
+    mocked_dependencies.command_bus.handle.return_value = {
+        "componentVersionId": "vers-1"
+    }
+    response = load_handler(monkeypatch, mocked_dependencies).handler(
+        client_event(
+            "POST",
+            "/projects/proj-1/components/comp-1/versions",
+            version_body,
+            scopes=["clients/packaging/component.write"],
+        ),
+        lambda_context,
+    )
+    command = mocked_dependencies.command_bus.handle.call_args.args[0]
+    assert response["statusCode"] == 202
+    assert (
+        yaml.safe_load(command.componentVersionYamlDefinition.value)["phases"][0][
+            "name"
+        ]
+        == "build"
+    )
 
 
 def test_component_version_requires_parent_project_membership_before_looking_up_version(
@@ -106,7 +135,9 @@ def test_component_release_requires_release_scope_before_command(
 def test_retire_component_version_uses_service_authorization(
     monkeypatch, mocked_dependencies, lambda_context, client_event
 ):
-    mocked_dependencies.command_bus.handle.return_value = {"componentVersionId": "vers-1"}
+    mocked_dependencies.command_bus.handle.return_value = {
+        "componentVersionId": "vers-1"
+    }
     handler = load_handler(monkeypatch, mocked_dependencies)
 
     response = handler.handler(
@@ -124,12 +155,20 @@ def test_retire_component_version_uses_service_authorization(
     assert command.lastUpdatedBy.value == "service:client-1"
 
 
-def test_project_denial_happens_before_component_query(monkeypatch, mocked_dependencies, lambda_context, client_event):
-    mocked_dependencies.project_access_service.require_access.side_effect = ProjectAccessDenied()
+def test_project_denial_happens_before_component_query(
+    monkeypatch, mocked_dependencies, lambda_context, client_event
+):
+    mocked_dependencies.project_access_service.require_access.side_effect = (
+        ProjectAccessDenied()
+    )
     handler = load_handler(monkeypatch, mocked_dependencies)
 
     response = handler.handler(
-        client_event("GET", "/projects/proj-1/components/comp-1", scopes=["clients/packaging/component.read"]),
+        client_event(
+            "GET",
+            "/projects/proj-1/components/comp-1",
+            scopes=["clients/packaging/component.read"],
+        ),
         lambda_context,
     )
 

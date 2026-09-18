@@ -899,6 +899,69 @@ components:
           type: "string"
       required: ["componentId","componentVersionId","componentVersionDescription","componentVersionName","softwareVendor","softwareVersion","status","createDate","createdBy","lastUpdateDate","lastUpdatedBy"]
       type: "object"
+    ComponentDefinition:
+      additionalProperties: false
+      properties:
+        name:
+          type: "string"
+          nullable: true
+        description:
+          type: "string"
+          nullable: true
+        schemaVersion:
+          type: "string"
+        constants:
+          items: {}
+          type: "array"
+          nullable: true
+        parameters:
+          items: {}
+          type: "array"
+          nullable: true
+        phases:
+          items:
+            $ref: "#/components/schemas/ComponentPhase"
+          minItems: 1
+          type: "array"
+      required: ["schemaVersion","phases"]
+      type: "object"
+    ComponentPhase:
+      additionalProperties: false
+      properties:
+        name:
+          type: "string"
+          enum: ["build","test","validate"]
+        steps:
+          items:
+            $ref: "#/components/schemas/ComponentStep"
+          minItems: 1
+          type: "array"
+      required: ["name","steps"]
+      type: "object"
+    ComponentStep:
+      additionalProperties: false
+      properties:
+        name:
+          type: "string"
+        action:
+          type: "string"
+        timeoutSeconds:
+          type: "integer"
+          default: 7200
+          nullable: true
+        onFailure:
+          type: "string"
+          enum: ["Abort","Continue","Failed"]
+          default: "Abort"
+          nullable: true
+        maxAttempts:
+          type: "integer"
+          default: 1
+          nullable: true
+        inputs:
+          nullable: true
+      required: ["name","action"]
+      type: "object"
     CreateComponentRequest:
       additionalProperties: false
       properties:
@@ -937,8 +1000,8 @@ components:
           nullable: true
         componentVersionReleaseType:
           type: "string"
-        componentVersionYamlDefinition:
-          type: "string"
+        componentVersionDefinition:
+          $ref: "#/components/schemas/ComponentDefinition"
         softwareVendor:
           type: "string"
         softwareVersion:
@@ -949,7 +1012,7 @@ components:
         notes:
           type: "string"
           nullable: true
-      required: ["componentVersionDescription","componentVersionReleaseType","componentVersionYamlDefinition","softwareVendor","softwareVersion"]
+      required: ["componentVersionDescription","componentVersionReleaseType","componentVersionDefinition","softwareVendor","softwareVersion"]
       type: "object"
     UpdateComponentVersionRequest:
       additionalProperties: false
@@ -961,8 +1024,8 @@ components:
             $ref: "#/components/schemas/ComponentVersionEntry"
           type: "array"
           nullable: true
-        componentVersionYamlDefinition:
-          type: "string"
+        componentVersionDefinition:
+          $ref: "#/components/schemas/ComponentDefinition"
         softwareVendor:
           type: "string"
         softwareVersion:
@@ -973,7 +1036,7 @@ components:
         notes:
           type: "string"
           nullable: true
-      required: ["componentVersionDescription","componentVersionYamlDefinition","softwareVendor","softwareVersion"]
+      required: ["componentVersionDescription","componentVersionDefinition","softwareVendor","softwareVersion"]
       type: "object"
     ComponentResponse:
       properties:
@@ -993,12 +1056,8 @@ components:
       properties:
         component_version:
           $ref: "#/components/schemas/ComponentVersion"
-        yaml_definition:
-          additionalProperties: true
-          type: "object"
-          nullable: true
-        yaml_definition_b64:
-          type: "string"
+        componentVersionDefinition:
+          $ref: "#/components/schemas/ComponentDefinition"
           nullable: true
       required: ["component_version"]
       type: "object"

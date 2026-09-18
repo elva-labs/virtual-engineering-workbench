@@ -45,6 +45,7 @@ def handle(
     current_time = datetime.now(timezone.utc).isoformat()
     pipeline_entity = pipeline.Pipeline(
         projectId=command.projectId.value,
+        pipelineId=command.pipelineId.value if command.pipelineId else pipeline.generate_pipeline_id(),
         buildInstanceTypes=command.buildInstanceTypes.value,
         pipelineDescription=command.pipelineDescription.value,
         pipelineName=command.pipelineName.value,

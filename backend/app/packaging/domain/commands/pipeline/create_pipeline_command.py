@@ -6,6 +6,7 @@ from app.packaging.domain.value_objects.pipeline import (
     pipeline_description_value_object,
     pipeline_name_value_object,
     pipeline_schedule_value_object,
+    pipeline_id_value_object,
 )
 from app.packaging.domain.value_objects.recipe import recipe_id_value_object
 from app.packaging.domain.value_objects.recipe_version import recipe_version_id_value_object
@@ -23,3 +24,4 @@ class CreatePipelineCommand(command_bus.Command):
     recipeVersionId: recipe_version_id_value_object.RecipeVersionIdValueObject
     createdBy: user_id_value_object.UserIdValueObject
     productId: Optional[product_id_value_object.ProductIdValueObject] = None
+    pipelineId: Optional[pipeline_id_value_object.PipelineIdValueObject] = None

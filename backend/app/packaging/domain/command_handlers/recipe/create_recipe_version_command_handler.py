@@ -280,6 +280,9 @@ def handle(
     current_time = datetime.now(timezone.utc).isoformat()
     recipe_version_entity = recipe_version.RecipeVersion(
         recipeId=command.recipeId.value,
+        recipeVersionId=(
+            command.recipeVersionId.value if command.recipeVersionId else recipe_version.generate_version_id()
+        ),
         recipeVersionName=recipe_version_name_value_object.from_str(new_recipe_version_name).value,
         parentImageUpstreamId=parent_image_upstream_id,
         configuredRecipeComponentsVersions=configured_components,

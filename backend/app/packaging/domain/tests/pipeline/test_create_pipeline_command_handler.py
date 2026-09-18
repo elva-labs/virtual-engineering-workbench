@@ -8,6 +8,7 @@ from app.packaging.domain.command_handlers.pipeline import create_pipeline_comma
 from app.packaging.domain.exceptions import domain_exception
 from app.packaging.domain.model.recipe import recipe_version
 from app.packaging.domain.tests.conftest import TEST_BUILD_INSTANCE_TYPES, TEST_DATE, TEST_PRODUCT_ID
+from app.packaging.domain.value_objects.pipeline import pipeline_id_value_object
 
 
 @freeze_time(TEST_DATE)
@@ -95,6 +96,34 @@ def test_create_pipeline_command_handler_should_create_pipeline(
     message_bus_mock.publish.assert_called_with(pipeline_creation_started_event)
     uow_mock.commit.assert_called()
     assert result == {"pipelineId": "pipe-11111111"}
+
+
+@freeze_time(TEST_DATE)
+def test_create_pipeline_uses_injected_id(
+    get_create_pipeline_command,
+    get_test_recipe_version_with_specific_version_name_and_status,
+    message_bus_mock,
+    recipe_version_query_service_mock,
+    recipe_query_service_mock,
+    mock_recipe_object,
+    pipeline_service_mock,
+    uow_mock,
+):
+    command = get_create_pipeline_command().model_copy(update={"pipelineId": pipeline_id_value_object.from_str("pipe-fixed")})
+    recipe_version_query_service_mock.get_recipe_version.return_value = get_test_recipe_version_with_specific_version_name_and_status(
+        status=recipe_version.RecipeVersionStatus.Released, version_name="1.0.0"
+    )
+    recipe_query_service_mock.get_recipe.return_value = mock_recipe_object
+    pipeline_service_mock.get_pipeline_allowed_build_instance_types.return_value = TEST_BUILD_INSTANCE_TYPES
+
+    result = create_pipeline_command_handler.handle(
+        command=command, message_bus=message_bus_mock, recipe_version_qry_srv=recipe_version_query_service_mock,
+        recipe_qry_srv=recipe_query_service_mock, pipeline_srv=pipeline_service_mock, uow=uow_mock,
+    )
+
+    saved = uow_mock.get_repository.return_value.add.call_args.args[0]
+    assert result == {"pipelineId": "pipe-fixed"}
+    assert saved.pipelineId == "pipe-fixed"
 
 
 def test_create_pipeline_command_should_raise_an_exception_if_recipe_version_is_not_found(

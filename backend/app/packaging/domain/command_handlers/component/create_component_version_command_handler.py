@@ -103,6 +103,9 @@ def handle(
     current_time = datetime.now(timezone.utc).isoformat()
     component_version_entity = component_version.ComponentVersion(
         componentId=command.componentId.value,
+        componentVersionId=(
+            command.componentVersionId.value if command.componentVersionId else component_version.generate_version_id()
+        ),
         componentVersionName=new_component_version_name,
         componentName=component_entity.componentName,
         componentVersionDescription=command.componentVersionDescription.value,

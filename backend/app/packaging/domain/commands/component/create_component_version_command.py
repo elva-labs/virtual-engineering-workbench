@@ -10,6 +10,7 @@ from app.packaging.domain.value_objects.component_version import (
     component_version_description_value_object,
     component_version_release_type_value_object,
     component_version_yaml_definition_value_object,
+    component_version_id_value_object,
 )
 from app.packaging.domain.value_objects.shared import project_id_value_object, user_id_value_object
 from app.shared.adapters.message_bus import command_bus
@@ -31,3 +32,4 @@ class CreateComponentVersionCommand(command_bus.Command):
     )
     notes: Optional[component_software_version_notes_value_object.ComponentSoftwareVersionNotesValueObject] = None
     createdBy: user_id_value_object.UserIdValueObject
+    componentVersionId: Optional[component_version_id_value_object.ComponentVersionIdValueObject] = None

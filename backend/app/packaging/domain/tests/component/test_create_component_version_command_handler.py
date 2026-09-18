@@ -527,6 +527,34 @@ def test_create_component_version_command_handler_should_create_a_component_when
     )
 
 
+def test_create_component_version_uses_injected_id(
+    create_component_version_command_mock,
+    component_query_service_mock,
+    component_version_query_service_mock,
+    get_test_component,
+    uow_mock,
+    message_bus_mock,
+    get_test_component_yaml_definition,
+):
+    command = create_component_version_command_mock(get_test_component_yaml_definition).model_copy(
+        update={"componentVersionId": component_version_id_value_object.from_str("vers-fixed")}
+    )
+    component_query_service_mock.get_component.return_value = get_test_component
+    component_version_query_service_mock.get_latest_component_version_name.return_value = None
+    component_version_repo_mock = mock.create_autospec(spec=unit_of_work.GenericRepository)
+    uow_mock.get_repository.return_value = component_version_repo_mock
+
+    result = create_component_version_command_handler.handle(
+        command=command, uow=uow_mock, message_bus=message_bus_mock,
+        component_qry_srv=component_query_service_mock,
+        component_version_qry_srv=component_version_query_service_mock,
+    )
+
+    saved = component_version_repo_mock.add.call_args.args[0]
+    assert result == {"componentVersionId": "vers-fixed"}
+    assert saved.componentVersionId == "vers-fixed"
+
+
 @pytest.mark.parametrize(
     "status,fetched_release_name,release_type,expected_version_name",
     (

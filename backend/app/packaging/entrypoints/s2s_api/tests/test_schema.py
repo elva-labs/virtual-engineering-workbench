@@ -40,6 +40,18 @@ def test_schema_constrains_component_definition_json_shapes(api_schema):
     )
 
 
+def test_schema_separates_recipe_component_views(api_schema):
+    schemas = api_schema["components"]["schemas"]
+    create = schemas["CreateRecipeVersionRequest"]
+    version = schemas["RecipeVersion"]
+    assert "configuredComponentsVersions" in create["required"]
+    assert "recipeComponentsVersions" not in create["properties"]
+    assert set(version["properties"]) >= {
+        "configuredComponentsVersions",
+        "effectiveComponentsVersions",
+    }
+
+
 def test_method_responses_use_explicit_status_codes_for_api_gateway(api_schema):
     for path, methods in api_schema["paths"].items():
         for method, operation in methods.items():

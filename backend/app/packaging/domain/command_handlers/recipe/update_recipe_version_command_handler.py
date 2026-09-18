@@ -227,6 +227,10 @@ def handle(
     component_qry_srv: component_query_service.ComponentQueryService,
 ):
 
+    configured_components = [
+        entry.model_copy(deep=True) for entry in command.recipeComponentsVersions.value
+    ]
+
     recipe_version_entity = __get_recipe_version_entity(command, recipe_version_query_service)
     recipe_version_name = recipe_version_entity.recipeVersionName
 
@@ -279,6 +283,10 @@ def handle(
                 recipeVersionId=command.recipeVersionId.value,
             ),
             parentImageUpstreamId=parent_image_upstream_id,
+            configuredRecipeComponentsVersions=[
+                component_version_entry.ComponentVersionEntry.model_validate(component_version).model_dump()
+                for component_version in configured_components
+            ],
             recipeComponentsVersions=[
                 component_version_entry.ComponentVersionEntry.model_validate(component_version).model_dump()
                 for component_version in recipe_component_versions

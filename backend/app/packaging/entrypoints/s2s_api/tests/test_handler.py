@@ -9,6 +9,7 @@ import yaml
 from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 
 from app.packaging.domain.exceptions.s2s_exception import ProjectAccessDenied
+from app.packaging.entrypoints.s2s_api.routers import recipes
 
 
 def load_handler(monkeypatch, dependencies):
@@ -41,6 +42,36 @@ def test_create_component_generates_an_internal_id_and_uses_service_actor(
     command = mocked_dependencies.command_bus.handle.call_args.args[0]
     assert command.componentId.value == component_id
     assert command.createdBy.value == "service:client-1"
+
+
+def test_recipe_version_model_omits_unavailable_legacy_configured_list():
+    version = mock.Mock()
+    version.model_dump.return_value = {
+        "recipeId": "reci-1",
+        "recipeVersionId": "vers-1",
+        "recipeComponentsVersions": [
+            {
+                "componentId": "comp-1",
+                "componentName": "agent",
+                "componentVersionId": "vers-1",
+                "componentVersionName": "1.0.0",
+                "componentVersionType": "MAIN",
+                "order": 1,
+            }
+        ],
+        "configuredRecipeComponentsVersions": None,
+        "recipeVersionDescription": "build",
+        "recipeVersionName": "1.0.0-rc.1",
+        "recipeVersionVolumeSize": "8",
+        "status": "CREATED",
+        "createDate": "2025-01-01",
+        "createdBy": "T1",
+        "lastUpdateDate": "2025-01-01",
+        "lastUpdatedBy": "T1",
+    }
+    result = recipes.recipe_version_model(version).model_dump(exclude_none=True)
+    assert "configuredComponentsVersions" not in result
+    assert result["effectiveComponentsVersions"]
 
 
 def test_create_component_version_returns_the_handler_generated_id(

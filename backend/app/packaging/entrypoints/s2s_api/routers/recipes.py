@@ -37,6 +37,15 @@ WRITE_SCOPE = "clients/packaging/recipe.write"
 RELEASE_SCOPE = "clients/packaging/recipe.release"
 
 
+def recipe_version_model(version) -> api_model.RecipeVersion:
+    payload = version.model_dump()
+    payload["effectiveComponentsVersions"] = payload.pop("recipeComponentsVersions")
+    configured = payload.pop("configuredRecipeComponentsVersions", None)
+    if configured is not None:
+        payload["configuredComponentsVersions"] = configured
+    return api_model.RecipeVersion.model_validate(payload)
+
+
 def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa: C901
     router = api_gateway.Router()
 
@@ -128,7 +137,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
                 projectId=project_id_value_object.from_str(project_id),
                 recipeId=recipe_id_value_object.from_str(recipe_id),
                 recipeComponentsVersions=recipe_version_components_versions_value_object.from_list(
-                    request.recipeComponentsVersions
+                    request.configuredComponentsVersions
                 ),
                 recipeVersionDescription=recipe_version_description_value_object.from_str(
                     request.recipeVersionDescription
@@ -156,7 +165,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             recipe_id_value_object.from_str(recipe_id)
         )
         return api_model.RecipeVersionPage(
-            recipe_versions=[api_model.RecipeVersion.model_validate(version.model_dump()) for version in versions]
+            recipe_versions=[recipe_version_model(version) for version in versions]
         )
 
     @tracer.capture_method
@@ -173,7 +182,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             recipe_version_id_value_object.from_str(version_id),
         )
         return api_model.RecipeVersionResponse(
-            recipe_version=api_model.RecipeVersion.model_validate(version.model_dump())
+            recipe_version=recipe_version_model(version)
         )
 
     @tracer.capture_method
@@ -196,7 +205,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
                 recipeId=recipe_id_value_object.from_str(recipe_id),
                 recipeVersionId=recipe_version_id_value_object.from_str(version_id),
                 recipeComponentsVersions=recipe_version_components_versions_value_object.from_list(
-                    request.recipeComponentsVersions
+                    request.configuredComponentsVersions
                 ),
                 recipeVersionDescription=recipe_version_description_value_object.from_str(
                     request.recipeVersionDescription

@@ -1145,11 +1145,15 @@ components:
         lastUpdatedBy: {type: string}
     RecipeVersion:
       type: object
-      required: [recipeId, recipeVersionId, recipeComponentsVersions, recipeVersionDescription, recipeVersionName, recipeVersionVolumeSize, status, createDate, createdBy, lastUpdateDate, lastUpdatedBy]
+      required: [recipeId, recipeVersionId, effectiveComponentsVersions, recipeVersionDescription, recipeVersionName, recipeVersionVolumeSize, status, createDate, createdBy, lastUpdateDate, lastUpdatedBy]
       properties:
         recipeId: {type: string}
         recipeVersionId: {type: string}
-        recipeComponentsVersions:
+        configuredComponentsVersions:
+          type: array
+          items: {$ref: '#/components/schemas/RecipeComponentVersion'}
+          nullable: true
+        effectiveComponentsVersions:
           type: array
           items: {$ref: '#/components/schemas/RecipeComponentVersion'}
         recipeVersionDescription: {type: string}
@@ -1177,9 +1181,9 @@ components:
     CreateRecipeVersionRequest:
       type: object
       additionalProperties: false
-      required: [recipeComponentsVersions, recipeVersionDescription, recipeVersionReleaseType, recipeVersionVolumeSize]
+      required: [configuredComponentsVersions, recipeVersionDescription, recipeVersionReleaseType, recipeVersionVolumeSize]
       properties:
-        recipeComponentsVersions:
+        configuredComponentsVersions:
           type: array
           items: {$ref: '#/components/schemas/RecipeComponentVersion'}
         recipeVersionDescription: {type: string}
@@ -1191,9 +1195,9 @@ components:
     UpdateRecipeVersionRequest:
       type: object
       additionalProperties: false
-      required: [recipeComponentsVersions, recipeVersionDescription, recipeVersionVolumeSize]
+      required: [configuredComponentsVersions, recipeVersionDescription, recipeVersionVolumeSize]
       properties:
-        recipeComponentsVersions:
+        configuredComponentsVersions:
           type: array
           items: {$ref: '#/components/schemas/RecipeComponentVersion'}
         recipeVersionDescription: {type: string}

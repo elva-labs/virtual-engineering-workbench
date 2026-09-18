@@ -21,6 +21,71 @@ from app.shared.adapters.message_bus import message_bus
 from app.shared.adapters.unit_of_work_v2 import unit_of_work
 
 
+def test_update_persists_configured_components_before_mandatory_injection(
+    recipe_version_query_service_mock,
+    update_recipe_version_command_mock,
+    component_version_query_service_mock,
+    component_query_service_mock,
+    recipe_query_service_mock,
+    parameter_service_mock,
+    mandatory_components_list_query_service_mock,
+    mock_system_configuration_mapping,
+    mock_recipe_object,
+    get_test_ami_id,
+    get_test_component_version_with_specific_status,
+    get_test_mandatory_components_list_with_specific_mandatory_components_versions,
+    get_test_recipe_version_with_specific_version_name,
+):
+    message_bus_mock = mock.create_autospec(spec=message_bus.MessageBus)
+    recipe_version_repo_mock = mock.create_autospec(spec=unit_of_work.GenericRepository)
+    uow_mock = mock.create_autospec(spec=unit_of_work.UnitOfWork)
+    uow_mock.get_repository.return_value = recipe_version_repo_mock
+    mandatory_components_list_query_service_mock.get_mandatory_components_list.return_value = (
+        get_test_mandatory_components_list_with_specific_mandatory_components_versions()
+    )
+    recipe_version_query_service_mock.get_recipe_version.return_value = get_test_recipe_version_with_specific_version_name(
+        "1.0.0-rc.1"
+    )
+    recipe_query_service_mock.get_recipe.return_value = mock_recipe_object
+    parameter_service_mock.get_parameter_value.return_value = get_test_ami_id
+    component_version_entities = []
+    for entry in update_recipe_version_command_mock.recipeComponentsVersions.value:
+        entity = get_test_component_version_with_specific_status(
+            status=component_version.ComponentVersionStatus.Released
+        )
+        entity.componentId = entry.componentId
+        entity.componentVersionId = entry.componentVersionId
+        component_version_entities.append(entity)
+    component_version_query_service_mock.get_component_version.side_effect = component_version_entities
+
+    configured_orders = [entry.order for entry in update_recipe_version_command_mock.recipeComponentsVersions.value]
+    update_recipe_version_command_handler.handle(
+        command=update_recipe_version_command_mock,
+        uow=uow_mock,
+        message_bus=message_bus_mock,
+        component_version_qry_srv=component_version_query_service_mock,
+        recipe_version_query_service=recipe_version_query_service_mock,
+        recipe_qry_service=recipe_query_service_mock,
+        parameter_qry_srv=parameter_service_mock,
+        mandatory_components_list_qry_srv=mandatory_components_list_query_service_mock,
+        system_configuration_mapping=mock_system_configuration_mapping,
+        component_qry_srv=component_query_service_mock,
+    )
+
+    update_attributes = recipe_version_repo_mock.update_attributes.call_args.kwargs
+    configured_ids = [entry.componentVersionId for entry in update_recipe_version_command_mock.recipeComponentsVersions.value]
+    assert [entry["componentVersionId"] for entry in update_attributes["configuredRecipeComponentsVersions"]] == configured_ids
+    assert [entry["order"] for entry in update_attributes["configuredRecipeComponentsVersions"]] == configured_orders
+    assert len(update_attributes["recipeComponentsVersions"]) >= len(update_attributes["configuredRecipeComponentsVersions"])
+
+
+def test_recipe_version_historical_item_without_configured_components_is_none(mock_recipe_version_object):
+    payload = mock_recipe_version_object.model_dump()
+    payload.pop("configuredRecipeComponentsVersions", None)
+    historical = recipe_version.RecipeVersion.model_validate(payload)
+    assert historical.configuredRecipeComponentsVersions is None
+
+
 @pytest.mark.parametrize(
     "fetched_release_name,expected_version_name",
     (

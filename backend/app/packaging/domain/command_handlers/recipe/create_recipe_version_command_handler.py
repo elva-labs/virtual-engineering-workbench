@@ -229,6 +229,10 @@ def handle(
     system_configuration_mapping: dict,
     component_qry_srv: component_query_service.ComponentQueryService,
 ):
+    configured_components = [
+        entry.model_copy(deep=True) for entry in command.recipeComponentsVersions.value
+    ]
+
     recipe_entity = __get_recipe_entity(
         recipe_qry_srv=recipe_qry_srv,
         project_id=command.projectId.value,
@@ -278,6 +282,7 @@ def handle(
         recipeId=command.recipeId.value,
         recipeVersionName=recipe_version_name_value_object.from_str(new_recipe_version_name).value,
         parentImageUpstreamId=parent_image_upstream_id,
+        configuredRecipeComponentsVersions=configured_components,
         recipeComponentsVersions=recipe_version_components_versions_value_object.from_list(
             recipe_component_versions
         ).value,

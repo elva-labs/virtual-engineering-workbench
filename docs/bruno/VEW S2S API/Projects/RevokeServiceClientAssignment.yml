@@ -1,0 +1,65 @@
+info:
+  name: RevokeServiceClientAssignment
+  type: http
+  seq: 1
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/projects/:projectId/clients/:clientId"
+  headers:
+    - name: Authorization
+      value: "{{apiKey}}"
+  params:
+    - name: projectId
+      value: ""
+      type: path
+    - name: clientId
+      value: ""
+      type: path
+  auth:
+    type: apikey
+    key: Authorization
+    value: "{{apiKey}}"
+    placement: header
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 200 Response
+    description: 200 response
+    request:
+      url: "{{baseUrl}}/projects/:projectId/clients/:clientId"
+      method: DELETE
+      headers:
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+        - name: clientId
+          value: ""
+          type: path
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "assignment": {
+              "clientId": "",
+              "projectId": "",
+              "status": "ACTIVE"
+            }
+          }
+
+docs: Revoke a service-client project assignment

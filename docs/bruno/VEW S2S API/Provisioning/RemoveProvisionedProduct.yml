@@ -1,0 +1,64 @@
+info:
+  name: RemoveProvisionedProduct
+  type: http
+  seq: 6
+  tags:
+    - ALL
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/projects/:projectId/products/provisioned/:provisionedProductId/remove"
+  headers:
+    - name: Authorization
+      value: ""
+    - name: Authorization
+      value: "{{apiKey}}"
+  params:
+    - name: projectId
+      value: ""
+      type: path
+    - name: provisionedProductId
+      value: ""
+      type: path
+  auth:
+    type: apikey
+    key: Authorization
+    value: "{{apiKey}}"
+    placement: header
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 200 Response
+    description: 200 response
+    request:
+      url: "{{baseUrl}}/projects/:projectId/products/provisioned/:provisionedProductId/remove"
+      method: PUT
+      headers:
+        - name: Authorization
+          value: ""
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+        - name: provisionedProductId
+          value: ""
+          type: path
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: "{}"
+
+docs: Remove provisioned product

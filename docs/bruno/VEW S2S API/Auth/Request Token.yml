@@ -1,0 +1,46 @@
+info:
+  name: Request Token
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: https://{{cognitoDomain}}/oauth2/token
+  body:
+    type: form-urlencoded
+    data:
+      - name: grant_type
+        value: client_credentials
+      - name: scope
+        value: clients/packaging/component.read clients/packaging/component.write clients/packaging/component.release clients/projects/program.read
+        disabled: true
+      - name: scope
+        value: clients/projects/program.read
+        disabled: true
+      - name: scope
+        value: clients/projects/client_assignment.write
+        disabled: true
+  auth:
+    type: basic
+    username: "{{clientId}}"
+    password: "{{clientSecret}}"
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        const body = res.getBody();
+
+        if (res.getStatus() === 200 && body.access_token) {
+          bru.setVar("apiKey", "Bearer " + body.access_token);
+        } else {
+          bru.deleteVar("apiKey");
+          throw new Error("Token request failed");
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

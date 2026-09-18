@@ -1,0 +1,83 @@
+info:
+  name: GetAvailableProducts
+  type: http
+  seq: 1
+  tags:
+    - ALL
+
+http:
+  method: GET
+  url: "{{baseUrl}}/projects/:projectId/products/available"
+  params:
+    - name: projectId
+      value: ""
+      type: path
+    - name: productType
+      value: ""
+      type: query
+    - name: filter
+      value: "[]"
+      type: query
+      disabled: true
+  auth:
+    type: apikey
+    key: Authorization
+    value: "{{apiKey}}"
+    placement: header
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 200 Response
+    description: 200 response
+    request:
+      url: "{{baseUrl}}/projects/:projectId/products/available"
+      method: GET
+      headers:
+        - name: Authorization
+          value: ""
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+        - name: productType
+          value: ""
+          type: query
+        - name: filter
+          value: "[]"
+          type: query
+          disabled: true
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "availableProducts": [
+              {
+                "productId": "",
+                "productName": "",
+                "productType": "",
+                "productDescription": "",
+                "totalReportedTimes": 0,
+                "averageProvisioningTime": 0,
+                "availableStages": [],
+                "availableRegions": [],
+                "availableTools": [],
+                "availableOSVersions": []
+              }
+            ]
+          }
+
+docs: Get available products

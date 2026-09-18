@@ -1,0 +1,86 @@
+info:
+  name: GetServiceClientAssignment
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{baseUrl}}/projects/:projectId/clients/:clientId"
+  headers:
+    - name: Authorization
+      value: "{{apiKey}}"
+  params:
+    - name: projectId
+      value: ""
+      type: path
+    - name: clientId
+      value: ""
+      type: path
+  auth:
+    type: apikey
+    key: Authorization
+    value: "{{apiKey}}"
+    placement: header
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 200 Response
+    description: 200 response
+    request:
+      url: "{{baseUrl}}/projects/:projectId/clients/:clientId"
+      method: GET
+      headers:
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+        - name: clientId
+          value: ""
+          type: path
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "assignment": {
+              "clientId": "",
+              "projectId": "",
+              "status": "ACTIVE"
+            }
+          }
+  - name: 404 Response
+    description: Assignment not found
+    request:
+      url: "{{baseUrl}}/projects/:projectId/clients/:clientId"
+      method: GET
+      headers:
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+        - name: clientId
+          value: ""
+          type: path
+    response:
+      status: 404
+      statusText: Not Found
+      body:
+        type: text
+        data: ""
+
+docs: Get a service-client project assignment

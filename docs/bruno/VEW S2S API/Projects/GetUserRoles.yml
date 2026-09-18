@@ -1,0 +1,65 @@
+info:
+  name: GetUserRoles
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{baseUrl}}/projects/:projectId/users/:userId"
+  headers:
+    - name: Authorization
+      value: ""
+    - name: Authorization
+      value: "{{apiKey}}"
+  params:
+    - name: projectId
+      value: ""
+      type: path
+    - name: userId
+      value: ""
+      type: path
+  auth:
+    type: apikey
+    key: Authorization
+    value: "{{apiKey}}"
+    placement: header
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 200 Response
+    description: 200 response
+    request:
+      url: "{{baseUrl}}/projects/:projectId/users/:userId"
+      method: GET
+      headers:
+        - name: Authorization
+          value: ""
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+        - name: userId
+          value: ""
+          type: path
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "roles": []
+          }
+
+docs: Get all roles associated to a user in a project

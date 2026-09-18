@@ -1,0 +1,70 @@
+info:
+  name: EnrolUser
+  type: http
+  seq: 1
+  tags:
+    - ALL
+
+http:
+  method: POST
+  url: "{{baseUrl}}/projects/:projectId/enrolments"
+  headers:
+    - name: Authorization
+      value: "{{apiKey}}"
+  params:
+    - name: projectId
+      value: ""
+      type: path
+  body:
+    type: json
+    data: |-
+      {
+        "userId": "",
+        "userEmail": "",
+        "approverId": ""
+      }
+  auth:
+    type: apikey
+    key: Authorization
+    value: "{{apiKey}}"
+    placement: header
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 201 Response
+    description: 201 response
+    request:
+      url: "{{baseUrl}}/projects/:projectId/enrolments"
+      method: POST
+      headers:
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+      body:
+        type: json
+        data: |-
+          {
+            "userId": "",
+            "userEmail": "",
+            "approverId": ""
+          }
+    response:
+      status: 201
+      statusText: Created
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: "{}"
+
+docs: Request to be enrolled to a program

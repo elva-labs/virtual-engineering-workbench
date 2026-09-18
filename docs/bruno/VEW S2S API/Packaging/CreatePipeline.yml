@@ -1,0 +1,119 @@
+info:
+  name: CreatePipeline
+  type: http
+  seq: 22
+  tags:
+    - ALL
+
+http:
+  method: POST
+  url: "{{baseUrl}}/projects/:projectId/pipelines"
+  headers:
+    - name: Authorization
+      value: "{{apiKey}}"
+  params:
+    - name: projectId
+      value: ""
+      type: path
+  body:
+    type: json
+    data: |-
+      {
+        "buildInstanceTypes": [],
+        "pipelineDescription": "",
+        "pipelineName": "",
+        "pipelineSchedule": "",
+        "recipeId": "",
+        "recipeVersionId": "",
+        "productId": ""
+      }
+  auth:
+    type: apikey
+    key: Authorization
+    value: "{{apiKey}}"
+    placement: header
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 202 Response
+    description: Accepted pipeline action.
+    request:
+      url: "{{baseUrl}}/projects/:projectId/pipelines"
+      method: POST
+      headers:
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+      body:
+        type: json
+        data: |-
+          {
+            "buildInstanceTypes": [],
+            "pipelineDescription": "",
+            "pipelineName": "",
+            "pipelineSchedule": "",
+            "recipeId": "",
+            "recipeVersionId": "",
+            "productId": ""
+          }
+    response:
+      status: 202
+      statusText: Accepted
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "pipelineId": ""
+          }
+  - name: default Response
+    description: RFC problem response.
+    request:
+      url: "{{baseUrl}}/projects/:projectId/pipelines"
+      method: POST
+      headers:
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+      body:
+        type: json
+        data: |-
+          {
+            "buildInstanceTypes": [],
+            "pipelineDescription": "",
+            "pipelineName": "",
+            "pipelineSchedule": "",
+            "recipeId": "",
+            "recipeVersionId": "",
+            "productId": ""
+          }
+    response:
+      headers:
+        - name: Content-Type
+          value: application/problem+json
+      body:
+        type: json
+        data: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "detail": "",
+            "code": "",
+            "requestId": "",
+            "retryable": false
+          }

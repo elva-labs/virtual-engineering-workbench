@@ -1,0 +1,26 @@
+opencollection: 1.0.0
+
+info:
+  name: Virtual Engineering Workbench
+  version: "1"
+config:
+  proxy:
+    inherit: true
+    config:
+      protocol: http
+      hostname: ""
+      port: ""
+      auth:
+        username: ""
+        password: ""
+      bypassProxy: ""
+
+docs:
+  content: Project-scoped component, recipe, and pipeline publishing POC using internal IDs.
+  type: text/markdown
+bundled: false
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git

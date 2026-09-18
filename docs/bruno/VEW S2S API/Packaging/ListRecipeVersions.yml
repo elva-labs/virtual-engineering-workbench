@@ -1,0 +1,116 @@
+info:
+  name: ListRecipeVersions
+  type: http
+  seq: 17
+  tags:
+    - ALL
+
+http:
+  method: GET
+  url: "{{baseUrl}}/projects/:projectId/recipes/:recipeId/versions"
+  headers:
+    - name: Authorization
+      value: "{{apiKey}}"
+  params:
+    - name: projectId
+      value: ""
+      type: path
+    - name: recipeId
+      value: ""
+      type: path
+  auth:
+    type: apikey
+    key: Authorization
+    value: "{{apiKey}}"
+    placement: header
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 200 Response
+    description: Recipe versions.
+    request:
+      url: "{{baseUrl}}/projects/:projectId/recipes/:recipeId/versions"
+      method: GET
+      headers:
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+        - name: recipeId
+          value: ""
+          type: path
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "recipe_versions": [
+              {
+                "recipeId": "",
+                "recipeVersionId": "",
+                "recipeComponentsVersions": [
+                  {
+                    "componentId": "",
+                    "componentName": "",
+                    "componentVersionId": "",
+                    "componentVersionName": "",
+                    "componentVersionType": "",
+                    "order": 0
+                  }
+                ],
+                "recipeVersionDescription": "",
+                "recipeVersionName": "",
+                "recipeVersionVolumeSize": "",
+                "recipeVersionIntegrations": [],
+                "status": "",
+                "createDate": "",
+                "createdBy": "",
+                "lastUpdateDate": "",
+                "lastUpdatedBy": ""
+              }
+            ]
+          }
+  - name: default Response
+    description: RFC problem response.
+    request:
+      url: "{{baseUrl}}/projects/:projectId/recipes/:recipeId/versions"
+      method: GET
+      headers:
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+        - name: recipeId
+          value: ""
+          type: path
+    response:
+      headers:
+        - name: Content-Type
+          value: application/problem+json
+      body:
+        type: json
+        data: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "detail": "",
+            "code": "",
+            "requestId": "",
+            "retryable": false
+          }

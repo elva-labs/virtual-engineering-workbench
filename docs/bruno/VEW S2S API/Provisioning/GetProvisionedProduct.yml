@@ -1,0 +1,181 @@
+info:
+  name: GetProvisionedProduct
+  type: http
+  seq: 5
+  tags:
+    - ALL
+
+http:
+  method: GET
+  url: "{{baseUrl}}/projects/:projectId/products/provisioned/:provisionedProductId"
+  headers:
+    - name: Authorization
+      value: ""
+    - name: Authorization
+      value: "{{apiKey}}"
+  params:
+    - name: projectId
+      value: ""
+      type: path
+    - name: provisionedProductId
+      value: ""
+      type: path
+  auth:
+    type: apikey
+    key: Authorization
+    value: "{{apiKey}}"
+    placement: header
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 200 Response
+    description: 200 response
+    request:
+      url: "{{baseUrl}}/projects/:projectId/products/provisioned/:provisionedProductId"
+      method: GET
+      headers:
+        - name: Authorization
+          value: ""
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+        - name: provisionedProductId
+          value: ""
+          type: path
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "provisionedProduct": {
+              "projectId": "",
+              "provisionedProductId": "",
+              "provisionedProductName": "",
+              "provisionedProductType": "",
+              "userId": "",
+              "status": "",
+              "statusReason": "",
+              "productId": "",
+              "productName": "",
+              "productDescription": "",
+              "versionId": "",
+              "versionName": "",
+              "versionDescription": "",
+              "stage": "",
+              "region": "",
+              "provisioningParameters": [
+                {
+                  "key": "",
+                  "value": ""
+                }
+              ],
+              "outputs": [
+                {
+                  "outputKey": "",
+                  "outputValue": "",
+                  "description": "",
+                  "outputType": ""
+                }
+              ],
+              "instanceId": "",
+              "privateIp": "",
+              "publicIp": "",
+              "sshEnabled": false,
+              "usernamePasswordLoginEnabled": false,
+              "upgradeAvailable": false,
+              "isVersionRetired": false,
+              "upgradeSchedulerGuidId": "",
+              "versionRetiredDate": "",
+              "newVersionName": "",
+              "newVersionId": "",
+              "createDate": "",
+              "lastUpdateDate": "",
+              "instanceRecommendationReason": "",
+              "recommendedInstanceType": "",
+              "additionalConfigurations": [
+                {
+                  "type": "",
+                  "parameters": [
+                    {
+                      "key": "",
+                      "value": ""
+                    }
+                  ]
+                }
+              ],
+              "experimental": false,
+              "componentVersionDetails": [
+                {
+                  "componentName": "",
+                  "componentVersionType": "",
+                  "softwareVendor": "",
+                  "softwareVersion": "",
+                  "licenseDashboard": "",
+                  "notes": ""
+                }
+              ],
+              "osVersion": "",
+              "awsAccountId": "",
+              "containerClusterName": "",
+              "containerName": "",
+              "containerTaskArn": "",
+              "provisionedCompoundProductId": ""
+            },
+            "versionMetadata": {
+              "versionId": "",
+              "versionName": "",
+              "versionDescription": "",
+              "isRecommendedVersion": false,
+              "parameters": [
+                {
+                  "parameterKey": "",
+                  "defaultValue": "",
+                  "description": "",
+                  "isNoEcho": false,
+                  "parameterType": "",
+                  "parameterConstraints": {
+                    "allowedPattern": "",
+                    "allowedValues": [],
+                    "constraintDescription": "",
+                    "maxLength": "",
+                    "maxValue": "",
+                    "minLength": "",
+                    "minValue": ""
+                  },
+                  "parameterMetaData": {
+                    "label": "",
+                    "optionLabels": {},
+                    "optionWarnings": {}
+                  }
+                }
+              ],
+              "metadata": {},
+              "componentVersionDetails": [
+                {
+                  "componentName": "",
+                  "componentVersionType": "",
+                  "softwareVendor": "",
+                  "softwareVersion": "",
+                  "licenseDashboard": "",
+                  "notes": ""
+                }
+              ],
+              "osVersion": ""
+            }
+          }
+
+docs: Get provisioned product

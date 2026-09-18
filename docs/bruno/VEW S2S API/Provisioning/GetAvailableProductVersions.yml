@@ -1,0 +1,121 @@
+info:
+  name: GetAvailableProductVersions
+  type: http
+  seq: 2
+  tags:
+    - ALL
+
+http:
+  method: GET
+  url: "{{baseUrl}}/projects/:projectId/products/:productId/versions"
+  headers:
+    - name: Authorization
+      value: ""
+    - name: Authorization
+      value: "{{apiKey}}"
+  params:
+    - name: projectId
+      value: ""
+      type: path
+    - name: productId
+      value: ""
+      type: path
+    - name: region
+      value: ""
+      type: query
+    - name: stage
+      value: ""
+      type: query
+  auth:
+    type: apikey
+    key: Authorization
+    value: "{{apiKey}}"
+    placement: header
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 200 Response
+    description: 200 response
+    request:
+      url: "{{baseUrl}}/projects/:projectId/products/:productId/versions"
+      method: GET
+      headers:
+        - name: Authorization
+          value: ""
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+        - name: productId
+          value: ""
+          type: path
+        - name: region
+          value: ""
+          type: query
+        - name: stage
+          value: ""
+          type: query
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "availableProductVersions": [
+              {
+                "versionId": "",
+                "versionName": "",
+                "versionDescription": "",
+                "isRecommendedVersion": false,
+                "parameters": [
+                  {
+                    "parameterKey": "",
+                    "defaultValue": "",
+                    "description": "",
+                    "isNoEcho": false,
+                    "parameterType": "",
+                    "parameterConstraints": {
+                      "allowedPattern": "",
+                      "allowedValues": [],
+                      "constraintDescription": "",
+                      "maxLength": "",
+                      "maxValue": "",
+                      "minLength": "",
+                      "minValue": ""
+                    },
+                    "parameterMetaData": {
+                      "label": "",
+                      "optionLabels": {},
+                      "optionWarnings": {}
+                    }
+                  }
+                ],
+                "metadata": {},
+                "componentVersionDetails": [
+                  {
+                    "componentName": "",
+                    "componentVersionType": "",
+                    "softwareVendor": "",
+                    "softwareVersion": "",
+                    "licenseDashboard": "",
+                    "notes": ""
+                  }
+                ],
+                "osVersion": ""
+              }
+            ]
+          }
+
+docs: Get available product versions by stage and region

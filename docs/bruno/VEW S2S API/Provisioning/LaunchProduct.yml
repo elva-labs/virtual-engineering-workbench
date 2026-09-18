@@ -1,0 +1,115 @@
+info:
+  name: LaunchProduct
+  type: http
+  seq: 3
+  tags:
+    - ALL
+
+http:
+  method: POST
+  url: "{{baseUrl}}/projects/:projectId/products/provisioned"
+  headers:
+    - name: Authorization
+      value: ""
+    - name: Authorization
+      value: "{{apiKey}}"
+  params:
+    - name: projectId
+      value: ""
+      type: path
+  body:
+    type: json
+    data: |-
+      {
+        "productId": "",
+        "versionId": "",
+        "provisioningParameters": [
+          {
+            "key": "",
+            "value": ""
+          }
+        ],
+        "additionalConfigurations": [
+          {
+            "type": "",
+            "parameters": [
+              {
+                "key": "",
+                "value": ""
+              }
+            ]
+          }
+        ],
+        "stage": "",
+        "region": "",
+        "userName": ""
+      }
+  auth:
+    type: apikey
+    key: Authorization
+    value: "{{apiKey}}"
+    placement: header
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: 201 Response
+    description: 201 response
+    request:
+      url: "{{baseUrl}}/projects/:projectId/products/provisioned"
+      method: POST
+      headers:
+        - name: Authorization
+          value: ""
+        - name: Authorization
+          value: "{{apiKey}}"
+      params:
+        - name: projectId
+          value: ""
+          type: path
+      body:
+        type: json
+        data: |-
+          {
+            "productId": "",
+            "versionId": "",
+            "provisioningParameters": [
+              {
+                "key": "",
+                "value": ""
+              }
+            ],
+            "additionalConfigurations": [
+              {
+                "type": "",
+                "parameters": [
+                  {
+                    "key": "",
+                    "value": ""
+                  }
+                ]
+              }
+            ],
+            "stage": "",
+            "region": "",
+            "userName": ""
+          }
+    response:
+      status: 201
+      statusText: Created
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "provisionedProductId": ""
+          }
+
+docs: Launch a specific product

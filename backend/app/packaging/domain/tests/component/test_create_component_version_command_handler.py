@@ -545,7 +545,9 @@ def test_create_component_version_uses_injected_id(
     uow_mock.get_repository.return_value = component_version_repo_mock
 
     result = create_component_version_command_handler.handle(
-        command=command, uow=uow_mock, message_bus=message_bus_mock,
+        command=command,
+        uow=uow_mock,
+        message_bus=message_bus_mock,
         component_qry_srv=component_query_service_mock,
         component_version_qry_srv=component_version_query_service_mock,
     )

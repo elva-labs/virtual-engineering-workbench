@@ -8,7 +8,7 @@ from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities import typing
 
 from app.packaging.domain.exceptions import domain_exception
-from app.packaging.domain.exceptions.s2s_exception import S2SException
+from app.packaging.domain.exceptions.s2s_exception import InvalidComponentDefinition, S2SException
 from app.packaging.entrypoints.s2s_api import bootstrapper, config, problem_details
 from app.packaging.entrypoints.s2s_api.routers import common, component_versions, components, pipelines, recipes
 from app.shared.logging.helpers import clear_auth_headers
@@ -43,6 +43,14 @@ def handle_validation_error(error: RequestValidationError):
             name="StructuredDefinitionValidationFailures",
             unit=MetricUnit.Count,
             value=1,
+        )
+        problem = InvalidComponentDefinition()
+        return problem_details.api_response(
+            HTTPStatus.UNPROCESSABLE_ENTITY,
+            detail=problem.detail,
+            code=problem.code,
+            request_id=request_id(app.current_event.raw_event),
+            retryable=problem.retryable,
         )
     return problem_details.api_response(
         HTTPStatus.BAD_REQUEST,
@@ -85,7 +93,7 @@ def add_cors(response: dict, event: dict) -> dict:
     return response
 
 
-@tracer.capture_lambda_handler  # type: ignore
+@tracer.capture_lambda_handler(capture_response=False, capture_error=False)  # type: ignore
 @logger.inject_lambda_context  # type: ignore
 @metric_handlers.report_invocation_metrics(
     dimensions={MetricDimensionNames.ByAPI: "PackagingS2SAPI"},

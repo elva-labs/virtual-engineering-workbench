@@ -51,6 +51,15 @@ class StoredDefinitionInvalid(S2SException):
         )
 
 
+class InvalidComponentDefinition(S2SException):
+    def __init__(self) -> None:
+        super().__init__(
+            "The component definition does not match the document contract.",
+            code="INVALID_COMPONENT_DEFINITION",
+            retryable=False,
+        )
+
+
 class ReplayedCreateFailure(S2SException):
     def __init__(self, *, status_code: int, detail: str, code: str, retryable: bool) -> None:
         super().__init__(detail, code=code, retryable=retryable)

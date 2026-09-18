@@ -47,9 +47,9 @@ class RecipeVersion(unit_of_work.Entity):
     recipeId: str = Field(..., title="RecipeId")
     recipeVersionId: str = Field(default_factory=generate_version_id, title="RecipeVersionId")
     parentImageUpstreamId: str = Field(..., title="ParentImageUpstreamId")
-    configuredRecipeComponentsVersions: typing.Optional[
-        list[component_version_entry.ComponentVersionEntry]
-    ] = Field(None, title="ConfiguredRecipeComponentsVersions")
+    configuredRecipeComponentsVersions: typing.Optional[list[component_version_entry.ComponentVersionEntry]] = Field(
+        None, title="ConfiguredRecipeComponentsVersions"
+    )
     recipeComponentsVersions: list[component_version_entry.ComponentVersionEntry] = Field(
         ..., title="RecipeComponentsVersions"
     )

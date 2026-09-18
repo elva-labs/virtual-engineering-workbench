@@ -9,6 +9,9 @@ servers:
       Host:
         default: example.invalid
 x-amazon-apigateway-request-validators:
+  lambda-only:
+    validateRequestBody: false
+    validateRequestParameters: false
   all:
     validateRequestBody: true
     validateRequestParameters: true
@@ -194,6 +197,7 @@ paths:
           application/json:
             schema: {$ref: '#/components/schemas/CreateComponentVersionRequest'}
       responses:
+        '422': {$ref: '#/components/responses/Problem'}
         '202': {$ref: '#/components/responses/ComponentVersionAction'}
         '400': {$ref: '#/components/responses/Problem'}
         '401': {$ref: '#/components/responses/Problem'}
@@ -205,7 +209,7 @@ paths:
         '503': {$ref: '#/components/responses/Problem'}
       security:
         - ClientCredentials: [clients/packaging/component.write]
-      x-amazon-apigateway-request-validator: body-only
+      x-amazon-apigateway-request-validator: lambda-only
       x-amazon-apigateway-integration: *lambdaIntegration
   /projects/{projectId}/components/{componentId}/versions/{versionId}:
     get:
@@ -242,6 +246,7 @@ paths:
           application/json:
             schema: {$ref: '#/components/schemas/UpdateComponentVersionRequest'}
       responses:
+        '422': {$ref: '#/components/responses/Problem'}
         '202': {$ref: '#/components/responses/ComponentVersionAction'}
         '400': {$ref: '#/components/responses/Problem'}
         '401': {$ref: '#/components/responses/Problem'}
@@ -253,7 +258,7 @@ paths:
         '503': {$ref: '#/components/responses/Problem'}
       security:
         - ClientCredentials: [clients/packaging/component.write]
-      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-request-validator: lambda-only
       x-amazon-apigateway-integration: *lambdaIntegration
     delete:
       operationId: RetireComponentVersion

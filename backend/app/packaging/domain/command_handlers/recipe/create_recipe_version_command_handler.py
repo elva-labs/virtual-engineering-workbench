@@ -30,6 +30,34 @@ from app.shared.adapters.unit_of_work_v2 import unit_of_work
 INITIAL_VERSION = "1.0.0-rc.1"
 
 
+def _publish_creation_started(project_id, entity, message_bus):
+    message_bus.publish(
+        recipe_version_creation_started.RecipeVersionCreationStarted(
+            project_id=project_id,
+            recipe_id=entity.recipeId,
+            recipe_version_id=entity.recipeVersionId,
+            parent_image_upstream_id=entity.parentImageUpstreamId,
+            recipe_component_versions=entity.recipeComponentsVersions,
+            recipe_version_name=entity.recipeVersionName,
+            recipe_version_volume_size=entity.recipeVersionVolumeSize,
+        )
+    )
+
+
+def resume_creation(
+    project_id: str,
+    recipe_id: str,
+    version_id: str,
+    recipe_version_qry_srv: recipe_version_query_service.RecipeVersionQueryService,
+    message_bus: message_bus.MessageBus,
+) -> None:
+    entity = recipe_version_qry_srv.get_recipe_version(recipe_id, version_id)
+    if entity is None:
+        raise RuntimeError("The recipe version is no longer readable.")
+    if entity.status == recipe_version.RecipeVersionStatus.Creating:
+        _publish_creation_started(project_id, entity, message_bus)
+
+
 class SystemConfigurationMappingAttributes(StrEnum):
     AMI_SSM_PARAM_NAME = "ami_ssm_param_name"
 
@@ -229,9 +257,7 @@ def handle(
     system_configuration_mapping: dict,
     component_qry_srv: component_query_service.ComponentQueryService,
 ):
-    configured_components = [
-        entry.model_copy(deep=True) for entry in command.recipeComponentsVersions.value
-    ]
+    configured_components = [entry.model_copy(deep=True) for entry in command.recipeComponentsVersions.value]
 
     recipe_entity = __get_recipe_entity(
         recipe_qry_srv=recipe_qry_srv,
@@ -306,18 +332,6 @@ def handle(
         )
         uow.commit()
 
-    message_bus.publish(
-        recipe_version_creation_started.RecipeVersionCreationStarted(
-            project_id=command.projectId.value,
-            recipe_id=command.recipeId.value,
-            recipe_version_id=recipe_version_entity.recipeVersionId,
-            parent_image_upstream_id=parent_image_upstream_id,
-            recipe_component_versions=recipe_version_components_versions_value_object.from_list(
-                recipe_component_versions
-            ).value,
-            recipe_version_name=recipe_version_name_value_object.from_str(new_recipe_version_name).value,
-            recipe_version_volume_size=recipe_version_entity.recipeVersionVolumeSize,
-        )
-    )
+    _publish_creation_started(command.projectId.value, recipe_version_entity, message_bus)
 
     return {"recipeVersionId": recipe_version_entity.recipeVersionId}

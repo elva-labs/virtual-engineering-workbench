@@ -103,6 +103,9 @@ def mocked_dependencies():
         component_version_domain_qry_srv=mock.Mock(),
         component_version_qry_srv=mock.Mock(),
         idempotency_service=mock.Mock(),
+        resume_component_version_creation=mock.Mock(),
+        resume_recipe_version_creation=mock.Mock(),
+        resume_pipeline_creation=mock.Mock(),
     )
     dependencies.idempotency_service.reserve.side_effect = lambda scope, request_hash, resource_id, now: Reservation(
         ReservationOutcome.ACQUIRED, resource_id

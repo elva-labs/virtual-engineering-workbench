@@ -4,9 +4,9 @@ from app.packaging.domain.value_objects.image import product_id_value_object
 from app.packaging.domain.value_objects.pipeline import (
     pipeline_build_instance_types_value_object,
     pipeline_description_value_object,
+    pipeline_id_value_object,
     pipeline_name_value_object,
     pipeline_schedule_value_object,
-    pipeline_id_value_object,
 )
 from app.packaging.domain.value_objects.recipe import recipe_id_value_object
 from app.packaging.domain.value_objects.recipe_version import recipe_version_id_value_object

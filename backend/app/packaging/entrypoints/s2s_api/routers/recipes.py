@@ -41,11 +41,24 @@ RELEASE_SCOPE = "clients/packaging/recipe.release"
 
 def recipe_version_model(version) -> api_model.RecipeVersion:
     payload = version.model_dump()
-    payload["effectiveComponentsVersions"] = payload.pop("recipeComponentsVersions")
+    payload["effectiveComponentsVersions"] = [
+        recipe_component_model(entry) for entry in payload.pop("recipeComponentsVersions")
+    ]
     configured = payload.pop("configuredRecipeComponentsVersions", None)
     if configured is not None:
-        payload["configuredComponentsVersions"] = configured
+        payload["configuredComponentsVersions"] = [recipe_component_model(entry) for entry in configured]
     return api_model.RecipeVersion.model_validate(payload)
+
+
+def recipe_component_model(entry: dict) -> api_model.RecipeComponentVersion:
+    return api_model.RecipeComponentVersion(
+        componentId=entry["componentId"],
+        componentName=entry["componentName"],
+        componentVersionId=entry["componentVersionId"],
+        componentVersionName=entry["componentVersionName"],
+        componentVersionType=entry["componentVersionType"],
+        order=entry["order"],
+    )
 
 
 def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa: C901
@@ -71,7 +84,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             content_type=content_types.APPLICATION_JSON,
         )
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.post("/projects/<project_id>/recipes")
     def create_recipe(project_id: str, request: api_model.CreateRecipeRequest):
         client_id = authorize(project_id, WRITE_SCOPE)
@@ -101,7 +114,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             content_type=content_types.APPLICATION_JSON,
         )
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.get("/projects/<project_id>/recipes")
     def list_recipes(project_id: str):
         authorize(project_id, READ_SCOPE)
@@ -110,7 +123,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             recipes=[api_model.Recipe.model_validate(recipe.model_dump()) for recipe in recipes]
         )
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.get("/projects/<project_id>/recipes/<recipe_id>")
     def get_recipe(project_id: str, recipe_id: str):
         authorize(project_id, READ_SCOPE)
@@ -121,7 +134,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
         )
         return api_model.RecipeResponse(recipe=api_model.Recipe.model_validate(recipe.model_dump()))
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.delete("/projects/<project_id>/recipes/<recipe_id>")
     def archive_recipe(project_id: str, recipe_id: str):
         client_id = authorize(project_id, WRITE_SCOPE)
@@ -141,7 +154,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
         )
         return api_gateway.Response(status_code=HTTPStatus.OK, body={}, headers=common.NO_STORE)
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.post("/projects/<project_id>/recipes/<recipe_id>/versions")
     def create_recipe_version(project_id: str, recipe_id: str, request: api_model.CreateRecipeVersionRequest):
         client_id = authorize(project_id, WRITE_SCOPE)
@@ -166,6 +179,9 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             response_for_id=lambda resource_id: idempotency.StoredCreateResponse(
                 HTTPStatus.ACCEPTED, {"recipeVersionId": resource_id}
             ),
+            resume_existing=lambda resource_id: dependencies.resume_recipe_version_creation(
+                project_id, recipe_id, resource_id
+            ),
             create=lambda resource_id: create_recipe_version_response(
                 dependencies, project_id, recipe_id, client_id, request, resource_id
             ),
@@ -178,7 +194,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             content_type=content_types.APPLICATION_JSON,
         )
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.get("/projects/<project_id>/recipes/<recipe_id>/versions")
     def list_recipe_versions(project_id: str, recipe_id: str):
         authorize(project_id, READ_SCOPE)
@@ -186,9 +202,11 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
         versions = dependencies.recipe_version_domain_qry_srv.get_recipe_versions(
             recipe_id_value_object.from_str(recipe_id)
         )
-        return api_model.RecipeVersionPage(recipe_versions=[recipe_version_model(version) for version in versions])
+        return api_model.RecipeVersionPage(
+            recipe_versions=[recipe_version_model(version) for version in versions]
+        ).model_dump(mode="json", exclude_none=True)
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.get("/projects/<project_id>/recipes/<recipe_id>/versions/<version_id>")
     def get_recipe_version(project_id: str, recipe_id: str, version_id: str):
         authorize(project_id, READ_SCOPE)
@@ -201,9 +219,11 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             recipe_id_value_object.from_str(recipe_id),
             recipe_version_id_value_object.from_str(version_id),
         )
-        return api_model.RecipeVersionResponse(recipe_version=recipe_version_model(version))
+        return api_model.RecipeVersionResponse(recipe_version=recipe_version_model(version)).model_dump(
+            mode="json", exclude_none=True
+        )
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.put("/projects/<project_id>/recipes/<recipe_id>/versions/<version_id>")
     def update_recipe_version(
         project_id: str,
@@ -239,7 +259,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
         )
         return action_response(version_id)
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.post("/projects/<project_id>/recipes/<recipe_id>/versions/<version_id>/release")
     def release_recipe_version(project_id: str, recipe_id: str, version_id: str):
         client_id = authorize(project_id, RELEASE_SCOPE)
@@ -273,7 +293,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             content_type=content_types.APPLICATION_JSON,
         )
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.delete("/projects/<project_id>/recipes/<recipe_id>/versions/<version_id>")
     def retire_recipe_version(project_id: str, recipe_id: str, version_id: str):
         client_id = authorize(project_id, WRITE_SCOPE)

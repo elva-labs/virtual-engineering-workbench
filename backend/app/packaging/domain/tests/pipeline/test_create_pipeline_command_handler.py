@@ -109,16 +109,24 @@ def test_create_pipeline_uses_injected_id(
     pipeline_service_mock,
     uow_mock,
 ):
-    command = get_create_pipeline_command().model_copy(update={"pipelineId": pipeline_id_value_object.from_str("pipe-fixed")})
-    recipe_version_query_service_mock.get_recipe_version.return_value = get_test_recipe_version_with_specific_version_name_and_status(
-        status=recipe_version.RecipeVersionStatus.Released, version_name="1.0.0"
+    command = get_create_pipeline_command().model_copy(
+        update={"pipelineId": pipeline_id_value_object.from_str("pipe-fixed")}
+    )
+    recipe_version_query_service_mock.get_recipe_version.return_value = (
+        get_test_recipe_version_with_specific_version_name_and_status(
+            status=recipe_version.RecipeVersionStatus.Released, version_name="1.0.0"
+        )
     )
     recipe_query_service_mock.get_recipe.return_value = mock_recipe_object
     pipeline_service_mock.get_pipeline_allowed_build_instance_types.return_value = TEST_BUILD_INSTANCE_TYPES
 
     result = create_pipeline_command_handler.handle(
-        command=command, message_bus=message_bus_mock, recipe_version_qry_srv=recipe_version_query_service_mock,
-        recipe_qry_srv=recipe_query_service_mock, pipeline_srv=pipeline_service_mock, uow=uow_mock,
+        command=command,
+        message_bus=message_bus_mock,
+        recipe_version_qry_srv=recipe_version_query_service_mock,
+        recipe_qry_srv=recipe_query_service_mock,
+        pipeline_srv=pipeline_service_mock,
+        uow=uow_mock,
     )
 
     saved = uow_mock.get_repository.return_value.add.call_args.args[0]

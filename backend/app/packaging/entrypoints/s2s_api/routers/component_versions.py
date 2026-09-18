@@ -13,7 +13,8 @@ from app.packaging.domain.commands.component import (
     retire_component_version_command,
     update_component_version_command,
 )
-from app.packaging.domain.exceptions.s2s_exception import StoredDefinitionInvalid
+from app.packaging.domain.exceptions.domain_exception import DomainException
+from app.packaging.domain.exceptions.s2s_exception import InvalidComponentDefinition, StoredDefinitionInvalid
 from app.packaging.domain.model.component import component_version
 from app.packaging.domain.value_objects.component import component_id_value_object
 from app.packaging.domain.value_objects.component_version import (
@@ -62,13 +63,18 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
 
     def version_kwargs(request, *, project_id: str, component_id: str) -> dict:
         definition = request.componentVersionDefinition.model_dump(mode="json", by_alias=True, exclude_none=True)
+        try:
+            yaml_definition = component_version_yaml_definition_value_object.from_dict(definition)
+        except DomainException as error:
+            common.api_metrics.add_metric(name="StructuredDefinitionValidationFailures", unit=MetricUnit.Count, value=1)
+            raise InvalidComponentDefinition() from error
         kwargs = {
             "projectId": project_id_value_object.from_str(project_id),
             "componentId": component_id_value_object.from_str(component_id),
             "componentVersionDescription": component_version_description_value_object.from_str(
                 request.componentVersionDescription
             ),
-            "componentVersionYamlDefinition": component_version_yaml_definition_value_object.from_dict(definition),
+            "componentVersionYamlDefinition": yaml_definition,
             "componentVersionDependencies": component_version_dependencies_value_object.from_list(
                 request.componentVersionDependencies or []
             ),
@@ -89,7 +95,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             content_type=content_types.APPLICATION_JSON,
         )
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.post("/projects/<project_id>/components/<component_id>/versions")
     def create_component_version(
         project_id: str,
@@ -105,6 +111,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             "CREATE_COMPONENT_VERSION",
             component_id,
         )
+        kwargs = version_kwargs(request, project_id=project_id, component_id=component_id)
         result = idempotency.execute_create(
             service=dependencies.idempotency_service,
             scope=scope,
@@ -117,9 +124,12 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             response_for_id=lambda resource_id: idempotency.StoredCreateResponse(
                 HTTPStatus.ACCEPTED, {"componentVersionId": resource_id}
             ),
+            resume_existing=lambda resource_id: dependencies.resume_component_version_creation(
+                component_id, resource_id, kwargs["componentVersionYamlDefinition"].value
+            ),
             create=lambda resource_id: create_component_version_response(
                 dependencies,
-                version_kwargs(request, project_id=project_id, component_id=component_id),
+                kwargs,
                 request,
                 client_id,
                 resource_id,
@@ -133,7 +143,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             content_type=content_types.APPLICATION_JSON,
         )
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.get("/projects/<project_id>/components/<component_id>/versions")
     def list_component_versions(project_id: str, component_id: str):
         authorize(project_id, READ_SCOPE)
@@ -145,7 +155,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             component_versions=[api_model.ComponentVersion.model_validate(item.model_dump()) for item in versions]
         )
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.get("/projects/<project_id>/components/<component_id>/versions/<version_id>")
     def get_component_version(project_id: str, component_id: str, version_id: str):
         authorize(project_id, READ_SCOPE)
@@ -175,7 +185,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             componentVersionDefinition=(structured_definition),
         )
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.put("/projects/<project_id>/components/<component_id>/versions/<version_id>")
     def update_component_version(
         project_id: str,
@@ -196,7 +206,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
         )
         return action_response(result["componentVersionId"], HTTPStatus.ACCEPTED)
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.delete("/projects/<project_id>/components/<component_id>/versions/<version_id>")
     def retire_component_version(project_id: str, component_id: str, version_id: str):
         client_id = authorize(project_id, WRITE_SCOPE)
@@ -215,7 +225,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
         )
         return action_response(result["componentVersionId"], HTTPStatus.ACCEPTED)
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.post("/projects/<project_id>/components/<component_id>/versions/<version_id>/release")
     def release_component_version(project_id: str, component_id: str, version_id: str):
         client_id = authorize(project_id, RELEASE_SCOPE)

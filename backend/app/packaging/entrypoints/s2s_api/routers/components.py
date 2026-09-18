@@ -41,7 +41,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             project_id_value_object.from_str(project_id), component_id_value_object.from_str(component_id)
         )
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.post("/projects/<project_id>/components")
     def create_component(project_id: str, request: api_model.CreateComponentRequest):
         client_id = authorize(project_id, WRITE_SCOPE)
@@ -71,7 +71,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             content_type=content_types.APPLICATION_JSON,
         )
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.get("/projects/<project_id>/components")
     def list_components(project_id: str):
         authorize(project_id, READ_SCOPE)
@@ -80,7 +80,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             components=[api_model.Component.model_validate(item.model_dump()) for item in components]
         )
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.get("/projects/<project_id>/components/<component_id>")
     def get_component(project_id: str, component_id: str):
         authorize(project_id, READ_SCOPE)
@@ -90,7 +90,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
         )
         return api_model.ComponentResponse(component=api_model.Component.model_validate(component.model_dump()))
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.put("/projects/<project_id>/components/<component_id>")
     def update_component(project_id: str, component_id: str, request: api_model.UpdateComponentRequest):
         client_id = authorize(project_id, WRITE_SCOPE)
@@ -104,7 +104,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
         )
         return api_gateway.Response(status_code=HTTPStatus.OK, body={}, headers=common.NO_STORE)
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.delete("/projects/<project_id>/components/<component_id>")
     def archive_component(project_id: str, component_id: str):
         client_id = authorize(project_id, WRITE_SCOPE)

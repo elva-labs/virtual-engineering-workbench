@@ -59,27 +59,45 @@ examples:
           {
             "recipe_versions": [
               {
-                "recipeId": "",
-                "recipeVersionId": "",
-                "recipeComponentsVersions": [
+                "recipeId": "reci-example",
+                "recipeVersionId": "vers-example",
+                "configuredComponentsVersions": [
                   {
-                    "componentId": "",
-                    "componentName": "",
-                    "componentVersionId": "",
-                    "componentVersionName": "",
-                    "componentVersionType": "",
-                    "order": 0
+                    "componentId": "comp-user",
+                    "componentName": "build-agent",
+                    "componentVersionId": "vers-user",
+                    "componentVersionName": "1.0.0",
+                    "componentVersionType": "MAIN",
+                    "order": 1
                   }
                 ],
-                "recipeVersionDescription": "",
-                "recipeVersionName": "",
-                "recipeVersionVolumeSize": "",
+                "effectiveComponentsVersions": [
+                  {
+                    "componentId": "comp-mandatory",
+                    "componentName": "mandatory-helper",
+                    "componentVersionId": "vers-mandatory",
+                    "componentVersionName": "1.0.0",
+                    "componentVersionType": "HELPER",
+                    "order": 1
+                  },
+                  {
+                    "componentId": "comp-user",
+                    "componentName": "build-agent",
+                    "componentVersionId": "vers-user",
+                    "componentVersionName": "1.0.0",
+                    "componentVersionType": "MAIN",
+                    "order": 2
+                  }
+                ],
+                "recipeVersionDescription": "Engineering image",
+                "recipeVersionName": "1.0.0-rc.1",
+                "recipeVersionVolumeSize": "30",
                 "recipeVersionIntegrations": [],
-                "status": "",
-                "createDate": "",
-                "createdBy": "",
-                "lastUpdateDate": "",
-                "lastUpdatedBy": ""
+                "status": "VALIDATED",
+                "createDate": "2026-09-18T12:00:00Z",
+                "createdBy": "service:client-example",
+                "lastUpdateDate": "2026-09-18T12:05:00Z",
+                "lastUpdatedBy": "service:client-example"
               }
             ]
           }

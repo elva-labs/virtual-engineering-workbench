@@ -2,6 +2,7 @@ from unittest import mock
 
 import assertpy
 import pytest
+import yaml
 
 from app.packaging.domain.exceptions.domain_exception import DomainException
 from app.packaging.domain.model.shared.component_version_entry import (
@@ -17,6 +18,21 @@ from app.packaging.domain.value_objects.component_version import (
     component_version_status_value_object,
     component_version_yaml_definition_value_object,
 )
+
+
+@pytest.mark.parametrize("phases", [[], [{"name": "build", "steps": []}]])
+def test_legacy_yaml_preserves_empty_phase_and_step_documents(phases):
+    original = "# Keep the user's original text\n" + yaml.safe_dump({"schemaVersion": "1.0", "phases": phases})
+    assert component_version_yaml_definition_value_object.from_str(original).value == original
+
+
+@pytest.mark.parametrize("phases", [[], [{"name": "build", "steps": []}]])
+@pytest.mark.parametrize("conversion", ["from_dict", "to_dict"])
+def test_s2s_canonical_conversion_rejects_empty_phase_and_step_documents(phases, conversion):
+    definition = {"schemaVersion": "1.0", "phases": phases}
+    value = definition if conversion == "from_dict" else yaml.safe_dump(definition)
+    with pytest.raises(DomainException):
+        getattr(component_version_yaml_definition_value_object, conversion)(value)
 
 
 def test_component_definition_dict_round_trips_with_defaults():
@@ -45,9 +61,7 @@ def test_component_definition_dict_round_trips_with_defaults():
 
 def test_component_definition_rejects_empty_phases():
     with pytest.raises(DomainException):
-        component_version_yaml_definition_value_object.from_dict(
-            {"schemaVersion": "1.0", "phases": []}
-        )
+        component_version_yaml_definition_value_object.from_dict({"schemaVersion": "1.0", "phases": []})
 
 
 def test_component_version_dependencies_value_object_should_parse_dependencies():
@@ -167,13 +181,8 @@ def test_component_version_description_value_object_should_raise_if_too_long():
     # ARRANGE
     description = ""
     for _ in range(16):
-        description = (
-            description
-            + "This is an invalid description as it is more than 1024 characters."
-        )
-    expected_exception_message = (
-        "Component version description should be between 0 and 1024 characters."
-    )
+        description = description + "This is an invalid description as it is more than 1024 characters."
+    expected_exception_message = "Component version description should be between 0 and 1024 characters."
 
     # ACT
     with pytest.raises(DomainException) as e:
@@ -237,9 +246,7 @@ def test_component_version_status_value_object_should_parse_status():
 def test_component_version_status_value_object_should_raise_if_invalid_status():
     # ARRANGE
     status = "TEST_STATUS_INVALID"
-    expected_exception_message = (
-        "Component version status should be in ['TEST_STATUS_1', 'TEST_STATUS_2']."
-    )
+    expected_exception_message = "Component version status should be in ['TEST_STATUS_1', 'TEST_STATUS_2']."
 
     # ACT
     with pytest.raises(DomainException) as e:
@@ -288,9 +295,7 @@ def test_component_license_dashboard_url_value_object_should_parse_license_dashb
     license_dashboard_url,
 ):
     # ACT
-    license_dashboard = component_license_dashboard_url_value_object.from_str(
-        license_dashboard_url
-    )
+    license_dashboard = component_license_dashboard_url_value_object.from_str(license_dashboard_url)
 
     # ASSERT
     assertpy.assert_that(license_dashboard.value).is_equal_to(license_dashboard_url)

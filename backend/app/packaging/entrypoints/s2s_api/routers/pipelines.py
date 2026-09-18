@@ -67,7 +67,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             content_type=content_types.APPLICATION_JSON,
         )
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.post("/projects/<project_id>/pipelines")
     def create_pipeline(project_id: str, request: api_model.CreatePipelineRequest):
         client_id = authorize(project_id, WRITE_SCOPE)
@@ -92,6 +92,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             response_for_id=lambda resource_id: idempotency.StoredCreateResponse(
                 HTTPStatus.ACCEPTED, {"pipelineId": resource_id}
             ),
+            resume_existing=lambda resource_id: dependencies.resume_pipeline_creation(project_id, resource_id),
             create=lambda resource_id: create_pipeline_response(
                 dependencies, project_id, client_id, request, resource_id
             ),
@@ -104,7 +105,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             content_type=content_types.APPLICATION_JSON,
         )
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.get("/projects/<project_id>/pipelines")
     def list_pipelines(project_id: str):
         authorize(project_id, READ_SCOPE)
@@ -113,14 +114,14 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             pipelines=[api_model.Pipeline.model_validate(pipeline.model_dump()) for pipeline in pipelines]
         )
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.get("/projects/<project_id>/pipelines/<pipeline_id>")
     def get_pipeline(project_id: str, pipeline_id: str):
         authorize(project_id, READ_SCOPE)
         pipeline = pipeline_in_project(project_id, pipeline_id)
         return api_model.PipelineResponse(pipeline=api_model.Pipeline.model_validate(pipeline.model_dump()))
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.put("/projects/<project_id>/pipelines/<pipeline_id>")
     def update_pipeline(project_id: str, pipeline_id: str, request: api_model.UpdatePipelineRequest):
         client_id = authorize(project_id, WRITE_SCOPE)
@@ -149,7 +150,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
         )
         return action_response(pipeline_id)
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.delete("/projects/<project_id>/pipelines/<pipeline_id>")
     def retire_pipeline(project_id: str, pipeline_id: str):
         client_id = authorize(project_id, WRITE_SCOPE)
@@ -165,7 +166,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
         )
         return action_response(pipeline_id)
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.post("/projects/<project_id>/images")
     def create_image(project_id: str, request: api_model.CreateImageRequest):
         authorize(project_id, EXECUTE_SCOPE)
@@ -183,14 +184,14 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             content_type=content_types.APPLICATION_JSON,
         )
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.get("/projects/<project_id>/images")
     def list_images(project_id: str):
         authorize(project_id, READ_SCOPE)
         images = dependencies.image_domain_qry_srv.get_images(project_id_value_object.from_str(project_id))
         return api_model.ImagePage(images=[image_model(image) for image in images])
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.get("/projects/<project_id>/images/<image_id>")
     def get_image(project_id: str, image_id: str):
         authorize(project_id, READ_SCOPE)

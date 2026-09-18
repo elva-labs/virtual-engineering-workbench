@@ -66,7 +66,9 @@ def test_create_persists_configured_components_before_mandatory_injection(
     )
 
     saved = recipe_version_repo_mock.add.call_args.args[0]
-    configured_ids = [entry.componentVersionId for entry in create_recipe_version_command_mock.recipeComponentsVersions.value]
+    configured_ids = [
+        entry.componentVersionId for entry in create_recipe_version_command_mock.recipeComponentsVersions.value
+    ]
     assert [entry.componentVersionId for entry in saved.configuredRecipeComponentsVersions] == configured_ids
     assert [entry.order for entry in saved.configuredRecipeComponentsVersions] == configured_orders
     assert len(saved.recipeComponentsVersions) >= len(saved.configuredRecipeComponentsVersions)
@@ -97,17 +99,22 @@ def test_create_recipe_version_uses_injected_id(
     )
     component_version_entities = []
     for entry in command.recipeComponentsVersions.value:
-        entity = get_test_component_version_with_specific_status(status=component_version.ComponentVersionStatus.Released)
+        entity = get_test_component_version_with_specific_status(
+            status=component_version.ComponentVersionStatus.Released
+        )
         entity.componentId = entry.componentId
         entity.componentVersionId = entry.componentVersionId
         component_version_entities.append(entity)
     component_version_query_service_mock.get_component_version.side_effect = component_version_entities
 
     result = create_recipe_version_command_handler.handle(
-        command=command, uow=uow_mock, message_bus=message_bus_mock,
+        command=command,
+        uow=uow_mock,
+        message_bus=message_bus_mock,
         component_version_qry_srv=component_version_query_service_mock,
         recipe_version_qry_srv=recipe_version_query_service_mock,
-        recipe_qry_srv=recipe_query_service_mock, parameter_srv=parameter_service_mock,
+        recipe_qry_srv=recipe_query_service_mock,
+        parameter_srv=parameter_service_mock,
         mandatory_components_list_qry_srv=mandatory_components_list_query_service_mock,
         system_configuration_mapping=mock_system_configuration_mapping,
         component_qry_srv=component_query_service_mock,

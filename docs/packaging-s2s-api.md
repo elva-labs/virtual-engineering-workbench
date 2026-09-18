@@ -2,7 +2,7 @@
 
 The Packaging S2S API is a thin proof of concept over the existing UI commands for
 project-scoped components, recipes, pipelines, and image builds. All resources use
-the existing internal IDs and request field names. There are no external-ID
+the existing internal IDs. There are no external-ID
 mappings, ETags, or separate reconciliation operations. This document describes
 the local contract; it does not claim deployed AWS availability.
 
@@ -99,12 +99,34 @@ Update and archive return `200` with `{}`. GET returns `{component: ...}`; list
 returns `{components: [...]}`.
 
 Every managed create (`POST /components`, component versions, recipes, recipe
-versions, and pipelines) requires an RFC4122 `Idempotency-Key` header. Reusing
-the same key with the same request replays the stored result; missing or malformed
-keys return the stable `INVALID_IDEMPOTENCY_KEY` problem.
+versions, and pipelines) requires an RFC 4122 UUID `Idempotency-Key` header.
+Missing or malformed keys return `400 INVALID_IDEMPOTENCY_KEY`.
 
-Create a version with `POST /components/{componentId}/versions` using the existing
-UI fields:
+Each key is scoped to `(clientId, projectId, operation, parentResourceId?, key)`.
+The optional parent is the component or recipe for a version create. The same key
+can be used independently in another scope. After request defaults are applied,
+object-key order is ignored when comparing bodies; array order is significant.
+
+An exact same-body retry replays the stored status and body for at least 24 hours
+after completion. Once that retention period expires, key reuse can create a new
+resource, even if DynamoDB has not physically deleted the expired record.
+Reusing an active key with a different body returns non-retryable
+`409 IDEMPOTENCY_KEY_REUSED`. A matching request with a live lease returns
+retryable `409 IDEMPOTENCY_REQUEST_IN_PROGRESS` with `Retry-After: 5`.
+
+Reservations use a 60-second lease and retain the reserved resource ID. After a
+lease expires, a retry acquires recovery ownership and checks that ID. If the
+resource does not exist, creation is retried using the same ID. If it exists,
+synchronous component/recipe creation reconstructs the successful response;
+component-version, recipe-version, and pipeline creation resumes workflow
+publication while still `CREATING` before completing the reservation. Resources
+that have already progressed are not restarted. Publication is at least once,
+consistent with EventBridge delivery; retryable publication failures leave the
+reservation recoverable. Validation and authorization failures before reservation
+do not consume the key.
+
+Create a version with `POST /components/{componentId}/versions` using a structured
+component definition:
 
 ```json
 {
@@ -137,6 +159,13 @@ use the UI's `componentId`, `componentName`, `componentVersionId`,
 use internal IDs for dependencies too. Dependencies must be available in the
 authorized project.
 
+Component-version create and update validate the body in Lambda so invalid
+`componentVersionDefinition` values return non-retryable
+`422 INVALID_COMPONENT_DEFINITION`. Definitions require at least one phase and
+at least one step per phase. Other request validation failures return
+`400 INVALID_REQUEST`. The S2S response returns the canonical structured
+definition; the user API continues accepting and returning its original YAML.
+
 Create/update/retire returns `202` with `componentVersionId` and `Retry-After: 5`.
 Poll the version GET and inspect `component_version.status`: wait for
 `VALIDATED` or `FAILED` after create/update, or `RETIRED` or `FAILED` after
@@ -166,7 +195,7 @@ scopes:
 - `clients/packaging/recipe.release` for release
 
 Existing clients are not automatically granted recipe scopes. The POC keeps the
-existing UI request field names and uses internal IDs; it does not accept or create
+existing domain commands and uses internal IDs; it does not accept or create
 external recipe/version IDs, ETags, or recipe mapping records.
 
 The routes are:
@@ -181,7 +210,7 @@ The routes are:
 
 Recipe creation uses the UI fields `recipeName`, `recipeDescription`,
 `recipePlatform`, `recipeArchitecture`, and `recipeOsVersion`. Version requests use
-the UI fields `recipeVersionDescription`, `recipeVersionReleaseType`,
+`recipeVersionDescription`, `recipeVersionReleaseType`,
 `recipeVersionVolumeSize`, `recipeVersionIntegrations`, and
 `configuredComponentsVersions`; each component entry must include the internal IDs,
 the UI names, `componentVersionType`, and `order`:
@@ -208,6 +237,8 @@ the UI names, `componentVersionType`, and `order`:
 Recipe-version reads expose both views: `configuredComponentsVersions` is the
 client-supplied selection, while `effectiveComponentsVersions` is the resolved
 selection after mandatory components and ordering have been applied.
+Historical versions without saved configured state omit
+`configuredComponentsVersions` entirely and still return the effective list.
 
 Components are sorted by `order`; existing mandatory components are added by the
 domain workflow. `recipeVersionReleaseType` is accepted only when the

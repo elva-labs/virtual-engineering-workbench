@@ -27,8 +27,23 @@ def test_schema_requires_idempotency_for_managed_creates(api_schema):
     reference = {"$ref": "#/components/parameters/IdempotencyKey"}
     for path, method in creates:
         assert reference in paths[path][method]["parameters"]
-        assert paths[path][method]["x-amazon-apigateway-request-validator"] == "body-only"
+        expected = "lambda-only" if "/components/{componentId}/versions" in path else "body-only"
+        assert paths[path][method]["x-amazon-apigateway-request-validator"] == expected
     assert reference not in paths["/projects/{projectId}/images"]["post"]["parameters"]
+
+
+def test_component_definition_validation_reaches_lambda_and_publishes_422(api_schema):
+    assert api_schema["x-amazon-apigateway-request-validators"]["lambda-only"] == {
+        "validateRequestBody": False,
+        "validateRequestParameters": False,
+    }
+    for path, method in [
+        ("/projects/{projectId}/components/{componentId}/versions", "post"),
+        ("/projects/{projectId}/components/{componentId}/versions/{versionId}", "put"),
+    ]:
+        operation = api_schema["paths"][path][method]
+        assert operation["x-amazon-apigateway-request-validator"] == "lambda-only"
+        assert operation["responses"]["422"] == {"$ref": "#/components/responses/Problem"}
 
 
 def test_schema_enumerates_resource_statuses(api_schema):

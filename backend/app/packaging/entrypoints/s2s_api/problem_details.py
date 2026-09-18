@@ -7,6 +7,7 @@ from app.packaging.domain.exceptions.s2s_exception import (
     IdempotencyKeyReused,
     IdempotencyRequestInProgress,
     InsufficientScope,
+    InvalidComponentDefinition,
     InvalidIdempotencyKey,
     ProjectAccessDenied,
     ProjectAccessUnavailable,
@@ -26,6 +27,8 @@ def status_for(error: S2SException) -> HTTPStatus:
         return HTTPStatus.CONFLICT
     if isinstance(error, ReplayedCreateFailure):
         return HTTPStatus(error.status_code)
+    if isinstance(error, InvalidComponentDefinition):
+        return HTTPStatus.UNPROCESSABLE_ENTITY
     if isinstance(error, (ProjectAccessDenied, InsufficientScope)):
         return HTTPStatus.FORBIDDEN
     if isinstance(error, (ProjectAccessUnavailable, ResourceReadNotReady)):

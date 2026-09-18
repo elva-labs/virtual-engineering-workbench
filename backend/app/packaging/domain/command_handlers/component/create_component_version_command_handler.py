@@ -13,17 +13,31 @@ from app.shared.adapters.unit_of_work_v2 import unit_of_work
 INITIAL_VERSION = "1.0.0-rc.1"
 
 
-def _publish_creation_started(command, entity, message_bus):
+def _publish_creation_started(entity, definition, message_bus):
     message_bus.publish(
         component_version_creation_started.ComponentVersionCreationStarted(
-            component_id=command.componentId.value,
+            component_id=entity.componentId,
             component_version_id=entity.componentVersionId,
-            component_version_description=command.componentVersionDescription.value,
+            component_version_description=entity.componentVersionDescription,
             component_version_name=entity.componentVersionName,
-            component_version_yaml_definition=command.componentVersionYamlDefinition.value,
-            component_version_dependencies=command.componentVersionDependencies.value,
+            component_version_yaml_definition=definition,
+            component_version_dependencies=entity.componentVersionDependencies or [],
         )
     )
+
+
+def resume_creation(
+    component_id: str,
+    version_id: str,
+    definition: str,
+    component_version_qry_srv: component_version_query_service.ComponentVersionQueryService,
+    message_bus: message_bus.MessageBus,
+) -> None:
+    entity = component_version_qry_srv.get_component_version(component_id, version_id)
+    if entity is None:
+        raise RuntimeError("The component version is no longer readable.")
+    if entity.status == component_version.ComponentVersionStatus.Creating:
+        _publish_creation_started(entity, definition, message_bus)
 
 
 def _calculate_new_version_name(
@@ -130,5 +144,5 @@ def handle(
         )
         uow.commit()
 
-    _publish_creation_started(command, component_version_entity, message_bus)
+    _publish_creation_started(component_version_entity, command.componentVersionYamlDefinition.value, message_bus)
     return {"componentVersionId": component_version_entity.componentVersionId}

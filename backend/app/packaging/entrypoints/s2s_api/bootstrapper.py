@@ -1,6 +1,7 @@
 import json
 import logging as stdlib_logging
-from typing import Any
+from functools import partial
+from typing import Any, Callable
 
 import boto3
 from aws_lambda_powertools import logging
@@ -134,6 +135,9 @@ class Dependencies(BaseModel):
     component_version_domain_qry_srv: component_version_domain_query_service.ComponentVersionDomainQueryService
     component_version_qry_srv: Any
     idempotency_service: IdempotencyService
+    resume_component_version_creation: Callable[[str, str, str], None]
+    resume_recipe_version_creation: Callable[[str, str, str], None]
+    resume_pipeline_creation: Callable[[str, str], None]
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -455,4 +459,19 @@ def bootstrap(app_config: config.AppConfig, logger: logging.Logger) -> Dependenc
         ),
         component_version_qry_srv=component_version_query_service,
         idempotency_service=idempotency_srv,
+        resume_component_version_creation=partial(
+            create_component_version_command_handler.resume_creation,
+            component_version_qry_srv=component_version_query_service,
+            message_bus=message_bus,
+        ),
+        resume_recipe_version_creation=partial(
+            create_recipe_version_command_handler.resume_creation,
+            recipe_version_qry_srv=recipe_version_query_service,
+            message_bus=message_bus,
+        ),
+        resume_pipeline_creation=partial(
+            create_pipeline_command_handler.resume_creation,
+            pipeline_qry_srv=pipeline_query_service,
+            message_bus=message_bus,
+        ),
     )

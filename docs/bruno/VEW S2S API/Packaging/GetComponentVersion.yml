@@ -64,45 +64,43 @@ examples:
         data: |-
           {
             "component_version": {
-              "componentId": "",
-              "componentVersionId": "",
-              "componentVersionDescription": "",
-              "componentVersionName": "",
-              "componentVersionDependencies": [
-                {
-                  "componentId": "",
-                  "componentName": "",
-                  "componentVersionId": "",
-                  "componentVersionName": "",
-                  "componentVersionType": "",
-                  "order": 0,
-                  "position": ""
-                }
-              ],
-              "associatedComponentsVersions": [
-                {
-                  "componentId": "",
-                  "componentName": "",
-                  "componentVersionId": "",
-                  "componentVersionName": "",
-                  "componentVersionType": "",
-                  "order": 0,
-                  "position": ""
-                }
-              ],
+              "componentId": "comp-user",
+              "componentVersionId": "vers-user",
+              "componentVersionDescription": "Install the build agent",
+              "componentVersionName": "1.0.0",
+              "componentVersionDependencies": [],
+              "associatedComponentsVersions": [],
               "associatedRecipesVersions": [],
-              "softwareVendor": "",
-              "softwareVersion": "",
-              "licenseDashboard": "",
-              "notes": "",
-              "status": "",
-              "createDate": "",
-              "createdBy": "",
-              "lastUpdateDate": "",
-              "lastUpdatedBy": ""
+              "softwareVendor": "Example",
+              "softwareVersion": "1.0.0",
+              "status": "VALIDATED",
+              "createDate": "2026-09-18T12:00:00Z",
+              "createdBy": "service:client-example",
+              "lastUpdateDate": "2026-09-18T12:05:00Z",
+              "lastUpdatedBy": "service:client-example"
             },
-            "yaml_definition": {},
-            "yaml_definition_b64": ""
+            "componentVersionDefinition": {
+              "schemaVersion": "1.0",
+              "phases": [
+                {
+                  "name": "build",
+                  "steps": [
+                    {
+                      "name": "InstallAgent",
+                      "action": "ExecuteBash",
+                      "timeoutSeconds": 7200,
+                      "onFailure": "Abort",
+                      "maxAttempts": 1,
+                      "inputs": {
+                        "commands": [
+                          "install-agent"
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
           }
   - name: default Response
     description: RFC problem response.

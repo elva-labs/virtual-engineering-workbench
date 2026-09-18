@@ -647,7 +647,8 @@ def test_create_component_version_rejects_malformed_structured_definition(
         ),
         lambda_context,
     )
-    assert response["statusCode"] == 400
+    assert response["statusCode"] == 422
+    assert json.loads(response["body"])["code"] == "INVALID_COMPONENT_DEFINITION"
     mocked_dependencies.command_bus.handle.assert_not_called()
 
 
@@ -1302,14 +1303,22 @@ def test_recovery_read_failure_is_retryable_not_ready(
     assert body["retryable"] is True
 
 
+@pytest.mark.parametrize(
+    "definition",
+    [
+        {"inputs": "invalid"},
+        {"schemaVersion": "1.0", "phases": []},
+        {"schemaVersion": "1.0", "phases": [{"name": "build", "steps": []}]},
+    ],
+)
 def test_invalid_stored_component_definition_returns_stable_problem_and_metric(
-    monkeypatch, mocked_dependencies, lambda_context, client_event
+    monkeypatch, mocked_dependencies, lambda_context, client_event, definition
 ):
     raw_version = mock.Mock(componentVersionS3Uri="s3://bucket/key")
     mocked_dependencies.component_version_qry_srv.get_component_version.return_value = raw_version
     mocked_dependencies.component_version_domain_qry_srv.get_component_version.return_value = (
         raw_version,
-        {"inputs": "invalid"},
+        definition,
         "unused",
     )
     handler = load_handler(monkeypatch, mocked_dependencies)
@@ -1354,7 +1363,7 @@ def test_invalid_structured_definition_records_validation_metric(
         lambda_context,
     )
 
-    assert response["statusCode"] == 400
+    assert response["statusCode"] == 422
     assert any(call.kwargs["name"] == "StructuredDefinitionValidationFailures" for call in metric.call_args_list)
 
 
@@ -1377,7 +1386,7 @@ def test_invalid_structured_definition_is_not_logged(
         lambda_context,
     )
 
-    assert response["statusCode"] == 400
+    assert response["statusCode"] == 422
     assert "TOP_SECRET_DEFINITION" not in str(log.call_args_list)
 
 

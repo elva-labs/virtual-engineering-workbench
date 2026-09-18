@@ -101,6 +101,7 @@ def _recover_response(
     reservation: Reservation,
     resource_exists: Callable[[str], bool],
     response_for_id: Callable[[str], StoredCreateResponse],
+    resume_existing: Callable[[str], None] | None,
     now: datetime,
 ) -> StoredCreateResponse | None:
     try:
@@ -109,6 +110,8 @@ def _recover_response(
         raise ResourceReadNotReady() from error
     if not exists:
         return None
+    if resume_existing is not None:
+        resume_existing(reservation.resource_id)
     result = response_for_id(reservation.resource_id)
     _complete(service, scope, request_hash, reservation.resource_id, result, now)
     return result
@@ -150,6 +153,7 @@ def execute_create(
     response_for_id: Callable[[str], StoredCreateResponse],
     create: Callable[[str], StoredCreateResponse],
     now: datetime,
+    resume_existing: Callable[[str], None] | None = None,
 ) -> StoredCreateResponse:
     request_hash = canonical_request_hash(request)
     reservation = service.reserve(scope, request_hash, resource_id, now)
@@ -170,6 +174,7 @@ def execute_create(
             reservation=reservation,
             resource_exists=resource_exists,
             response_for_id=response_for_id,
+            resume_existing=resume_existing,
             now=now,
         )
         if recovered is not None:

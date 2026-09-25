@@ -5,6 +5,7 @@ from unittest import mock
 import pytest
 from openapi_spec_validator.readers import read_from_filename
 
+from app.packaging.domain.ports.idempotency_service import Reservation, ReservationOutcome
 from app.packaging.domain.ports.service_client_project_access_service import ServiceClientProjectAccessService
 from app.shared.api import secrets_manager_api
 
@@ -18,7 +19,11 @@ def runtime_environment(monkeypatch):
     monkeypatch.setenv("AUDIT_LOGGING_KEY_NAME", "audit-key")
     monkeypatch.setenv("POWERTOOLS_METRICS_NAMESPACE", "Tests")
     monkeypatch.setenv("POWERTOOLS_SERVICE_NAME", "Packaging")
-    monkeypatch.setattr(secrets_manager_api.SecretsManagerAPI, "get_secret_value", lambda self, secret_id: "key")
+    monkeypatch.setattr(
+        secrets_manager_api.SecretsManagerAPI,
+        "get_secret_value",
+        lambda self, secret_id: "key",
+    )
 
 
 @pytest.fixture()
@@ -33,8 +38,20 @@ def lambda_context():
 
 @pytest.fixture()
 def client_event():
-    def build(method, path, body=None, headers=None, query=None, client_id="client-1", scopes=None):
-        request_headers = {"Accept": "application/json", "Content-Type": "application/json", **(headers or {})}
+    def build(
+        method,
+        path,
+        body=None,
+        headers=None,
+        query=None,
+        client_id="client-1",
+        scopes=None,
+    ):
+        request_headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            **(headers or {}),
+        }
         return {
             "resource": path,
             "path": path,
@@ -75,7 +92,7 @@ def client_event():
 
 @pytest.fixture()
 def mocked_dependencies():
-    return SimpleNamespace(
+    dependencies = SimpleNamespace(
         project_access_service=mock.create_autospec(ServiceClientProjectAccessService),
         command_bus=mock.Mock(),
         recipe_domain_qry_srv=mock.Mock(),
@@ -85,7 +102,15 @@ def mocked_dependencies():
         component_domain_qry_srv=mock.Mock(),
         component_version_domain_qry_srv=mock.Mock(),
         component_version_qry_srv=mock.Mock(),
+        idempotency_service=mock.Mock(),
+        resume_component_version_creation=mock.Mock(),
+        resume_recipe_version_creation=mock.Mock(),
+        resume_pipeline_creation=mock.Mock(),
     )
+    dependencies.idempotency_service.reserve.side_effect = lambda scope, request_hash, resource_id, now: Reservation(
+        ReservationOutcome.ACQUIRED, resource_id
+    )
+    return dependencies
 
 
 @pytest.fixture()
@@ -103,7 +128,21 @@ def component_body():
 def version_body():
     return {
         "componentVersionDescription": "install agent",
-        "componentVersionYamlDefinition": "schemaVersion: 1\nphases: []\n",
+        "componentVersionDefinition": {
+            "schemaVersion": "1.0",
+            "phases": [
+                {
+                    "name": "build",
+                    "steps": [
+                        {
+                            "name": "InstallAgent",
+                            "action": "ExecuteBash",
+                            "inputs": {"commands": ["install-agent"]},
+                        }
+                    ],
+                }
+            ],
+        },
         "componentVersionReleaseType": "MAJOR",
         "componentVersionDependencies": [],
         "softwareVendor": "Example",
@@ -131,6 +170,16 @@ def pipeline_body():
         "pipelineSchedule": "0 0 ? * MON *",
         "recipeId": "reci-1",
         "recipeVersionId": "vers-1",
+    }
+
+
+@pytest.fixture()
+def recipe_version_body():
+    return {
+        "configuredComponentsVersions": [],
+        "recipeVersionDescription": "build image",
+        "recipeVersionReleaseType": "MAJOR",
+        "recipeVersionVolumeSize": "8",
     }
 
 

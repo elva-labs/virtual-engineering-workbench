@@ -13,6 +13,7 @@ def handle(
 
     recipe_entity = recipe.Recipe(
         projectId=command.projectId.value,
+        recipeId=command.recipeId.value if command.recipeId else recipe.generate_recipe_id(),
         recipeDescription=command.recipeDescription.value,
         recipeName=command.recipeName.value,
         recipePlatform=command.recipeSystemConfiguration.platform,

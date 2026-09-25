@@ -10,16 +10,26 @@ DICT_KEY_USER_NAME = "userName"
 MASKED_JWT = "***"
 
 
-def clear_auth_headers(event: dict) -> dict:
+def _mask_header(headers: dict, header_name: str) -> None:
+    for name in list(headers):
+        if name.lower() == header_name.lower():
+            value = headers[name]
+            headers[name] = [MASKED_JWT for _ in value] if isinstance(value, list) else MASKED_JWT
+
+
+def clear_auth_headers(event: dict, *, mask_body: bool = False) -> dict:
     log_dict = copy.deepcopy(event)
 
-    if DICT_KEY_HEADERS in log_dict and DICT_KEY_AUTHORIZATION in log_dict[DICT_KEY_HEADERS]:
-        log_dict[DICT_KEY_HEADERS][DICT_KEY_AUTHORIZATION] = MASKED_JWT
+    if DICT_KEY_HEADERS in log_dict and log_dict[DICT_KEY_HEADERS]:
+        _mask_header(log_dict[DICT_KEY_HEADERS], DICT_KEY_AUTHORIZATION)
+        _mask_header(log_dict[DICT_KEY_HEADERS], "Idempotency-Key")
 
-    if DICT_KEY_MULTI_VALUE_HEADERS in log_dict and DICT_KEY_AUTHORIZATION in log_dict[DICT_KEY_MULTI_VALUE_HEADERS]:
-        log_dict[DICT_KEY_MULTI_VALUE_HEADERS][DICT_KEY_AUTHORIZATION] = [
-            MASKED_JWT for _ in log_dict[DICT_KEY_MULTI_VALUE_HEADERS][DICT_KEY_AUTHORIZATION]
-        ]
+    if DICT_KEY_MULTI_VALUE_HEADERS in log_dict and log_dict[DICT_KEY_MULTI_VALUE_HEADERS]:
+        _mask_header(log_dict[DICT_KEY_MULTI_VALUE_HEADERS], DICT_KEY_AUTHORIZATION)
+        _mask_header(log_dict[DICT_KEY_MULTI_VALUE_HEADERS], "Idempotency-Key")
+
+    if mask_body and "body" in log_dict and log_dict["body"] is not None:
+        log_dict["body"] = MASKED_JWT
 
     if DICT_KEY_REQUEST_CONTEXT in log_dict and DICT_KEY_AUTHORIZER in log_dict[DICT_KEY_REQUEST_CONTEXT]:
         authorizer = log_dict[DICT_KEY_REQUEST_CONTEXT][DICT_KEY_AUTHORIZER]

@@ -81,6 +81,7 @@ class DynamoDBRecipeVersionQueryService(recipe_version_query_service.RecipeVersi
                 "PK": f"{DBPrefix.Recipe}#{recipe_id}",
                 "SK": f"{DBPrefix.Version}#{version_id}",
             },
+            ConsistentRead=True,
         )
 
         if "Item" in result:
@@ -90,7 +91,7 @@ class DynamoDBRecipeVersionQueryService(recipe_version_query_service.RecipeVersi
 
     def get_all_recipe_versions(
         self,
-        status: recipe_version.RecipeVersionStatus,
+        status: str | recipe_version.RecipeVersionStatus,
     ) -> list[recipe_version_summary.RecipeVersionSummary]:
         """Returns a dictionary of all the recipe versions given a specific status"""
 

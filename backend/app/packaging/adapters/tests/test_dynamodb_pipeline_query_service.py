@@ -1,3 +1,5 @@
+from unittest import mock
+
 import assertpy
 
 from app.packaging.adapters.tests.conftest import GlobalVariables
@@ -71,6 +73,16 @@ def test_get_pipeline_returns_none_when_not_found(
 
     # ASSERT
     assertpy.assert_that(pipeline_entity).is_equal_to(None)
+
+
+def test_get_pipeline_uses_strong_consistency(get_dynamodb_pipeline_query_service):
+    client = mock.Mock()
+    client.get_item.return_value = {}
+    get_dynamodb_pipeline_query_service._dynamodb_client = client
+
+    get_dynamodb_pipeline_query_service.get_pipeline("proj-1", "pipe-1")
+
+    assert client.get_item.call_args.kwargs["ConsistentRead"] is True
 
 
 def test_get_pipeline_by_pipeline_id(

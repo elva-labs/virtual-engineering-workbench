@@ -125,7 +125,17 @@ class IntegrationOauthStack(aws_cdk.Stack):
                 ),
                 backend_app_api_oauth_client.AppClientResourceServer(
                     resource_server=packaging_resource_server,
-                    scopes=["component.read", "component.write", "component.release"],
+                    scopes=[
+                        "component.read",
+                        "component.write",
+                        "component.release",
+                        "recipe.read",
+                        "recipe.write",
+                        "recipe.release",
+                        "pipeline.read",
+                        "pipeline.write",
+                        "pipeline.execute",
+                    ],
                 ),
                 backend_app_api_oauth_client.AppClientResourceServer(
                     resource_server=publishing_compound_resource_server,

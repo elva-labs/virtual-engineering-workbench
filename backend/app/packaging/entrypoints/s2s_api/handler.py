@@ -8,7 +8,7 @@ from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities import typing
 
 from app.packaging.domain.exceptions import domain_exception
-from app.packaging.domain.exceptions.s2s_exception import S2SException
+from app.packaging.domain.exceptions.s2s_exception import InvalidComponentDefinition, S2SException
 from app.packaging.entrypoints.s2s_api import bootstrapper, config, problem_details
 from app.packaging.entrypoints.s2s_api.routers import common, component_versions, components, pipelines, recipes
 from app.shared.logging.helpers import clear_auth_headers
@@ -36,7 +36,22 @@ app.include_router(pipelines.init(dependencies))
 
 @app.exception_handler(RequestValidationError)
 def handle_validation_error(error: RequestValidationError):
-    logger.info("Packaging S2S request validation failed", errors=error.errors())
+    errors = error.errors()
+    logger.info("Packaging S2S request validation failed")
+    if any("componentVersionDefinition" in item.get("loc", ()) for item in errors):
+        common.api_metrics.add_metric(
+            name="StructuredDefinitionValidationFailures",
+            unit=MetricUnit.Count,
+            value=1,
+        )
+        problem = InvalidComponentDefinition()
+        return problem_details.api_response(
+            HTTPStatus.UNPROCESSABLE_ENTITY,
+            detail=problem.detail,
+            code=problem.code,
+            request_id=request_id(app.current_event.raw_event),
+            retryable=problem.retryable,
+        )
     return problem_details.api_response(
         HTTPStatus.BAD_REQUEST,
         detail="The request does not match the API contract.",
@@ -78,7 +93,7 @@ def add_cors(response: dict, event: dict) -> dict:
     return response
 
 
-@tracer.capture_lambda_handler  # type: ignore
+@tracer.capture_lambda_handler(capture_response=False, capture_error=False)  # type: ignore
 @logger.inject_lambda_context  # type: ignore
 @metric_handlers.report_invocation_metrics(
     dimensions={MetricDimensionNames.ByAPI: "PackagingS2SAPI"},
@@ -90,7 +105,7 @@ def add_cors(response: dict, event: dict) -> dict:
 def handler(event: dict, context: typing.LambdaContext):
     common.api_metrics.add_metric(name="APIRequests", unit=MetricUnit.Count, value=1)
     append_correlation_fields(event)
-    logger.info(clear_auth_headers(event))
+    logger.info(clear_auth_headers(event, mask_body=True))
     try:
         resolved = app.resolve(event, context)
         if "headers" not in resolved and "multiValueHeaders" in resolved:
@@ -123,8 +138,11 @@ def handler(event: dict, context: typing.LambdaContext):
             ),
             event,
         )
-    except Exception:
-        logger.exception("Unhandled Packaging S2S API error")
+    except Exception as error:
+        logger.error(
+            "Unhandled Packaging S2S API error",
+            exceptionClass=type(error).__name__,
+        )
         return add_cors(
             problem_details.response(
                 HTTPStatus.INTERNAL_SERVER_ERROR,

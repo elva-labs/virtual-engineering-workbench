@@ -53,6 +53,7 @@ class DynamoDBPipelineQueryService(pipeline_query_service.PipelineQueryService):
                 "PK": f"{DBPrefix.Project}#{project_id}",
                 "SK": f"{DBPrefix.Pipeline}#{pipeline_id}",
             },
+            ConsistentRead=True,
         )
 
         if "Item" in result:

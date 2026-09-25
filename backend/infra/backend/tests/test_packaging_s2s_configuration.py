@@ -1,7 +1,6 @@
 import json
 
 import aws_cdk
-import pytest
 from aws_cdk.assertions import Template
 
 from infra import config, constants
@@ -18,14 +17,7 @@ def test_packaging_stack_has_no_reconciliation_entrypoint():
     assert "s2s-reconciliation-events" not in {entry.value for entry in packaging_app_stack.Entrypoint}
 
 
-@pytest.mark.parametrize(
-    ("prefix", "expected_scopes"),
-    [
-        ("recipe.", {"recipe.read", "recipe.write", "recipe.release"}),
-        ("pipeline.", {"pipeline.read", "pipeline.write", "pipeline.execute"}),
-    ],
-)
-def test_publishing_scopes_are_available_without_granting_existing_clients_access(prefix, expected_scopes):
+def packaging_oauth_template() -> Template:
     app = aws_cdk.App()
     app_config = config.AppConfig(
         account="111111111111",
@@ -44,14 +36,46 @@ def test_publishing_scopes_are_available_without_granting_existing_clients_acces
         app_config=app_config,
         env=aws_cdk.Environment(account="111111111111", region="eu-west-1"),
     )
-    template = Template.from_stack(stack)
+    return Template.from_stack(stack)
+
+
+def test_packaging_resource_server_exposes_all_supported_scopes():
+    template = packaging_oauth_template()
     servers = template.find_resources("AWS::Cognito::UserPoolResourceServer")
     packaging = next(
         server["Properties"] for server in servers.values() if server["Properties"]["Identifier"] == "clients/packaging"
     )
     scopes = {scope["ScopeName"] for scope in packaging["Scopes"]}
-    assert expected_scopes <= scopes
+    assert scopes == {
+        "component.read",
+        "component.write",
+        "component.release",
+        "recipe.read",
+        "recipe.write",
+        "recipe.release",
+        "pipeline.read",
+        "pipeline.write",
+        "pipeline.execute",
+    }
     assert "operation.read" not in scopes
-    for client in template.find_resources("AWS::Cognito::UserPoolClient").values():
-        assert prefix not in json.dumps(client["Properties"].get("AllowedOAuthScopes", []))
-        assert "operation.read" not in json.dumps(client["Properties"].get("AllowedOAuthScopes", []))
+
+
+def test_sample_s2s_client_is_granted_all_packaging_scopes():
+    template = packaging_oauth_template()
+    clients = template.find_resources("AWS::Cognito::UserPoolClient")
+    assert len(clients) == 1
+
+    allowed_scopes = json.dumps(next(iter(clients.values()))["Properties"].get("AllowedOAuthScopes", []))
+    for scope in (
+        "component.read",
+        "component.write",
+        "component.release",
+        "recipe.read",
+        "recipe.write",
+        "recipe.release",
+        "pipeline.read",
+        "pipeline.write",
+        "pipeline.execute",
+    ):
+        assert scope in allowed_scopes
+    assert "operation.read" not in allowed_scopes

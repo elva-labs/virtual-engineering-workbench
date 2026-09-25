@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from http import HTTPStatus
 
 from aws_lambda_powertools import Tracer
@@ -10,6 +11,7 @@ from app.packaging.domain.commands.pipeline import (
     retire_pipeline_command,
     update_pipeline_command,
 )
+from app.packaging.domain.model.pipeline import pipeline
 from app.packaging.domain.value_objects.image import image_id_value_object, product_id_value_object
 from app.packaging.domain.value_objects.pipeline import (
     pipeline_build_instance_types_value_object,
@@ -21,7 +23,7 @@ from app.packaging.domain.value_objects.pipeline import (
 from app.packaging.domain.value_objects.recipe import recipe_id_value_object
 from app.packaging.domain.value_objects.recipe_version import recipe_version_id_value_object
 from app.packaging.domain.value_objects.shared import project_id_value_object, user_id_value_object
-from app.packaging.entrypoints.s2s_api import bootstrapper
+from app.packaging.entrypoints.s2s_api import bootstrapper, idempotency
 from app.packaging.entrypoints.s2s_api.model import api_model
 from app.packaging.entrypoints.s2s_api.routers import common
 
@@ -65,7 +67,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             content_type=content_types.APPLICATION_JSON,
         )
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.post("/projects/<project_id>/pipelines")
     def create_pipeline(project_id: str, request: api_model.CreatePipelineRequest):
         client_id = authorize(project_id, WRITE_SCOPE)
@@ -76,22 +78,34 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             recipe_id_value_object.from_str(request.recipeId),
             recipe_version_id_value_object.from_str(request.recipeVersionId),
         )
-        result = dependencies.command_bus.handle(
-            create_pipeline_command.CreatePipelineCommand(
-                projectId=project_id_value_object.from_str(project_id),
-                buildInstanceTypes=pipeline_build_instance_types_value_object.from_list(request.buildInstanceTypes),
-                pipelineDescription=pipeline_description_value_object.from_str(request.pipelineDescription),
-                pipelineName=pipeline_name_value_object.from_str(request.pipelineName),
-                pipelineSchedule=pipeline_schedule_value_object.from_str(request.pipelineSchedule),
-                recipeId=recipe_id_value_object.from_str(request.recipeId),
-                recipeVersionId=recipe_version_id_value_object.from_str(request.recipeVersionId),
-                productId=product_id_value_object.from_str(request.productId) if request.productId else None,
-                createdBy=user_id_value_object.from_str(f"service:{client_id}"),
+        scope = common.idempotency_scope(router, client_id, project_id, "CREATE_PIPELINE")
+        result = idempotency.execute_create(
+            service=dependencies.idempotency_service,
+            scope=scope,
+            request=request,
+            resource_id=pipeline.generate_pipeline_id(),
+            resource_exists=lambda resource_id: dependencies.pipeline_domain_qry_srv.get_pipeline(
+                project_id_value_object.from_str(project_id),
+                pipeline_id_value_object.from_str(resource_id),
             )
+            is not None,
+            response_for_id=lambda resource_id: idempotency.StoredCreateResponse(
+                HTTPStatus.ACCEPTED, {"pipelineId": resource_id}
+            ),
+            resume_existing=lambda resource_id: dependencies.resume_pipeline_creation(project_id, resource_id),
+            create=lambda resource_id: create_pipeline_response(
+                dependencies, project_id, client_id, request, resource_id
+            ),
+            now=datetime.now(timezone.utc),
         )
-        return action_response(result["pipelineId"])
+        return api_gateway.Response(
+            status_code=result.status_code,
+            body=result.body,
+            headers={**common.NO_STORE, "Retry-After": "5"},
+            content_type=content_types.APPLICATION_JSON,
+        )
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.get("/projects/<project_id>/pipelines")
     def list_pipelines(project_id: str):
         authorize(project_id, READ_SCOPE)
@@ -100,14 +114,14 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             pipelines=[api_model.Pipeline.model_validate(pipeline.model_dump()) for pipeline in pipelines]
         )
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.get("/projects/<project_id>/pipelines/<pipeline_id>")
     def get_pipeline(project_id: str, pipeline_id: str):
         authorize(project_id, READ_SCOPE)
         pipeline = pipeline_in_project(project_id, pipeline_id)
         return api_model.PipelineResponse(pipeline=api_model.Pipeline.model_validate(pipeline.model_dump()))
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.put("/projects/<project_id>/pipelines/<pipeline_id>")
     def update_pipeline(project_id: str, pipeline_id: str, request: api_model.UpdatePipelineRequest):
         client_id = authorize(project_id, WRITE_SCOPE)
@@ -136,11 +150,13 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
         )
         return action_response(pipeline_id)
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.delete("/projects/<project_id>/pipelines/<pipeline_id>")
     def retire_pipeline(project_id: str, pipeline_id: str):
         client_id = authorize(project_id, WRITE_SCOPE)
-        pipeline_in_project(project_id, pipeline_id)
+        existing = pipeline_in_project(project_id, pipeline_id)
+        if existing.status == pipeline.PipelineStatus.Retired:
+            return action_response(pipeline_id)
         dependencies.command_bus.handle(
             retire_pipeline_command.RetirePipelineCommand(
                 projectId=project_id_value_object.from_str(project_id),
@@ -150,7 +166,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
         )
         return action_response(pipeline_id)
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.post("/projects/<project_id>/images")
     def create_image(project_id: str, request: api_model.CreateImageRequest):
         authorize(project_id, EXECUTE_SCOPE)
@@ -168,14 +184,14 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             content_type=content_types.APPLICATION_JSON,
         )
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.get("/projects/<project_id>/images")
     def list_images(project_id: str):
         authorize(project_id, READ_SCOPE)
         images = dependencies.image_domain_qry_srv.get_images(project_id_value_object.from_str(project_id))
         return api_model.ImagePage(images=[image_model(image) for image in images])
 
-    @tracer.capture_method
+    @tracer.capture_method(capture_response=False, capture_error=False)
     @router.get("/projects/<project_id>/images/<image_id>")
     def get_image(project_id: str, image_id: str):
         authorize(project_id, READ_SCOPE)
@@ -186,3 +202,27 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
 
 def image_model(image) -> api_model.Image:
     return api_model.Image.model_validate({**image.model_dump(), "imageBuildVersion": str(image.imageBuildVersion)})
+
+
+def create_pipeline_response(
+    dependencies: bootstrapper.Dependencies,
+    project_id: str,
+    client_id: str,
+    request: api_model.CreatePipelineRequest,
+    pipeline_id: str,
+) -> idempotency.StoredCreateResponse:
+    dependencies.command_bus.handle(
+        create_pipeline_command.CreatePipelineCommand(
+            projectId=project_id_value_object.from_str(project_id),
+            pipelineId=pipeline_id_value_object.from_str(pipeline_id),
+            buildInstanceTypes=pipeline_build_instance_types_value_object.from_list(request.buildInstanceTypes),
+            pipelineDescription=pipeline_description_value_object.from_str(request.pipelineDescription),
+            pipelineName=pipeline_name_value_object.from_str(request.pipelineName),
+            pipelineSchedule=pipeline_schedule_value_object.from_str(request.pipelineSchedule),
+            recipeId=recipe_id_value_object.from_str(request.recipeId),
+            recipeVersionId=recipe_version_id_value_object.from_str(request.recipeVersionId),
+            productId=(product_id_value_object.from_str(request.productId) if request.productId else None),
+            createdBy=user_id_value_object.from_str(f"service:{client_id}"),
+        )
+    )
+    return idempotency.StoredCreateResponse(HTTPStatus.ACCEPTED, {"pipelineId": pipeline_id})

@@ -56,3 +56,26 @@ def test_clear_auth_headers_should_mask_user_info():
     assert_that(response["requestContext"]["authorizer"]["userEmail"]).is_equal_to("***")
     assert_that(response["requestContext"]["authorizer"]["userName"]).is_equal_to("***")
     assert_that(response["requestContext"]["authorizer"]["userRoles"]).is_equal_to("[]")
+
+
+def test_clear_auth_headers_masks_idempotency_key_case_insensitively_and_optional_body():
+    payload = {
+        "headers": {"idempotency-key": "secret-key"},
+        "multiValueHeaders": {"IDEMPOTENCY-KEY": ["secret-key"]},
+        "body": '{"componentVersionDefinition":{"secret":"value"}}',
+    }
+
+    response = helpers.clear_auth_headers(payload, mask_body=True)
+
+    assert_that(response["headers"]["idempotency-key"]).is_equal_to("***")
+    assert_that(response["multiValueHeaders"]["IDEMPOTENCY-KEY"]).is_equal_to(["***"])
+    assert_that(response["body"]).is_equal_to("***")
+    assert_that(payload["body"]).is_not_equal_to("***")
+
+
+def test_clear_auth_headers_preserves_body_by_default():
+    payload = {"body": '{"safe":"existing-api-behavior"}'}
+
+    response = helpers.clear_auth_headers(payload)
+
+    assert_that(response["body"]).is_equal_to(payload["body"])

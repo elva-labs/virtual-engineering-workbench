@@ -110,7 +110,7 @@ class ComponentConstant(BaseModel):
         extra="forbid",
     )
     type: Type
-    value: str | None = None
+    value: str | None = Field(None, max_length=4096)
 
 
 class ComponentParameter(BaseModel):
@@ -118,8 +118,8 @@ class ComponentParameter(BaseModel):
         extra="forbid",
     )
     type: Type
-    default: str | None = None
-    description: str | None = None
+    default: str | None = Field(None, max_length=4096)
+    description: str | None = Field(None, max_length=1024)
 
 
 class Name(Enum):
@@ -138,11 +138,11 @@ class ComponentStep(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    name: str
-    action: str
-    timeoutSeconds: int | None = 7200
+    name: str = Field(..., max_length=256)
+    action: str = Field(..., max_length=128)
+    timeoutSeconds: int | None = Field(7200, ge=1, le=43200)
     onFailure: OnFailure | None = "Abort"
-    maxAttempts: int | None = 1
+    maxAttempts: int | None = Field(1, ge=1, le=10)
     inputs: dict[str, Any] | list[Any] | None = None
 
 
@@ -401,7 +401,7 @@ class ComponentPhase(BaseModel):
         extra="forbid",
     )
     name: Name
-    steps: list[ComponentStep] = Field(..., min_length=1)
+    steps: list[ComponentStep] = Field(..., min_length=1, max_length=100)
 
 
 class ComponentDefinition(BaseModel):
@@ -409,39 +409,14 @@ class ComponentDefinition(BaseModel):
         extra="forbid",
         coerce_numbers_to_str=True,
     )
-    name: str | None = None
-    description: str | None = None
-    schemaVersion: str
-    constants: list[dict[str, ComponentConstant]] | None = None
-    parameters: list[dict[str, ComponentParameter]] | None = None
-    phases: list[ComponentPhase] = Field(..., min_length=1)
-
-
-class CreateComponentVersionRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
+    name: str | None = Field(None, max_length=256)
+    description: str | None = Field(None, max_length=1024)
+    schemaVersion: str = Field(..., max_length=16)
+    constants: list[Annotated[dict[str, ComponentConstant], Field(max_length=10)]] | None = Field(None, max_length=100)
+    parameters: list[Annotated[dict[str, ComponentParameter], Field(max_length=10)]] | None = Field(
+        None, max_length=100
     )
-    componentVersionDescription: str
-    componentVersionDependencies: list[ComponentVersionEntry] | None = None
-    componentVersionReleaseType: str
-    componentVersionDefinition: ComponentDefinition
-    softwareVendor: str
-    softwareVersion: str
-    licenseDashboard: str | None = None
-    notes: str | None = None
-
-
-class UpdateComponentVersionRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    componentVersionDescription: str
-    componentVersionDependencies: list[ComponentVersionEntry] | None = None
-    componentVersionDefinition: ComponentDefinition
-    softwareVendor: str
-    softwareVersion: str
-    licenseDashboard: str | None = None
-    notes: str | None = None
+    phases: list[ComponentPhase] = Field(..., min_length=1, max_length=3)
 
 
 class ComponentVersionResponse(BaseModel):

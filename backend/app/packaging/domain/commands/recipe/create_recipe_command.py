@@ -1,5 +1,8 @@
+from typing import Optional
+
 from app.packaging.domain.value_objects.recipe import (
     recipe_description_value_object,
+    recipe_id_value_object,
     recipe_name_value_object,
     recipe_system_configuration_value_object,
 )
@@ -13,3 +16,4 @@ class CreateRecipeCommand(command_bus.Command):
     recipeName: recipe_name_value_object.RecipeNameValueObject
     recipeSystemConfiguration: recipe_system_configuration_value_object.RecipeSystemConfigurationValueObject
     createdBy: user_id_value_object.UserIdValueObject
+    recipeId: Optional[recipe_id_value_object.RecipeIdValueObject] = None

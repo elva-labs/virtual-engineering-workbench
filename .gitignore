@@ -11,3 +11,6 @@ htmlcov/
 .deploy-config-*
 deploy-config.env
 poc-code-snippets-add-poc-nv
+
+
+.agents/*

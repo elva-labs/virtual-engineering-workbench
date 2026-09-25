@@ -8,6 +8,7 @@ from app.packaging.domain.value_objects.component_version import (
     component_software_version_value_object,
     component_version_dependencies_value_object,
     component_version_description_value_object,
+    component_version_id_value_object,
     component_version_release_type_value_object,
     component_version_yaml_definition_value_object,
 )
@@ -31,3 +32,4 @@ class CreateComponentVersionCommand(command_bus.Command):
     )
     notes: Optional[component_software_version_notes_value_object.ComponentSoftwareVersionNotesValueObject] = None
     createdBy: user_id_value_object.UserIdValueObject
+    componentVersionId: Optional[component_version_id_value_object.ComponentVersionIdValueObject] = None

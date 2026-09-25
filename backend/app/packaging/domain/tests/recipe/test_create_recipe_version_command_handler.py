@@ -14,10 +14,115 @@ from app.packaging.domain.model.recipe import recipe, recipe_version
 from app.packaging.domain.model.shared import component_version_entry
 from app.packaging.domain.value_objects.recipe_version import (
     recipe_version_components_versions_value_object,
+    recipe_version_id_value_object,
     recipe_version_release_type_value_object,
 )
 from app.shared.adapters.message_bus import message_bus
 from app.shared.adapters.unit_of_work_v2 import unit_of_work
+
+
+def test_create_persists_configured_components_before_mandatory_injection(
+    create_recipe_version_command_mock,
+    get_test_ami_id,
+    get_test_component_version_with_specific_status,
+    get_test_mandatory_components_list_with_specific_mandatory_components_versions,
+    component_version_query_service_mock,
+    component_query_service_mock,
+    mandatory_components_list_query_service_mock,
+    recipe_version_query_service_mock,
+    recipe_query_service_mock,
+    parameter_service_mock,
+    mock_system_configuration_mapping,
+):
+    message_bus_mock = mock.create_autospec(spec=message_bus.MessageBus)
+    recipe_version_repo_mock = mock.create_autospec(spec=unit_of_work.GenericRepository)
+    uow_mock = mock.create_autospec(spec=unit_of_work.UnitOfWork)
+    uow_mock.get_repository.return_value = recipe_version_repo_mock
+    mandatory_components_list_query_service_mock.get_mandatory_components_list.return_value = (
+        get_test_mandatory_components_list_with_specific_mandatory_components_versions()
+    )
+    component_version_entities = []
+    for entry in create_recipe_version_command_mock.recipeComponentsVersions.value:
+        entity = get_test_component_version_with_specific_status(
+            status=component_version.ComponentVersionStatus.Released
+        )
+        entity.componentId = entry.componentId
+        entity.componentVersionId = entry.componentVersionId
+        component_version_entities.append(entity)
+    component_version_query_service_mock.get_component_version.side_effect = component_version_entities
+
+    configured_orders = [entry.order for entry in create_recipe_version_command_mock.recipeComponentsVersions.value]
+    create_recipe_version_command_handler.handle(
+        command=create_recipe_version_command_mock,
+        uow=uow_mock,
+        message_bus=message_bus_mock,
+        component_version_qry_srv=component_version_query_service_mock,
+        recipe_version_qry_srv=recipe_version_query_service_mock,
+        recipe_qry_srv=recipe_query_service_mock,
+        parameter_srv=parameter_service_mock,
+        mandatory_components_list_qry_srv=mandatory_components_list_query_service_mock,
+        system_configuration_mapping=mock_system_configuration_mapping,
+        component_qry_srv=component_query_service_mock,
+    )
+
+    saved = recipe_version_repo_mock.add.call_args.args[0]
+    configured_ids = [
+        entry.componentVersionId for entry in create_recipe_version_command_mock.recipeComponentsVersions.value
+    ]
+    assert [entry.componentVersionId for entry in saved.configuredRecipeComponentsVersions] == configured_ids
+    assert [entry.order for entry in saved.configuredRecipeComponentsVersions] == configured_orders
+    assert len(saved.recipeComponentsVersions) >= len(saved.configuredRecipeComponentsVersions)
+
+
+def test_create_recipe_version_uses_injected_id(
+    create_recipe_version_command_mock,
+    get_test_ami_id,
+    get_test_component_version_with_specific_status,
+    get_test_mandatory_components_list_with_specific_mandatory_components_versions,
+    component_version_query_service_mock,
+    component_query_service_mock,
+    mandatory_components_list_query_service_mock,
+    recipe_version_query_service_mock,
+    recipe_query_service_mock,
+    parameter_service_mock,
+    mock_system_configuration_mapping,
+):
+    command = create_recipe_version_command_mock.model_copy(
+        update={"recipeVersionId": recipe_version_id_value_object.from_str("vers-fixed")}
+    )
+    message_bus_mock = mock.create_autospec(spec=message_bus.MessageBus)
+    recipe_version_repo_mock = mock.create_autospec(spec=unit_of_work.GenericRepository)
+    uow_mock = mock.create_autospec(spec=unit_of_work.UnitOfWork)
+    uow_mock.get_repository.return_value = recipe_version_repo_mock
+    mandatory_components_list_query_service_mock.get_mandatory_components_list.return_value = (
+        get_test_mandatory_components_list_with_specific_mandatory_components_versions()
+    )
+    component_version_entities = []
+    for entry in command.recipeComponentsVersions.value:
+        entity = get_test_component_version_with_specific_status(
+            status=component_version.ComponentVersionStatus.Released
+        )
+        entity.componentId = entry.componentId
+        entity.componentVersionId = entry.componentVersionId
+        component_version_entities.append(entity)
+    component_version_query_service_mock.get_component_version.side_effect = component_version_entities
+
+    result = create_recipe_version_command_handler.handle(
+        command=command,
+        uow=uow_mock,
+        message_bus=message_bus_mock,
+        component_version_qry_srv=component_version_query_service_mock,
+        recipe_version_qry_srv=recipe_version_query_service_mock,
+        recipe_qry_srv=recipe_query_service_mock,
+        parameter_srv=parameter_service_mock,
+        mandatory_components_list_qry_srv=mandatory_components_list_query_service_mock,
+        system_configuration_mapping=mock_system_configuration_mapping,
+        component_qry_srv=component_query_service_mock,
+    )
+
+    saved = recipe_version_repo_mock.add.call_args.args[0]
+    assert result == {"recipeVersionId": "vers-fixed"}
+    assert saved.recipeVersionId == "vers-fixed"
 
 
 @pytest.mark.parametrize(
@@ -72,6 +177,10 @@ def test_handle_should_create_new_version_recipe_if_version_in_repository(
         component_version_entities.append(component_version_entity)
 
     component_version_query_service_mock.get_component_version.side_effect = component_version_entities
+
+    configured_recipe_components = [
+        entry.model_copy(deep=True) for entry in create_recipe_version_command_mock.recipeComponentsVersions.value
+    ]
 
     # ACT
     result = create_recipe_version_command_handler.handle(
@@ -151,6 +260,7 @@ def test_handle_should_create_new_version_recipe_if_version_in_repository(
             ],
             status=recipe_version.RecipeVersionStatus.Creating,
             parentImageUpstreamId=get_test_ami_id,
+            configuredRecipeComponentsVersions=configured_recipe_components,
             recipeVersionVolumeSize="8",
             createDate="2023-09-29T00:00:00+00:00",
             createdBy="T123456",
@@ -276,6 +386,10 @@ def test_handle_should_create_new_inital_version_for_recipe_if_no_version_in_rep
 
     component_version_query_service_mock.get_component_version.side_effect = component_version_entities
 
+    configured_recipe_components = [
+        entry.model_copy(deep=True) for entry in create_recipe_version_command_mock.recipeComponentsVersions.value
+    ]
+
     # ACT
     create_recipe_version_command_handler.handle(
         command=create_recipe_version_command_mock,
@@ -353,6 +467,7 @@ def test_handle_should_create_new_inital_version_for_recipe_if_no_version_in_rep
             ],
             status=recipe_version.RecipeVersionStatus.Creating,
             parentImageUpstreamId=get_test_ami_id,
+            configuredRecipeComponentsVersions=configured_recipe_components,
             recipeVersionVolumeSize="8",
             createDate="2023-09-29T00:00:00+00:00",
             createdBy="T123456",
@@ -479,6 +594,10 @@ def test_handle_should_create_new_inital_version_for_recipe_if_no_version_in_rep
 
     component_version_query_service_mock.get_component_version.side_effect = component_version_entities
 
+    configured_recipe_components = [
+        entry.model_copy(deep=True) for entry in create_recipe_version_command_mock.recipeComponentsVersions.value
+    ]
+
     # ACT
     create_recipe_version_command_handler.handle(
         command=create_recipe_version_command_mock,
@@ -556,6 +675,7 @@ def test_handle_should_create_new_inital_version_for_recipe_if_no_version_in_rep
             ],
             status=recipe_version.RecipeVersionStatus.Creating,
             parentImageUpstreamId=get_test_ami_id,
+            configuredRecipeComponentsVersions=configured_recipe_components,
             recipeVersionVolumeSize="8",
             createDate="2023-09-29T00:00:00+00:00",
             createdBy="T123456",
@@ -864,6 +984,8 @@ def test_handle_should_create_new_version_recipe_with_correct_component_versions
 
     component_version_query_service_mock.get_component_version.side_effect = component_version_entities
 
+    configured_recipe_components = [entry.model_copy(deep=True) for entry in recipe_component_versions]
+
     # ACT
     create_recipe_version_command_handler.handle(
         command=create_recipe_version_command_mock,
@@ -889,6 +1011,7 @@ def test_handle_should_create_new_version_recipe_with_correct_component_versions
             recipeComponentsVersions=expected_recipe_component_versions,
             status=recipe_version.RecipeVersionStatus.Creating,
             parentImageUpstreamId=get_test_ami_id,
+            configuredRecipeComponentsVersions=configured_recipe_components,
             recipeVersionVolumeSize="8",
             createDate="2023-09-29T00:00:00+00:00",
             createdBy="T123456",

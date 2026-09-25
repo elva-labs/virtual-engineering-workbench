@@ -170,7 +170,6 @@ def test_create_recipe_should_raise_exception_with_incompatible_platform_os_vers
 def create_recipe_command_mock() -> CreateRecipeCommand:
     return CreateRecipeCommand(
         projectId=project_id_value_object.from_str("proj-12345"),
-        recipeId=recipe_id_value_object.from_str("reci-12345"),
         recipeName=recipe_name_value_object.from_str("proserve-autosar-recipe"),
         recipeDescription=recipe_description_value_object.from_str("This is a recipe for validation"),
         recipeSystemConfiguration=recipe_system_configuration_value_object.from_attrs(
@@ -212,3 +211,13 @@ def test_create_recipe_should_create_new_recipe(
     # ASSERT
     generic_repo_mock.add.assert_called_with(mock_recipe_object)
     uow_mock.commit.assert_called()
+
+
+def test_create_recipe_uses_injected_id(create_recipe_command_mock, generic_repo_mock, uow_mock):
+    command = create_recipe_command_mock.model_copy(update={"recipeId": recipe_id_value_object.from_str("reci-fixed")})
+
+    result = handle(command, uow=uow_mock)
+
+    saved = generic_repo_mock.add.call_args.args[0]
+    assert result == {"recipeId": "reci-fixed"}
+    assert saved.recipeId == "reci-fixed"

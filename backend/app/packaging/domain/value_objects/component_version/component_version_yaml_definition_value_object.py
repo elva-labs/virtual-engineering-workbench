@@ -1,10 +1,9 @@
-import json
 import typing
 from dataclasses import dataclass
-from typing import Dict, List, Literal, Optional, Union
+from typing import Annotated, Dict, List, Literal, Optional, Union
 
 import yaml
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.packaging.domain.exceptions import domain_exception
 
@@ -25,6 +24,10 @@ class ComponentPhaseYaml(BaseModel):
 
     name: Literal["build", "test", "validate"]
     steps: List[ComponentStepYaml]
+
+
+class CanonicalComponentPhaseYaml(ComponentPhaseYaml):
+    steps: Annotated[List[ComponentStepYaml], Field(min_length=1)]
 
 
 class ComponentConstantYaml(BaseModel):
@@ -53,6 +56,10 @@ class ComponentYaml(BaseModel):
     phases: List[ComponentPhaseYaml]
 
 
+class CanonicalComponentYaml(ComponentYaml):
+    phases: Annotated[List[CanonicalComponentPhaseYaml], Field(min_length=1)]
+
+
 @dataclass(frozen=True)
 class ComponentVersionYamlDefinitionValueObject:
     value: str
@@ -63,10 +70,25 @@ def from_str(value: typing.Optional[str]) -> ComponentVersionYamlDefinitionValue
         raise domain_exception.DomainException("Component version YAML definition cannot be empty.")
 
     try:
-        # Convert YAML to JSON
-        component_json_str = json.loads(json.dumps(yaml.full_load(value)))
-        ComponentYaml(**component_json_str)
-    except:
-        raise domain_exception.DomainException("Component version YAML definition is invalid.")
+        ComponentYaml.model_validate(yaml.safe_load(value))
+    except (TypeError, yaml.YAMLError, ValidationError) as error:
+        raise domain_exception.DomainException("Component version YAML definition is invalid.") from error
 
     return ComponentVersionYamlDefinitionValueObject(value=value)
+
+
+def from_dict(value: dict) -> ComponentVersionYamlDefinitionValueObject:
+    try:
+        model = CanonicalComponentYaml.model_validate(value)
+    except ValidationError as error:
+        raise domain_exception.DomainException("Component version definition is invalid.") from error
+    canonical = model.model_dump(mode="json", exclude_none=True)
+    return ComponentVersionYamlDefinitionValueObject(value=yaml.safe_dump(canonical, sort_keys=False))
+
+
+def to_dict(value: str | bytes) -> dict:
+    try:
+        model = CanonicalComponentYaml.model_validate(yaml.safe_load(value))
+    except (TypeError, yaml.YAMLError, ValidationError) as error:
+        raise domain_exception.DomainException("Component version definition is invalid.") from error
+    return model.model_dump(mode="json", exclude_none=True)

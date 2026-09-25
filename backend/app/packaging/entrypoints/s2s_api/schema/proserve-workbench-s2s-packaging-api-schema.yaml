@@ -9,33 +9,79 @@ servers:
       Host:
         default: example.invalid
 x-amazon-apigateway-request-validators:
+  lambda-only:
+    validateRequestBody: false
+    validateRequestParameters: false
   all:
     validateRequestBody: true
     validateRequestParameters: true
   params-only:
     validateRequestBody: false
     validateRequestParameters: true
+  body-only:
+    validateRequestBody: true
+    validateRequestParameters: false
 x-amazon-apigateway-request-validator: params-only
 x-amazon-apigateway-gateway-responses:
-  DEFAULT_4XX: &clientGatewayError
-    responseParameters:
+  DEFAULT_4XX: &clientProblem400
+    responseParameters: &problemHeaders
       gatewayresponse.header.Content-Type: "'application/problem+json'"
       gatewayresponse.header.Cache-Control: "'no-store'"
     responseTemplates:
       application/problem+json: >-
-        {"type":"https://problems.virtual-engineering-workbench.dev/api-gateway-error","title":"Client Error","status":$context.status,"detail":$context.error.messageString,"code":"$context.error.responseType","requestId":"$context.requestId","retryable":false}
-  BAD_REQUEST_BODY: *clientGatewayError
-  BAD_REQUEST_PARAMETERS: *clientGatewayError
-  UNAUTHORIZED: *clientGatewayError
-  ACCESS_DENIED: *clientGatewayError
-  THROTTLED: *clientGatewayError
-  DEFAULT_5XX:
-    responseParameters:
-      gatewayresponse.header.Content-Type: "'application/problem+json'"
-      gatewayresponse.header.Cache-Control: "'no-store'"
+        {"type":"https://problems.virtual-engineering-workbench.dev/api-gateway-error","title":"Client Error","status":400,"detail":$context.error.messageString,"code":"$context.error.responseType","requestId":"$context.requestId","retryable":false}
+  BAD_REQUEST_BODY: *clientProblem400
+  BAD_REQUEST_PARAMETERS: *clientProblem400
+  UNAUTHORIZED: &clientProblem401
+    responseParameters: *problemHeaders
     responseTemplates:
       application/problem+json: >-
-        {"type":"https://problems.virtual-engineering-workbench.dev/api-gateway-error","title":"Server Error","status":$context.status,"detail":"API Gateway could not process the request.","code":"$context.error.responseType","requestId":"$context.requestId","retryable":true}
+        {"type":"https://problems.virtual-engineering-workbench.dev/api-gateway-error","title":"Client Error","status":401,"detail":$context.error.messageString,"code":"$context.error.responseType","requestId":"$context.requestId","retryable":false}
+  ACCESS_DENIED: &clientProblem403
+    responseParameters: *problemHeaders
+    responseTemplates:
+      application/problem+json: >-
+        {"type":"https://problems.virtual-engineering-workbench.dev/api-gateway-error","title":"Client Error","status":403,"detail":$context.error.messageString,"code":"$context.error.responseType","requestId":"$context.requestId","retryable":false}
+  EXPIRED_TOKEN: *clientProblem403
+  INVALID_API_KEY: *clientProblem403
+  INVALID_SIGNATURE: *clientProblem403
+  MISSING_AUTHENTICATION_TOKEN: *clientProblem403
+  WAF_FILTERED: *clientProblem403
+  RESOURCE_NOT_FOUND: &clientProblem404
+    responseParameters: *problemHeaders
+    responseTemplates:
+      application/problem+json: >-
+        {"type":"https://problems.virtual-engineering-workbench.dev/api-gateway-error","title":"Client Error","status":404,"detail":$context.error.messageString,"code":"$context.error.responseType","requestId":"$context.requestId","retryable":false}
+  REQUEST_TOO_LARGE: &clientProblem413
+    responseParameters: *problemHeaders
+    responseTemplates:
+      application/problem+json: >-
+        {"type":"https://problems.virtual-engineering-workbench.dev/api-gateway-error","title":"Client Error","status":413,"detail":$context.error.messageString,"code":"$context.error.responseType","requestId":"$context.requestId","retryable":false}
+  UNSUPPORTED_MEDIA_TYPE: &clientProblem415
+    responseParameters: *problemHeaders
+    responseTemplates:
+      application/problem+json: >-
+        {"type":"https://problems.virtual-engineering-workbench.dev/api-gateway-error","title":"Client Error","status":415,"detail":$context.error.messageString,"code":"$context.error.responseType","requestId":"$context.requestId","retryable":false}
+  THROTTLED: &clientProblem429
+    responseParameters: *problemHeaders
+    responseTemplates:
+      application/problem+json: >-
+        {"type":"https://problems.virtual-engineering-workbench.dev/api-gateway-error","title":"Client Error","status":429,"detail":$context.error.messageString,"code":"$context.error.responseType","requestId":"$context.requestId","retryable":false}
+  QUOTA_EXCEEDED: *clientProblem429
+  DEFAULT_5XX: &serverProblem500
+    responseParameters: *problemHeaders
+    responseTemplates:
+      application/problem+json: >-
+        {"type":"https://problems.virtual-engineering-workbench.dev/api-gateway-error","title":"Server Error","status":500,"detail":"API Gateway could not process the request.","code":"$context.error.responseType","requestId":"$context.requestId","retryable":true}
+  API_CONFIGURATION_ERROR: *serverProblem500
+  AUTHORIZER_CONFIGURATION_ERROR: *serverProblem500
+  AUTHORIZER_FAILURE: *serverProblem500
+  INTEGRATION_FAILURE: &serverProblem504
+    responseParameters: *problemHeaders
+    responseTemplates:
+      application/problem+json: >-
+        {"type":"https://problems.virtual-engineering-workbench.dev/api-gateway-error","title":"Server Error","status":504,"detail":"API Gateway could not process the request.","code":"$context.error.responseType","requestId":"$context.requestId","retryable":true}
+  INTEGRATION_TIMEOUT: *serverProblem504
 paths:
   /projects/{projectId}/components:
     get:
@@ -71,6 +117,7 @@ paths:
       tags: [ALL]
       parameters:
         - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -88,7 +135,7 @@ paths:
         '503': {$ref: '#/components/responses/Problem'}
       security:
         - ClientCredentials: [clients/packaging/component.write]
-      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-request-validator: body-only
       x-amazon-apigateway-integration: *lambdaIntegration
   /projects/{projectId}/components/{componentId}:
     get:
@@ -183,12 +230,14 @@ paths:
       parameters:
         - $ref: '#/components/parameters/ProjectId'
         - $ref: '#/components/parameters/ComponentId'
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
           application/json:
             schema: {$ref: '#/components/schemas/CreateComponentVersionRequest'}
       responses:
+        '422': {$ref: '#/components/responses/Problem'}
         '202': {$ref: '#/components/responses/ComponentVersionAction'}
         '400': {$ref: '#/components/responses/Problem'}
         '401': {$ref: '#/components/responses/Problem'}
@@ -200,7 +249,7 @@ paths:
         '503': {$ref: '#/components/responses/Problem'}
       security:
         - ClientCredentials: [clients/packaging/component.write]
-      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-request-validator: lambda-only
       x-amazon-apigateway-integration: *lambdaIntegration
   /projects/{projectId}/components/{componentId}/versions/{versionId}:
     get:
@@ -237,6 +286,7 @@ paths:
           application/json:
             schema: {$ref: '#/components/schemas/UpdateComponentVersionRequest'}
       responses:
+        '422': {$ref: '#/components/responses/Problem'}
         '202': {$ref: '#/components/responses/ComponentVersionAction'}
         '400': {$ref: '#/components/responses/Problem'}
         '401': {$ref: '#/components/responses/Problem'}
@@ -248,7 +298,7 @@ paths:
         '503': {$ref: '#/components/responses/Problem'}
       security:
         - ClientCredentials: [clients/packaging/component.write]
-      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-request-validator: lambda-only
       x-amazon-apigateway-integration: *lambdaIntegration
     delete:
       operationId: RetireComponentVersion
@@ -280,7 +330,7 @@ paths:
         - $ref: '#/components/parameters/ComponentId'
         - $ref: '#/components/parameters/ComponentVersionId'
       responses:
-        '200': {$ref: '#/components/responses/ComponentVersionAction'}
+        '200': {$ref: '#/components/responses/ComponentVersionRelease'}
         '400': {$ref: '#/components/responses/Problem'}
         '401': {$ref: '#/components/responses/Problem'}
         '403': {$ref: '#/components/responses/Problem'}
@@ -297,7 +347,9 @@ paths:
     post:
       operationId: CreateRecipe
       tags: [ALL]
-      parameters: [{$ref: '#/components/parameters/ProjectId'}]
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -314,7 +366,7 @@ paths:
         '500': {$ref: '#/components/responses/Problem'}
         '503': {$ref: '#/components/responses/Problem'}
       security: [{ClientCredentials: [clients/packaging/recipe.write]}]
-      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-request-validator: body-only
       x-amazon-apigateway-integration: *lambdaIntegration
     get:
       operationId: ListRecipes
@@ -372,7 +424,10 @@ paths:
     post:
       operationId: CreateRecipeVersion
       tags: [ALL]
-      parameters: [{$ref: '#/components/parameters/ProjectId'}, {$ref: '#/components/parameters/RecipeId'}]
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/RecipeId'
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -389,7 +444,7 @@ paths:
         '500': {$ref: '#/components/responses/Problem'}
         '503': {$ref: '#/components/responses/Problem'}
       security: [{ClientCredentials: [clients/packaging/recipe.write]}]
-      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-request-validator: body-only
       x-amazon-apigateway-integration: *lambdaIntegration
     get:
       operationId: ListRecipeVersions
@@ -471,7 +526,7 @@ paths:
       tags: [ALL]
       parameters: [{$ref: '#/components/parameters/ProjectId'}, {$ref: '#/components/parameters/RecipeId'}, {$ref: '#/components/parameters/RecipeVersionId'}]
       responses:
-        '200': {$ref: '#/components/responses/RecipeVersionAction'}
+        '200': {$ref: '#/components/responses/RecipeVersionRelease'}
         '400': {$ref: '#/components/responses/Problem'}
         '401': {$ref: '#/components/responses/Problem'}
         '403': {$ref: '#/components/responses/Problem'}
@@ -487,7 +542,9 @@ paths:
     post:
       operationId: CreatePipeline
       tags: [ALL]
-      parameters: [{$ref: '#/components/parameters/ProjectId'}]
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -504,7 +561,7 @@ paths:
         '500': {$ref: '#/components/responses/Problem'}
         '503': {$ref: '#/components/responses/Problem'}
       security: [{ClientCredentials: [clients/packaging/pipeline.write]}]
-      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-request-validator: body-only
       x-amazon-apigateway-integration: *lambdaIntegration
     get:
       operationId: ListPipelines
@@ -685,6 +742,13 @@ components:
       in: path
       required: true
       schema: {type: string, minLength: 1}
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
   responses:
     CreateComponent:
       description: Created component identifier.
@@ -715,7 +779,12 @@ components:
       description: Component-version action; poll the version resource after an asynchronous change.
       headers:
         Retry-After:
-          schema: {type: string}
+          schema: {type: string, default: '5'}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ComponentVersionActionResponse'}
+    ComponentVersionRelease:
+      description: Synchronous component-version release.
       content:
         application/json:
           schema: {$ref: '#/components/schemas/ComponentVersionActionResponse'}
@@ -759,9 +828,14 @@ components:
       description: Accepted recipe-version action; poll the version resource for status.
       headers:
         Retry-After:
-          schema: {type: string}
+          schema: {type: string, default: '5'}
         Cache-Control:
           schema: {type: string}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/RecipeVersionActionResponse'}
+    RecipeVersionRelease:
+      description: Synchronous recipe-version release.
       content:
         application/json:
           schema: {$ref: '#/components/schemas/RecipeVersionActionResponse'}
@@ -802,6 +876,24 @@ components:
         application/json:
           schema: {$ref: '#/components/schemas/ImagePage'}
   schemas:
+    ComponentStatus:
+      type: string
+      enum: [ARCHIVED, CREATED]
+    ComponentVersionStatus:
+      type: string
+      enum: [CREATING, CREATED, TESTING, VALIDATED, UPDATING, RELEASED, RETIRED, FAILED]
+    RecipeStatus:
+      type: string
+      enum: [ARCHIVED, CREATED]
+    RecipeVersionStatus:
+      type: string
+      enum: [CREATING, CREATED, TESTING, VALIDATED, UPDATING, RELEASED, RETIRED, FAILED]
+    PipelineStatus:
+      type: string
+      enum: [CREATING, CREATED, UPDATING, RETIRED, FAILED]
+    ImageStatus:
+      type: string
+      enum: [CREATED, CREATING, FAILED, RETIRED, DELETED]
     Component:
       properties:
         componentId:
@@ -821,7 +913,7 @@ components:
             type: "string"
           type: "array"
         status:
-          type: "string"
+          $ref: "#/components/schemas/ComponentStatus"
         createDate:
           type: "string"
         createdBy:
@@ -888,7 +980,7 @@ components:
           type: "string"
           nullable: true
         status:
-          type: "string"
+          $ref: "#/components/schemas/ComponentVersionStatus"
         createDate:
           type: "string"
         createdBy:
@@ -898,6 +990,105 @@ components:
         lastUpdatedBy:
           type: "string"
       required: ["componentId","componentVersionId","componentVersionDescription","componentVersionName","softwareVendor","softwareVersion","status","createDate","createdBy","lastUpdateDate","lastUpdatedBy"]
+      type: "object"
+    ComponentConstant:
+      additionalProperties: false
+      properties:
+        type:
+          type: "string"
+          enum: ["string"]
+        value:
+          type: "string"
+          nullable: true
+      required: ["type"]
+      type: "object"
+    ComponentParameter:
+      additionalProperties: false
+      properties:
+        type:
+          type: "string"
+          enum: ["string"]
+        default:
+          type: "string"
+          nullable: true
+        description:
+          type: "string"
+          nullable: true
+      required: ["type"]
+      type: "object"
+    ComponentDefinition:
+      additionalProperties: false
+      properties:
+        name:
+          type: "string"
+          nullable: true
+        description:
+          type: "string"
+          nullable: true
+        schemaVersion:
+          type: "string"
+        constants:
+          items:
+            type: "object"
+            additionalProperties:
+              $ref: "#/components/schemas/ComponentConstant"
+          type: "array"
+          nullable: true
+        parameters:
+          items:
+            type: "object"
+            additionalProperties:
+              $ref: "#/components/schemas/ComponentParameter"
+          type: "array"
+          nullable: true
+        phases:
+          items:
+            $ref: "#/components/schemas/ComponentPhase"
+          minItems: 1
+          type: "array"
+      required: ["schemaVersion","phases"]
+      type: "object"
+    ComponentPhase:
+      additionalProperties: false
+      properties:
+        name:
+          type: "string"
+          enum: ["build","test","validate"]
+        steps:
+          items:
+            $ref: "#/components/schemas/ComponentStep"
+          minItems: 1
+          type: "array"
+      required: ["name","steps"]
+      type: "object"
+    ComponentStep:
+      additionalProperties: false
+      properties:
+        name:
+          type: "string"
+        action:
+          type: "string"
+        timeoutSeconds:
+          type: "integer"
+          default: 7200
+          nullable: true
+        onFailure:
+          type: "string"
+          enum: ["Abort","Continue","Failed"]
+          default: "Abort"
+          nullable: true
+        maxAttempts:
+          type: "integer"
+          default: 1
+          nullable: true
+        inputs:
+          oneOf:
+            - type: "object"
+              additionalProperties: true
+            - type: "array"
+              items: {}
+          nullable: true
+      required: ["name","action"]
       type: "object"
     CreateComponentRequest:
       additionalProperties: false
@@ -937,8 +1128,8 @@ components:
           nullable: true
         componentVersionReleaseType:
           type: "string"
-        componentVersionYamlDefinition:
-          type: "string"
+        componentVersionDefinition:
+          $ref: "#/components/schemas/ComponentDefinition"
         softwareVendor:
           type: "string"
         softwareVersion:
@@ -949,7 +1140,7 @@ components:
         notes:
           type: "string"
           nullable: true
-      required: ["componentVersionDescription","componentVersionReleaseType","componentVersionYamlDefinition","softwareVendor","softwareVersion"]
+      required: ["componentVersionDescription","componentVersionReleaseType","componentVersionDefinition","softwareVendor","softwareVersion"]
       type: "object"
     UpdateComponentVersionRequest:
       additionalProperties: false
@@ -961,8 +1152,8 @@ components:
             $ref: "#/components/schemas/ComponentVersionEntry"
           type: "array"
           nullable: true
-        componentVersionYamlDefinition:
-          type: "string"
+        componentVersionDefinition:
+          $ref: "#/components/schemas/ComponentDefinition"
         softwareVendor:
           type: "string"
         softwareVersion:
@@ -973,7 +1164,7 @@ components:
         notes:
           type: "string"
           nullable: true
-      required: ["componentVersionDescription","componentVersionYamlDefinition","softwareVendor","softwareVersion"]
+      required: ["componentVersionDescription","componentVersionDefinition","softwareVendor","softwareVersion"]
       type: "object"
     ComponentResponse:
       properties:
@@ -993,12 +1184,8 @@ components:
       properties:
         component_version:
           $ref: "#/components/schemas/ComponentVersion"
-        yaml_definition:
-          additionalProperties: true
-          type: "object"
-          nullable: true
-        yaml_definition_b64:
-          type: "string"
+        componentVersionDefinition:
+          $ref: "#/components/schemas/ComponentDefinition"
           nullable: true
       required: ["component_version"]
       type: "object"
@@ -1043,18 +1230,22 @@ components:
         recipePlatform: {type: string}
         recipeArchitecture: {type: string}
         recipeOsVersion: {type: string}
-        status: {type: string}
+        status: {$ref: '#/components/schemas/RecipeStatus'}
         createDate: {type: string}
         createdBy: {type: string}
         lastUpdateDate: {type: string}
         lastUpdatedBy: {type: string}
     RecipeVersion:
       type: object
-      required: [recipeId, recipeVersionId, recipeComponentsVersions, recipeVersionDescription, recipeVersionName, recipeVersionVolumeSize, status, createDate, createdBy, lastUpdateDate, lastUpdatedBy]
+      required: [recipeId, recipeVersionId, effectiveComponentsVersions, recipeVersionDescription, recipeVersionName, recipeVersionVolumeSize, status, createDate, createdBy, lastUpdateDate, lastUpdatedBy]
       properties:
         recipeId: {type: string}
         recipeVersionId: {type: string}
-        recipeComponentsVersions:
+        configuredComponentsVersions:
+          type: array
+          items: {$ref: '#/components/schemas/RecipeComponentVersion'}
+          nullable: true
+        effectiveComponentsVersions:
           type: array
           items: {$ref: '#/components/schemas/RecipeComponentVersion'}
         recipeVersionDescription: {type: string}
@@ -1064,7 +1255,7 @@ components:
           type: array
           items: {type: string}
           nullable: true
-        status: {type: string}
+        status: {$ref: '#/components/schemas/RecipeVersionStatus'}
         createDate: {type: string}
         createdBy: {type: string}
         lastUpdateDate: {type: string}
@@ -1082,9 +1273,9 @@ components:
     CreateRecipeVersionRequest:
       type: object
       additionalProperties: false
-      required: [recipeComponentsVersions, recipeVersionDescription, recipeVersionReleaseType, recipeVersionVolumeSize]
+      required: [configuredComponentsVersions, recipeVersionDescription, recipeVersionReleaseType, recipeVersionVolumeSize]
       properties:
-        recipeComponentsVersions:
+        configuredComponentsVersions:
           type: array
           items: {$ref: '#/components/schemas/RecipeComponentVersion'}
         recipeVersionDescription: {type: string}
@@ -1096,9 +1287,9 @@ components:
     UpdateRecipeVersionRequest:
       type: object
       additionalProperties: false
-      required: [recipeComponentsVersions, recipeVersionDescription, recipeVersionVolumeSize]
+      required: [configuredComponentsVersions, recipeVersionDescription, recipeVersionVolumeSize]
       properties:
-        recipeComponentsVersions:
+        configuredComponentsVersions:
           type: array
           items: {$ref: '#/components/schemas/RecipeComponentVersion'}
         recipeVersionDescription: {type: string}
@@ -1157,7 +1348,7 @@ components:
         recipeName: {type: string}
         recipeVersionId: {type: string}
         recipeVersionName: {type: string}
-        status: {type: string}
+        status: {$ref: '#/components/schemas/PipelineStatus'}
         productId: {type: string, nullable: true}
         distributionConfigArn: {type: string, nullable: true}
         infrastructureConfigArn: {type: string, nullable: true}
@@ -1208,7 +1399,7 @@ components:
         recipeName: {type: string}
         recipeVersionId: {type: string}
         recipeVersionName: {type: string}
-        status: {type: string}
+        status: {$ref: '#/components/schemas/ImageStatus'}
         imageUpstreamId: {type: string, nullable: true}
         createDate: {type: string}
         lastUpdateDate: {type: string}

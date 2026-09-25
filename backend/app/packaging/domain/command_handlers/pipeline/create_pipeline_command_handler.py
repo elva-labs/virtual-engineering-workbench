@@ -5,9 +5,33 @@ from app.packaging.domain.events.pipeline import pipeline_creation_started
 from app.packaging.domain.exceptions import domain_exception
 from app.packaging.domain.model.pipeline import pipeline
 from app.packaging.domain.model.recipe import recipe_version
-from app.packaging.domain.ports import pipeline_service, recipe_query_service, recipe_version_query_service
+from app.packaging.domain.ports import (
+    pipeline_query_service,
+    pipeline_service,
+    recipe_query_service,
+    recipe_version_query_service,
+)
 from app.shared.adapters.message_bus import message_bus
 from app.shared.adapters.unit_of_work_v2 import unit_of_work
+
+
+def _publish_creation_started(entity, message_bus):
+    message_bus.publish(
+        pipeline_creation_started.PipelineCreationStarted(projectId=entity.projectId, pipelineId=entity.pipelineId)
+    )
+
+
+def resume_creation(
+    project_id: str,
+    pipeline_id: str,
+    pipeline_qry_srv: pipeline_query_service.PipelineQueryService,
+    message_bus: message_bus.MessageBus,
+) -> None:
+    entity = pipeline_qry_srv.get_pipeline(project_id, pipeline_id)
+    if entity is None:
+        raise RuntimeError("The pipeline is no longer readable.")
+    if entity.status == pipeline.PipelineStatus.Creating:
+        _publish_creation_started(entity, message_bus)
 
 
 def handle(
@@ -45,6 +69,7 @@ def handle(
     current_time = datetime.now(timezone.utc).isoformat()
     pipeline_entity = pipeline.Pipeline(
         projectId=command.projectId.value,
+        pipelineId=command.pipelineId.value if command.pipelineId else pipeline.generate_pipeline_id(),
         buildInstanceTypes=command.buildInstanceTypes.value,
         pipelineDescription=command.pipelineDescription.value,
         pipelineName=command.pipelineName.value,
@@ -65,10 +90,5 @@ def handle(
         uow.get_repository(repo_key=pipeline.PipelinePrimaryKey, repo_type=pipeline.Pipeline).add(pipeline_entity)
         uow.commit()
 
-    message_bus.publish(
-        pipeline_creation_started.PipelineCreationStarted(
-            projectId=command.projectId.value,
-            pipelineId=pipeline_entity.pipelineId,
-        )
-    )
+    _publish_creation_started(pipeline_entity, message_bus)
     return {"pipelineId": pipeline_entity.pipelineId}

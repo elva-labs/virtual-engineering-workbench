@@ -2,6 +2,7 @@ from unittest import mock
 
 import assertpy
 import pytest
+import yaml
 
 from app.packaging.domain.exceptions.domain_exception import DomainException
 from app.packaging.domain.model.shared.component_version_entry import (
@@ -15,7 +16,52 @@ from app.packaging.domain.value_objects.component_version import (
     component_version_description_value_object,
     component_version_release_type_value_object,
     component_version_status_value_object,
+    component_version_yaml_definition_value_object,
 )
+
+
+@pytest.mark.parametrize("phases", [[], [{"name": "build", "steps": []}]])
+def test_legacy_yaml_preserves_empty_phase_and_step_documents(phases):
+    original = "# Keep the user's original text\n" + yaml.safe_dump({"schemaVersion": "1.0", "phases": phases})
+    assert component_version_yaml_definition_value_object.from_str(original).value == original
+
+
+@pytest.mark.parametrize("phases", [[], [{"name": "build", "steps": []}]])
+@pytest.mark.parametrize("conversion", ["from_dict", "to_dict"])
+def test_s2s_canonical_conversion_rejects_empty_phase_and_step_documents(phases, conversion):
+    definition = {"schemaVersion": "1.0", "phases": phases}
+    value = definition if conversion == "from_dict" else yaml.safe_dump(definition)
+    with pytest.raises(DomainException):
+        getattr(component_version_yaml_definition_value_object, conversion)(value)
+
+
+def test_component_definition_dict_round_trips_with_defaults():
+    definition = {
+        "schemaVersion": "1.0",
+        "phases": [
+            {
+                "name": "build",
+                "steps": [
+                    {
+                        "name": "InstallAgent",
+                        "action": "ExecuteBash",
+                        "inputs": {"commands": ["install-agent"]},
+                    }
+                ],
+            }
+        ],
+    }
+    encoded = component_version_yaml_definition_value_object.from_dict(definition)
+    decoded = component_version_yaml_definition_value_object.to_dict(encoded.value)
+    step = decoded["phases"][0]["steps"][0]
+    assert step["timeoutSeconds"] == 7200
+    assert step["onFailure"] == "Abort"
+    assert step["maxAttempts"] == 1
+
+
+def test_component_definition_rejects_empty_phases():
+    with pytest.raises(DomainException):
+        component_version_yaml_definition_value_object.from_dict({"schemaVersion": "1.0", "phases": []})
 
 
 def test_component_version_dependencies_value_object_should_parse_dependencies():

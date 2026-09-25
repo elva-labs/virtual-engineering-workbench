@@ -1,5 +1,7 @@
 import json
-from typing import Any
+import logging as stdlib_logging
+from functools import partial
+from typing import Any, Callable
 
 import boto3
 from aws_lambda_powertools import logging
@@ -18,6 +20,7 @@ from app.packaging.adapters.query_services import (
 from app.packaging.adapters.repository import dynamo_entity_config
 from app.packaging.adapters.services import (
     aws_component_definition_service,
+    dynamodb_idempotency_service,
     ec2_image_builder_pipeline_service,
     parameter_service,
 )
@@ -70,6 +73,7 @@ from app.packaging.domain.commands.recipe import (
     retire_recipe_version_command,
     update_recipe_version_command,
 )
+from app.packaging.domain.ports.idempotency_service import IdempotencyService
 from app.packaging.domain.ports.service_client_project_access_service import ServiceClientProjectAccessService
 from app.packaging.domain.query_services import (
     component_domain_query_service,
@@ -92,6 +96,34 @@ from app.shared.instrumentation import power_tools_metrics
 from app.shared.logging import boto_logger
 
 
+class S2SSafeLogger:
+    """Keep operational metadata while suppressing S2S payloads and unsafe errors."""
+
+    def __init__(self, logger: logging.Logger) -> None:
+        self._logger = logger
+
+    @property
+    def log_level(self) -> int:
+        # The shared boto hook includes request params at DEBUG. For S2S, force its
+        # metadata-only branch even when the Lambda logger itself runs at DEBUG.
+        return stdlib_logging.INFO
+
+    def info(self, message: Any, *args: Any, **kwargs: Any) -> None:
+        self._logger.info(message, *args, **kwargs)
+
+    def debug(self, message: Any, *args: Any, **kwargs: Any) -> None:
+        return None
+
+    def warning(self, message: Any, *args: Any, **kwargs: Any) -> None:
+        self._logger.warning("Packaging S2S operation warning")
+
+    def error(self, message: Any, *args: Any, **kwargs: Any) -> None:
+        self._logger.error("Packaging S2S operation failed")
+
+    def exception(self, message: Any, *args: Any, **kwargs: Any) -> None:
+        self._logger.error("Packaging S2S logging failed")
+
+
 class Dependencies(BaseModel):
     project_access_service: ServiceClientProjectAccessService
     command_bus: Any
@@ -102,18 +134,26 @@ class Dependencies(BaseModel):
     component_domain_qry_srv: component_domain_query_service.ComponentDomainQueryService
     component_version_domain_qry_srv: component_version_domain_query_service.ComponentVersionDomainQueryService
     component_version_qry_srv: Any
+    idempotency_service: IdempotencyService
+    resume_component_version_creation: Callable[[str, str, str], None]
+    resume_recipe_version_creation: Callable[[str, str, str], None]
+    resume_pipeline_creation: Callable[[str, str], None]
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 def bootstrap(app_config: config.AppConfig, logger: logging.Logger) -> Dependencies:  # noqa: C901
-    session = boto_logger.loggable_session(boto3.session.Session(), logger)
+    safe_logger = S2SSafeLogger(logger)
+    session = boto_logger.loggable_session(boto3.session.Session(), safe_logger)
     dynamodb = session.resource("dynamodb", region_name=app_config.get_default_region())
     dynamodb_client = dynamodb.meta.client
+    idempotency_srv = dynamodb_idempotency_service.DynamoDBIdempotencyService(
+        app_config.get_table_name(), dynamodb_client
+    )
     uow = dynamodb_unit_of_work.DynamoDBUnitOfWork(
         table_name=app_config.get_table_name(),
         dynamodb_client=dynamodb_client,
         repo_factories=dynamo_entity_config.EntityConfigurator(table_name=app_config.get_table_name()).repo_factories(),
-        logger=logger,
+        logger=safe_logger,
     )
 
     metrics_client = power_tools_metrics.PowerToolsMetrics()
@@ -125,10 +165,10 @@ def bootstrap(app_config: config.AppConfig, logger: logging.Logger) -> Dependenc
             events_api=events_api,
             event_bus_name=app_config.get_domain_event_bus_name(),
             bounded_context_name=app_config.get_bounded_context_name(),
-            logger=logger,
+            logger=safe_logger,
         ),
         metrics_client=metrics_client,
-        logger=logger,
+        logger=safe_logger,
     )
 
     component_query_service = dynamodb_component_query_service.DynamoDBComponentQueryService(
@@ -354,7 +394,7 @@ def bootstrap(app_config: config.AppConfig, logger: logging.Logger) -> Dependenc
         )
 
     command_bus = command_bus_metrics.CommandBusMetrics(
-        inner=in_memory_command_bus.InMemoryCommandBus(logger=logger),
+        inner=in_memory_command_bus.InMemoryCommandBus(logger=safe_logger),
         metrics_client=metrics_client,
     )
     command_bus.register_handler(create_component_command.CreateComponentCommand, create_component).register_handler(
@@ -392,7 +432,7 @@ def bootstrap(app_config: config.AppConfig, logger: logging.Logger) -> Dependenc
     registry = service_registry.ServiceRegistry.from_config(
         app_config=app_config,
         ssm_client=session.client("ssm", region_name=app_config.get_default_region()),
-        logger=logger,
+        logger=safe_logger,
     )
     project_access_service = ProjectsApiServiceClientProjectAccessService(
         api=registry.api_for(bounded_contexts.BoundedContext.PROJECTS)
@@ -418,4 +458,20 @@ def bootstrap(app_config: config.AppConfig, logger: logging.Logger) -> Dependenc
             component_version_definition_srv=component_definition_service,
         ),
         component_version_qry_srv=component_version_query_service,
+        idempotency_service=idempotency_srv,
+        resume_component_version_creation=partial(
+            create_component_version_command_handler.resume_creation,
+            component_version_qry_srv=component_version_query_service,
+            message_bus=message_bus,
+        ),
+        resume_recipe_version_creation=partial(
+            create_recipe_version_command_handler.resume_creation,
+            recipe_version_qry_srv=recipe_version_query_service,
+            message_bus=message_bus,
+        ),
+        resume_pipeline_creation=partial(
+            create_pipeline_command_handler.resume_creation,
+            pipeline_qry_srv=pipeline_query_service,
+            message_bus=message_bus,
+        ),
     )

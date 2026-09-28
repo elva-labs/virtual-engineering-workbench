@@ -37,14 +37,10 @@ def handle(
     elif account.accountStatus == project_account.ProjectAccountStatusEnum.ReOnboarding:
         account.accountStatus = project_account.ProjectAccountStatusEnum.Active
 
-    error_text: str = command.error.error
-    error_cause: str = command.error.cause
-
-    if error_dict := string_utils.try_parse_json(text=command.error.cause):
-        error_text = error_dict.get("StopCode", error_text)
-        error_cause = error_dict.get("StoppedReason", error_cause)
-
-    account.lastOnboardingErrorMessage = string_utils.sanitize_aws_resource_ids(text=f"{error_text}: {error_cause}")
+    account.lastOnboardingErrorMessage = string_utils.safe_onboarding_error(
+        error=command.error.error,
+        cause=command.error.cause,
+    )
 
     with uow:
         uow.get_repository(project_account.ProjectAccountPrimaryKey, project_account.ProjectAccount).update_entity(

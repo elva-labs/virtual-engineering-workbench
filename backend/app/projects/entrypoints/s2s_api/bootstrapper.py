@@ -12,9 +12,19 @@ from app.projects.domain.command_handlers.enrolments import (
     approve_enrolments_command_handler,
     enrol_user_to_program_command_handler,
 )
+from app.projects.domain.command_handlers.project_accounts import (
+    deactivate_project_account_s2s_command_handler,
+    on_board_project_account_command_handler,
+    update_project_account_command_handler,
+)
 from app.projects.domain.command_handlers.service_clients import (
     put_service_client_assignment_command_handler,
     revoke_service_client_assignment_command_handler,
+)
+from app.projects.domain.command_handlers.technologies import (
+    add_technology_command_handler,
+    delete_technology_command_handler,
+    update_technology_command_handler,
 )
 from app.projects.domain.command_handlers.users import (
     assign_user_command_handler,
@@ -22,13 +32,24 @@ from app.projects.domain.command_handlers.users import (
     unassign_user_command_handler,
 )
 from app.projects.domain.commands.enrolments import approve_enrolments_command, enrol_user_to_program_command
+from app.projects.domain.commands.project_accounts import (
+    deactivate_project_account_s2s_command,
+    on_board_project_account_command,
+    update_project_account_command,
+)
 from app.projects.domain.commands.service_clients import (
     put_service_client_assignment_command,
     revoke_service_client_assignment_command,
 )
+from app.projects.domain.commands.technologies import (
+    add_technology,
+    delete_technology_command,
+    update_technology_command,
+)
 from app.projects.domain.commands.users import assign_user_command, reassign_user_command, unassign_user_command
 from app.projects.domain.ports import enrolment_query_service, projects_query_service, technologies_query_service
-from app.projects.entrypoints.s2s_api import config
+from app.projects.entrypoints.s2s_api import common, config
+from app.shared.adapters.idempotency import dynamodb_idempotency_service
 from app.shared.adapters.message_bus import (
     command_bus,
     command_bus_metrics,
@@ -39,6 +60,7 @@ from app.shared.adapters.message_bus import (
 from app.shared.adapters.unit_of_work_v2 import dynamodb_migrations
 from app.shared.adapters.unit_of_work_v2 import dynamodb_unit_of_work as dynamodb_unit_of_work_v2
 from app.shared.api import aws_events_api
+from app.shared.domain.ports.idempotency_service import IdempotencyService
 from app.shared.instrumentation import power_tools_metrics
 from app.shared.logging import boto_logger
 
@@ -48,6 +70,7 @@ class Dependencies(BaseModel):
     projects_query_service: projects_query_service.ProjectsQueryService
     technologies_query_service: technologies_query_service.TechnologiesQueryService
     enrolment_query_service: enrolment_query_service.EnrolmentQueryService
+    idempotency_service: IdempotencyService
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -92,6 +115,12 @@ def bootstrap(
         table_name=app_config.get_table_name(), dynamodb_client=dynamodb.meta.client
     )
 
+    idempotency_srv = dynamodb_idempotency_service.DynamoDBIdempotencyService(
+        table_name=app_config.get_table_name(),
+        dynamodb_client=dynamodb.meta.client,
+        key_token=common.hash_idempotency_key,
+    )
+
     cognito_idp_client = session.client("cognito-idp", region_name=app_config.get_default_region())
     user_directory_svc = cognito_user_directory_service.CognitoUserDirectoryService(
         cognito_client=cognito_idp_client,
@@ -117,7 +146,8 @@ def bootstrap(
 
     command_bus = (
         command_bus_metrics.CommandBusMetrics(
-            inner=in_memory_command_bus.InMemoryCommandBus(logger=logger), metrics_client=metrics_client
+            inner=in_memory_command_bus.InMemoryCommandBus(logger=logger),
+            metrics_client=metrics_client,
         )
         .register_handler(
             approve_enrolments_command.ApproveEnrolmentsCommand,
@@ -137,6 +167,43 @@ def bootstrap(
                 projects_qry_srv=projects_query_service,
                 enrolment_qry_srv=enrolment_qry_srv,
                 msg_bus=message_bus,
+            ),
+        )
+        .register_handler(
+            on_board_project_account_command.OnBoardProjectAccountCommand,
+            lambda command: on_board_project_account_command_handler.handle_on_board_project_account_command(
+                command=command,
+                unit_of_work=shared_uow_v2,
+                projects_query_service=projects_query_service,
+                message_bus=message_bus,
+                web_application_account_id=app_config.get_web_application_account_id(),
+                web_application_environment=app_config.get_web_application_environment(),
+                web_application_region=app_config.get_default_region(),
+                image_service_account_id=app_config.get_image_service_account_id(),
+                catalog_service_account_id=app_config.get_catalog_service_account_id(),
+            ),
+        )
+        .register_handler(
+            update_project_account_command.UpdateProjectAccountCommand,
+            lambda command: update_project_account_command_handler.handle(
+                command=command,
+                unit_of_work=shared_uow_v2,
+                projects_query_service=projects_query_service,
+                technologies_query_service=technologies_qry_srv,
+                message_bus=message_bus,
+                web_application_account_id=app_config.get_web_application_account_id(),
+                web_application_environment=app_config.get_web_application_environment(),
+                web_application_region=app_config.get_default_region(),
+                image_service_account_id=app_config.get_image_service_account_id(),
+                catalog_service_account_id=app_config.get_catalog_service_account_id(),
+            ),
+        )
+        .register_handler(
+            deactivate_project_account_s2s_command.DeactivateProjectAccountS2SCommand,
+            lambda command: deactivate_project_account_s2s_command_handler.handle(
+                command=command,
+                unit_of_work=shared_uow_v2,
+                projects_query_service=projects_query_service,
             ),
         )
         .register_handler(
@@ -184,6 +251,34 @@ def bootstrap(
                 projects_query_service=projects_query_service,
             ),
         )
+        .register_handler(
+            add_technology.AddTechnologyCommand,
+            lambda command: add_technology_command_handler.handle_add_technology_command(
+                cmd=command,
+                uow=shared_uow_v2,
+                projects_qry_srv=projects_query_service,
+                msg_bus=message_bus,
+            ),
+        )
+        .register_handler(
+            update_technology_command.UpdateTechnologyCommand,
+            lambda command: update_technology_command_handler.handle_update_technology_command(
+                cmd=command,
+                uow=shared_uow_v2,
+                projects_qry_srv=projects_query_service,
+                technologies_qry_srv=technologies_qry_srv,
+                msg_bus=message_bus,
+            ),
+        )
+        .register_handler(
+            delete_technology_command.DeleteTechnologyCommand,
+            lambda command: delete_technology_command_handler.handle_delete_technology_command(
+                cmd=command,
+                uow=shared_uow_v2,
+                projects_qry_srv=projects_query_service,
+                msg_bus=message_bus,
+            ),
+        )
     )
 
     return Dependencies(
@@ -191,4 +286,5 @@ def bootstrap(
         projects_query_service=projects_query_service,
         technologies_query_service=technologies_qry_srv,
         enrolment_query_service=enrolment_qry_srv,
+        idempotency_service=idempotency_srv,
     )

@@ -10,9 +10,9 @@ export class DCVBrowserLoginType extends DCVLoginType {
       throw Error(i18n.errorConnectionAddress);
     }
 
-    let params = `#${this.getSessionId(context)}`;
+    let params = `#${encodeURIComponent(this.getSessionId(context))}`;
     if (context.authToken) {
-      params = `?authToken=${context.authToken}${params}`;
+      params = `?authToken=${encodeURIComponent(context.authToken)}${params}`;
     }
 
     const port = this.getPort(context);

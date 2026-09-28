@@ -34,6 +34,10 @@ import {
 import { ValueWithLabel } from '../../shared/value-with-label.tsx';
 import { CopyText } from '../../shared/index.ts';
 import { LoginConfig } from './provisioned-product-login-types';
+import {
+  canLoginWithoutDirectAddress,
+  performProvisionedProductLogin,
+} from './provisioned-product-login-flow';
 
 const EMPTY_COUNT = 0;
 
@@ -117,7 +121,8 @@ function provisionedProductLogin({
         confirmText={i18n.loginPromptConfirm}
         confirmButtonLoading={confirmInProgress}
         visible={loginPromptVisible}
-        confirmButtonDisabled={!selectedIPForLogon || !selectedConnectionOption}
+        confirmButtonDisabled={!selectedConnectionOption || !selectedIPForLogon &&
+          !canLoginWithoutDirectAddress(selectedConnectionOption)}
         data-test="login-modal"
       />
     </>
@@ -145,15 +150,20 @@ function provisionedProductLogin({
 
       const loginType = loginTypes.getLoginType(selectedConnectionOption);
 
-      await authorizeUserIpAddress();
-
-      const loginResult = await loginType?.doLogin({
-        user: loggedInUser.user,
-        userDomain: selectedDomain,
-        provisionedProduct,
-        connectAddress: selectedIPForLogon,
-        extendToAllMonitors: selectedAllMonitors === 'true',
-        vpnConnection: connectDirectly,
+      const loginResult = await performProvisionedProductLogin({
+        connectionOption: selectedConnectionOption,
+        loginType,
+        authorizeDirectConnection: async () => {
+          await authorizeUserIpAddress();
+        },
+        loginRequest: {
+          user: loggedInUser.user,
+          userDomain: selectedDomain,
+          provisionedProduct,
+          connectAddress: selectedIPForLogon,
+          extendToAllMonitors: selectedAllMonitors === 'true',
+          vpnConnection: connectDirectly,
+        },
       });
 
       switch (loginResult.type) {

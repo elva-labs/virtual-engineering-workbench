@@ -21,5 +21,8 @@ export default defineConfig({
     "import.meta.env.REACT_APP_ENVIRONMENT": JSON.stringify(
       process.env.REACT_APP_ENVIRONMENT
     ),
+    "import.meta.env.DCV_GATEWAY_URL": JSON.stringify(
+      process.env.DCV_GATEWAY_URL
+    ) ?? "undefined",
   },
 });

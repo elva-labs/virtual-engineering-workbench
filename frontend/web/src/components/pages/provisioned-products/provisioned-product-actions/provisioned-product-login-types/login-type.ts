@@ -3,8 +3,8 @@ import { sanitizePath } from '../../../../../utils/os-path';
 import { LoginContext, LoginRequest, LoginResponse } from './interface';
 
 export abstract class ProvisionedProductLoginType {
-  public doLogin(loginRequest: LoginRequest): Promise<LoginResponse> {
-    return this.doLoginPrivate(loginRequest, {});
+  public doLogin(loginRequest: LoginRequest, context: LoginContext = {}): Promise<LoginResponse> {
+    return this.doLoginPrivate(loginRequest, context);
   }
 
   abstract doLoginPrivate(loginRequest: LoginRequest, context: LoginContext): Promise<LoginResponse>;

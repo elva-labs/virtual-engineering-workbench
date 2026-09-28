@@ -10,7 +10,7 @@ def test_method_responses_use_explicit_status_codes_for_api_gateway(api_schema):
         for method, operation in methods.items():
             responses = operation["responses"]
             assert all(code.isdigit() and len(code) == 3 for code in responses), (method, path)
-            for code in ("400", "401", "403", "404", "409", "429", "500", "503"):
+            for code in ("400", "401", "403", "404", "409", "422", "429", "500", "503"):
                 assert responses[code] == {"$ref": "#/components/responses/Problem"}
 
 

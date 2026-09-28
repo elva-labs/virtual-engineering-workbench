@@ -296,6 +296,11 @@ class FakeTechnologiesQueryService(technologies_query_service.TechnologiesQueryS
             techs.append(new_tech)
         return techs
 
+    def get_technology_by_id(self, project_id: str, technology_id: str) -> technology.Technology | None:
+        return next(
+            (tech for tech in self.list_technologies(project_id, page_size=100) if tech.id == technology_id), None
+        )
+
 
 class FakeEnrolmentsQueryService(enrolment_query_service.EnrolmentQueryService):
     def __init__(self):

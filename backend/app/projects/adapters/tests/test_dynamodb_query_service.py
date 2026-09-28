@@ -765,6 +765,22 @@ def test_get_project_account_by_id_if_exists_should_return(
     assertpy.assert_that(workbench_account).is_equal_to(sample_user_account)
 
 
+def test_get_project_account_by_id_reads_consistently_for_onboarding_polling():
+    dynamodb_client = mock.Mock()
+    dynamodb_client.get_item.return_value = {}
+    query_service = dynamodb_query_service.DynamoDBProjectsQueryService(
+        table_name="projects",
+        dynamodb_client=dynamodb_client,
+        gsi_inverted_primary_key="inverted-primary-key",
+        gsi_aws_accounts="aws-accounts",
+        gsi_entities="entities",
+    )
+
+    assert query_service.get_project_account_by_id("project-1", "account-1") is None
+
+    assert dynamodb_client.get_item.call_args.kwargs["ConsistentRead"] is True
+
+
 def test_get_project_by_id_should_return_when_exists(
     mock_dynamodb, mock_ddb_repo, test_table_name, gsi_name, gsi_aws_accounts, gsi_entities
 ):
@@ -1021,6 +1037,35 @@ def test_can_return_empty_list_technologies_for_project(
 
     # Assert
     assertpy.assert_that(expected_techs).is_empty()
+
+
+def test_can_get_technology_by_exact_id(
+    mock_dynamodb,
+    sample_projects,
+    backend_app_dynamodb_table,
+    test_table_name,
+    gsi_name,
+    gsi_aws_accounts,
+    gsi_entities,
+):
+    query_service = dynamodb_query_service.DynamoDBTechnologiesQueryService(
+        table_name=test_table_name,
+        dynamodb_client=mock_dynamodb.meta.client,
+    )
+    sample_project = sample_projects.pop()
+    expected = make_fake_technology("exact")
+    backend_app_dynamodb_table.put_item(
+        Item={
+            "PK": f"{dynamo_entity_config.DBPrefix.PROJECT}#{sample_project.projectId}",
+            "SK": f"{dynamo_entity_config.DBPrefix.TECHNOLOGY}#{expected.id}",
+            **expected.model_dump(),
+        }
+    )
+
+    actual = query_service.get_technology_by_id(sample_project.projectId, expected.id)
+
+    assert actual == expected
+    assert query_service.get_technology_by_id(sample_project.projectId, "missing") is None
 
 
 def test_can_list_project_accounts_by_aws_account(
@@ -1621,9 +1666,7 @@ def test_service_client_assignment_repository_uses_client_and_project_keys(
         ).add(assignment)
         mock_ddb_repo.commit()
 
-    item = backend_app_dynamodb_table.get_item(
-        Key={"PK": "CLIENT#terraform-prod", "SK": "PROJECT#proj-1"}
-    )["Item"]
+    item = backend_app_dynamodb_table.get_item(Key={"PK": "CLIENT#terraform-prod", "SK": "PROJECT#proj-1"})["Item"]
     assert item["clientId"] == "terraform-prod"
     assert item["projectId"] == "proj-1"
     assert item["sequenceNo"] == 0

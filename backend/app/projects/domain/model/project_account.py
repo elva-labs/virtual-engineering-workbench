@@ -23,6 +23,11 @@ class ProjectAccountOnboardingResult(enum.StrEnum):
     Failed = "Failed"
 
 
+class ProjectAccountOnboardingPublicationStatus(enum.StrEnum):
+    Pending = "Pending"
+    Published = "Published"
+
+
 class ProjectAccountStageEnum(enum.StrEnum):
     DEV = "dev"
     QA = "qa"
@@ -30,12 +35,7 @@ class ProjectAccountStageEnum(enum.StrEnum):
 
 
 def generate_id():
-    return uuid_to_str
-
-
-def uuid_to_str():
-    unique_id = uuid4()
-    return str(unique_id)
+    return str(uuid4())
 
 
 class ProjectAccountPrimaryKey(unit_of_work.PrimaryKey):
@@ -45,7 +45,7 @@ class ProjectAccountPrimaryKey(unit_of_work.PrimaryKey):
 
 class ProjectAccount(unit_of_work.Entity):
     projectId: str = Field(..., title="ProjectId")
-    id: str = Field(default_factory=generate_id(), title="Id")
+    id: str = Field(default_factory=generate_id, title="Id")
     awsAccountId: str = Field(..., title="AwsAccountId")
     accountType: account_type_value_object.AccountTypeEnum = Field(..., title="AccountType")
     accountName: str | None = Field(None, title="AccountName")
@@ -58,4 +58,12 @@ class ProjectAccount(unit_of_work.Entity):
     region: str | None = Field(None, title="Region")
     lastOnboardingResult: ProjectAccountOnboardingResult | None = Field(None, title="LastOnboardingResult")
     lastOnboardingErrorMessage: str | None = Field(None, title="LastOnboardingErrorMessage")
+    onboardingOperationId: str | None = Field(
+        None, title="OnboardingOperationId", exclude_if=lambda value: value is None
+    )
+    onboardingPublicationStatus: ProjectAccountOnboardingPublicationStatus | None = Field(
+        None,
+        title="OnboardingPublicationStatus",
+        exclude_if=lambda value: value is None,
+    )
     parameters: dict[str, str] | None = Field(None, title="Parameters")

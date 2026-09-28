@@ -20,6 +20,8 @@ from app.projects import domain
 from infra import config, constants
 from infra.auth import projects_auth, projects_auth_schema
 from infra.backend import vew_bounded_context_stack
+from infra.backend.projects_s2s_permissions import permissions as projects_s2s_permissions
+from infra.backend.projects_s2s_runtime_config import account_onboarding_environment
 from infra.constructs import (
     backend_app_api_auth,
     backend_app_ecs_cluster,
@@ -44,6 +46,13 @@ GSI_NAME_ENTITIES = "gsi_entities"
 GSI_NAME_QPK = "gsi_query_pk"
 GSI_NAME_QSK = "gsi_query_sk"
 VEW_SERVICE = "Projects"
+S2S_CACHE_EXPLICIT_DISABLE = [
+    "/projects/GET",
+    "/projects/{projectId}/technologies/GET",
+    "/projects/{projectId}/technologies/{technologyId}/GET",
+    "/projects/{projectId}/accounts/GET",
+    "/projects/{projectId}/accounts/{accountId}/GET",
+]
 
 
 class Entrypoint(enum.StrEnum):
@@ -108,6 +117,7 @@ class ProjectsAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
             self,
             "ProjectsAppStorage",
             app_config,
+            enable_ttl=True,
             enable_streaming=True,
         )
         self._storage.table.add_global_secondary_index(
@@ -285,30 +295,18 @@ class ProjectsAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                         "API_BASE_PATH": constants.CUSTOM_DNS_S2S_API_PATH_PROJECTS,
                         "STRIP_PREFIXES": constants.CUSTOM_DNS_S2S_API_PATH_PROJECTS,
                         "COGNITO_USER_POOL_ID": cognito_user_pool_id,
+                        **account_onboarding_environment(
+                            app_config,
+                            image_service_account_id,
+                            catalog_service_account_id,
+                        ),
                     },
-                    permissions=[
-                        lambda lambda_f: lambda_f.add_to_role_policy(
-                            statement=aws_iam.PolicyStatement(
-                                actions=[
-                                    "secretsmanager:GetSecretValue",
-                                    "secretsmanager:DescribeSecret",
-                                ],
-                                effect=aws_iam.Effect.ALLOW,
-                                resources=[
-                                    audit_logging_key_arn,
-                                ],
-                            )
-                        ),
-                        lambda lambda_f: lambda_f.add_to_role_policy(
-                            statement=aws_iam.PolicyStatement(
-                                actions=["cognito-idp:ListUsers"],
-                                effect=aws_iam.Effect.ALLOW,
-                                resources=[cognito_user_pool_arn],
-                            )
-                        ),
-                        lambda lambda_f: self._storage.table.grant_read_write_data(lambda_f),
-                        lambda lambda_f: self._event_bus.grant_put_events_to(lambda_f),
-                    ],
+                    permissions=projects_s2s_permissions(
+                        self._storage.table,
+                        self._event_bus,
+                        audit_logging_key_arn,
+                        cognito_user_pool_arn,
+                    ),
                     reserved_concurrency=app_config.component_specific["api-lambda-reserved-concurrency"],
                     provisioned_concurrency=app_config.component_specific["api-lambda-provisioned-concurrency"],
                     timeout=aws_cdk.Duration.seconds(5),
@@ -525,6 +523,7 @@ class ProjectsAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
             account_onboarding_lambda=self._backend_app.app_entries_functions[account_onboarding_handler_name],
             ecs_cluster=self.__ecs_cluster.ecs_cluster,
             task_definition=self.__usecase_cdk_app_task_definition.task_definition,
+            projects_table=self._storage.table,
         )
 
         self._event_bus.l3_event_bus.subscribe_to_events(
@@ -592,9 +591,7 @@ class ProjectsAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
             user_pool_id=cognito_user_pool_id,
             cache_enabled=True,
             waf_acl_arn=api_acl_arn if not provision_private_endpoint else None,
-            cache_explicit_disable=[
-                "/projects/GET",
-            ],
+            cache_explicit_disable=S2S_CACHE_EXPLICIT_DISABLE,
             endpoint_type=(
                 aws_apigateway.EndpointType.PRIVATE
                 if provision_private_endpoint

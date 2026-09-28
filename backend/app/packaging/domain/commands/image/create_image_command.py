@@ -6,3 +6,5 @@ from app.shared.adapters.message_bus import command_bus
 class CreateImageCommand(command_bus.Command):
     projectId: project_id_value_object.ProjectIdValueObject
     pipelineId: pipeline_id_value_object.PipelineIdValueObject
+    imageId: str | None = None
+    clientToken: str | None = None

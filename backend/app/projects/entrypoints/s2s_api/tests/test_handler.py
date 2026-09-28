@@ -342,9 +342,7 @@ def test_get_service_client_assignment_returns_404_when_missing(lambda_context, 
         )
 
     assert response["statusCode"] == 404
-    dependencies.projects_query_service.get_service_client_assignment.assert_called_once_with(
-        "proj-1", "missing"
-    )
+    dependencies.projects_query_service.get_service_client_assignment.assert_called_once_with("proj-1", "missing")
 
 
 def test_delete_service_client_assignment_dispatches_command(lambda_context, authenticated_event):

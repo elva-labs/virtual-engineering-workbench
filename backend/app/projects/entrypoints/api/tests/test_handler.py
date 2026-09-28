@@ -8,30 +8,20 @@ import assertpy
 import pytest
 
 from app.projects.adapters.query_services import dynamodb_query_service
-from app.projects.domain.commands.enrolments import (
-    approve_enrolments_command,
-    enrol_user_to_program_command,
-)
+from app.projects.domain.commands.enrolments import approve_enrolments_command, enrol_user_to_program_command
 from app.projects.domain.commands.project_accounts import (
     activate_project_account_command,
     deactivate_project_account_command,
     on_board_project_account_command,
     reonboard_project_account_command,
 )
-from app.projects.domain.commands.projects import (
-    create_project_command,
-    update_project_command,
-)
+from app.projects.domain.commands.projects import create_project_command, update_project_command
 from app.projects.domain.commands.technologies import (
     add_technology,
     delete_technology_command,
     update_technology_command,
 )
-from app.projects.domain.commands.users import (
-    assign_user_command,
-    reassign_user_command,
-    unassign_user_command,
-)
+from app.projects.domain.commands.users import assign_user_command, reassign_user_command, unassign_user_command
 from app.projects.domain.model import project_assignment, service_client_assignment
 from app.projects.domain.ports import projects_query_service
 from app.projects.entrypoints.api import bootstrapper
@@ -781,9 +771,7 @@ def test_internal_lookup_returns_404_for_missing_service_client_assignment(
     )
 
 
-def test_internal_lookup_returns_service_client_assignment(
-    lambda_context, authenticated_event, get_mock_dependencies
-):
+def test_internal_lookup_returns_service_client_assignment(lambda_context, authenticated_event, get_mock_dependencies):
     from app.projects.entrypoints.api import handler
 
     handler.dependencies = get_mock_dependencies

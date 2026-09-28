@@ -1621,9 +1621,7 @@ def test_service_client_assignment_repository_uses_client_and_project_keys(
         ).add(assignment)
         mock_ddb_repo.commit()
 
-    item = backend_app_dynamodb_table.get_item(
-        Key={"PK": "CLIENT#terraform-prod", "SK": "PROJECT#proj-1"}
-    )["Item"]
+    item = backend_app_dynamodb_table.get_item(Key={"PK": "CLIENT#terraform-prod", "SK": "PROJECT#proj-1"})["Item"]
     assert item["clientId"] == "terraform-prod"
     assert item["projectId"] == "proj-1"
     assert item["sequenceNo"] == 0

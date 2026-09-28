@@ -22,20 +22,13 @@ from app.projects.domain.commands.project_accounts import (
     on_board_project_account_command,
     reonboard_project_account_command,
 )
-from app.projects.domain.commands.projects import (
-    create_project_command,
-    update_project_command,
-)
+from app.projects.domain.commands.projects import create_project_command, update_project_command
 from app.projects.domain.commands.technologies import (
     add_technology,
     delete_technology_command,
     update_technology_command,
 )
-from app.projects.domain.commands.users import (
-    assign_user_command,
-    reassign_user_command,
-    unassign_user_command,
-)
+from app.projects.domain.commands.users import assign_user_command, reassign_user_command, unassign_user_command
 from app.projects.domain.exceptions import domain_exception
 from app.projects.domain.model import enrolment, project_account, project_assignment
 from app.projects.domain.value_objects import (

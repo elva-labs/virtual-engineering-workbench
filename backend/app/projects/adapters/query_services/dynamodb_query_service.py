@@ -15,11 +15,7 @@ from app.projects.domain.model import (
     technology,
     user,
 )
-from app.projects.domain.ports import (
-    enrolment_query_service,
-    projects_query_service,
-    technologies_query_service,
-)
+from app.projects.domain.ports import enrolment_query_service, projects_query_service, technologies_query_service
 from app.shared.adapters.boto import paging_utils
 from app.shared.adapters.unit_of_work_v2 import dynamodb_repo_config
 

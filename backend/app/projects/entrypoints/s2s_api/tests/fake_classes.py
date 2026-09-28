@@ -13,11 +13,7 @@ from app.projects.domain.model import (
     technology,
     user,
 )
-from app.projects.domain.ports import (
-    enrolment_query_service,
-    projects_query_service,
-    technologies_query_service,
-)
+from app.projects.domain.ports import enrolment_query_service, projects_query_service, technologies_query_service
 from app.projects.domain.value_objects.account_type_value_object import AccountTypeEnum
 from app.shared.adapters.boto import paging_utils
 

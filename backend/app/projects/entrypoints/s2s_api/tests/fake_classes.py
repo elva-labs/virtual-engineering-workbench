@@ -13,13 +13,10 @@ from app.projects.domain.model import (
     technology,
     user,
 )
-from app.projects.domain.ports import (
-    enrolment_query_service,
-    projects_query_service,
-    technologies_query_service,
-)
+from app.projects.domain.ports import enrolment_query_service, projects_query_service, technologies_query_service
 from app.projects.domain.value_objects.account_type_value_object import AccountTypeEnum
 from app.shared.adapters.boto import paging_utils
+from app.shared.domain.ports.idempotency_service import IdempotencyService, Reservation, ReservationOutcome
 
 
 class FakeProjectsQueryService(projects_query_service.ProjectsQueryService):
@@ -41,7 +38,9 @@ class FakeProjectsQueryService(projects_query_service.ProjectsQueryService):
             token,
             [
                 project_assignment.Assignment(
-                    userId="TID", projectId="PID", roles=[project_assignment.Role.PLATFORM_USER]
+                    userId="TID",
+                    projectId="PID",
+                    roles=[project_assignment.Role.PLATFORM_USER],
                 )
             ],
         )
@@ -136,7 +135,9 @@ class FakeProjectsQueryService(projects_query_service.ProjectsQueryService):
     def list_users_by_project(self, project_id: str) -> List[project_assignment.Assignment]:
         return [
             project_assignment.Assignment(
-                projectId="project-id", userId="T0000AA", roles=[project_assignment.Role.PLATFORM_USER]
+                projectId="project-id",
+                userId="T0000AA",
+                roles=[project_assignment.Role.PLATFORM_USER],
             )
         ]
 
@@ -197,7 +198,10 @@ class FakeProjectsQueryService(projects_query_service.ProjectsQueryService):
         new_assignment = project_assignment.Assignment(
             projectId="123",
             userId="U0",
-            roles=[project_assignment.Role.ADMIN.value, project_assignment.Role.PLATFORM_USER.value],
+            roles=[
+                project_assignment.Role.ADMIN.value,
+                project_assignment.Role.PLATFORM_USER.value,
+            ],
         )
         return new_assignment
 
@@ -256,6 +260,7 @@ class FakeTechnologiesQueryService(technologies_query_service.TechnologiesQueryS
             current_time_iso = current_time.isoformat()
             new_tech = technology.Technology(
                 id=str(i),
+                project_id=project_id,
                 name="test-name",
                 description="test-description",
                 createDate=current_time_iso,
@@ -263,6 +268,12 @@ class FakeTechnologiesQueryService(technologies_query_service.TechnologiesQueryS
             )
             techs.append(new_tech)
         return techs
+
+    def get_technology_by_id(self, project_id: str, technology_id: str) -> technology.Technology | None:
+        return next(
+            (tech for tech in self.list_technologies(project_id, page_size=100) if tech.id == technology_id),
+            None,
+        )
 
 
 class FakeEnrolmentsQueryService(enrolment_query_service.EnrolmentQueryService):
@@ -278,7 +289,11 @@ class FakeEnrolmentsQueryService(enrolment_query_service.EnrolmentQueryService):
         return next(filter(lambda e: e.id == enrolment_id, enrolments), None)
 
     def list_enrolments_by_project(
-        self, project_id: str, page_size: int, next_token: Any, status: Optional[str] = None
+        self,
+        project_id: str,
+        page_size: int,
+        next_token: Any,
+        status: Optional[str] = None,
     ) -> Tuple[List[enrolment.Enrolment], Any]:
         enrolments = [*self.enrolments]
         return list(filter(lambda e: e.projectId == project_id, enrolments)), None
@@ -292,9 +307,40 @@ class FakeEnrolmentsQueryService(enrolment_query_service.EnrolmentQueryService):
         project_id: Optional[str] = None,
     ) -> Tuple[List[enrolment.Enrolment], Any]:
         enrolments = [*self.enrolments]
-        return list(filter(lambda e: e.userId.upper() == user_id.upper(), enrolments)), None
+        return (
+            list(filter(lambda e: e.userId.upper() == user_id.upper(), enrolments)),
+            None,
+        )
 
     def update_enrolments_by_project(self, project_id: str, items_to_update: List[dict]) -> List[enrolment.Enrolment]:
         approved_enrolment = enrolment.Enrolment(projectId="P1", userId="U1", status="Approved")
         rejected_enrolment = enrolment.Enrolment(projectId="P1", userId="U1", status="Rejected")
         return [approved_enrolment, rejected_enrolment]
+
+
+class FakeIdempotencyService(IdempotencyService):
+    def __init__(self):
+        self.records = {}
+
+    def reserve(self, scope, request_hash, resource_id, now):
+        existing = self.records.get(scope)
+        if existing is None:
+            self.records[scope] = {
+                "hash": request_hash,
+                "resource_id": resource_id,
+                "status": "IN_PROGRESS",
+            }
+            return Reservation(ReservationOutcome.ACQUIRED, resource_id)
+        if existing["hash"] != request_hash:
+            return Reservation(ReservationOutcome.CONFLICT, existing["resource_id"])
+        if existing["status"] == "COMPLETED":
+            return Reservation(
+                ReservationOutcome.REPLAY,
+                existing["resource_id"],
+                existing["status_code"],
+                existing["body"],
+            )
+        return Reservation(ReservationOutcome.IN_PROGRESS, existing["resource_id"])
+
+    def complete(self, scope, request_hash, resource_id, response_status, response_body, now):
+        self.records[scope].update(status="COMPLETED", status_code=response_status, body=response_body)

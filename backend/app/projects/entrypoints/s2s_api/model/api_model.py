@@ -7,7 +7,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class Empty(BaseModel):
@@ -15,18 +15,12 @@ class Empty(BaseModel):
 
 
 class Project(BaseModel):
-    projectId: str = Field(
-        ..., description="Unique ID of the project.", title="ProjectId"
-    )
-    projectName: Optional[str] = Field(
-        None, description="Name of the project.", title="ProjectName"
-    )
+    projectId: str = Field(..., description="Unique ID of the project.", title="ProjectId")
+    projectName: Optional[str] = Field(None, description="Name of the project.", title="ProjectName")
     projectDescription: Optional[str] = Field(
         None, description="Description of the project.", title="ProjectDescription"
     )
-    createDate: Optional[str] = Field(
-        None, description="Point in time where project is created.", title="CreateDate"
-    )
+    createDate: Optional[str] = Field(None, description="Point in time where project is created.", title="CreateDate")
     lastUpdateDate: Optional[str] = Field(
         None,
         description="Point in time where project is last updated.",
@@ -53,9 +47,7 @@ class EnrolPendingUserRequest(BaseModel):
     userId: str = Field(..., description="ID of the user", title="UserId")
     userEmail: str = Field(..., description="Email of the user", title="UserEmail")
     approverId: str = Field(..., description="ID of the approver", title="ApproverId")
-    source: str = Field(
-        ..., description="Source or origin of the request", title="Source"
-    )
+    source: str = Field(..., description="Source or origin of the request", title="Source")
 
 
 class EnrolPendingUserResponse(BaseModel):
@@ -72,9 +64,7 @@ class RemoveUsersResponse(BaseModel):
 
 class AssignUserRequest(BaseModel):
     userId: Optional[str] = Field(None, description="User TID", title="UserId")
-    roles: Optional[List[str]] = Field(
-        None, description="User roles in the project", title="Roles"
-    )
+    roles: Optional[List[str]] = Field(None, description="User roles in the project", title="Roles")
 
 
 class AssignUserResponse(BaseModel):
@@ -82,12 +72,8 @@ class AssignUserResponse(BaseModel):
 
 
 class ReAssignUsersRequest(BaseModel):
-    roles: Optional[List[str]] = Field(
-        None, description="Users roles in the project", title="Roles"
-    )
-    userIds: Optional[List[str]] = Field(
-        None, description="User IDs in the project", title="UserIds"
-    )
+    roles: Optional[List[str]] = Field(None, description="Users roles in the project", title="Roles")
+    userIds: Optional[List[str]] = Field(None, description="User IDs in the project", title="UserIds")
 
 
 class ReAssignUsersResponse(BaseModel):
@@ -96,18 +82,12 @@ class ReAssignUsersResponse(BaseModel):
 
 class GetProjectAssignmentsResponseItem(BaseModel):
     userId: Optional[str] = Field(None, description="User TID", title="UserId")
-    roles: Optional[List[str]] = Field(
-        None, description="User roles in the project", title="Roles"
-    )
-    userEmail: Optional[str] = Field(
-        None, description="Email address of the user", title="UserEmail"
-    )
+    roles: Optional[List[str]] = Field(None, description="User roles in the project", title="Roles")
+    userEmail: Optional[str] = Field(None, description="Email address of the user", title="UserEmail")
 
 
 class GetProjectAssignmentsResponse(BaseModel):
-    assignments: Optional[List[GetProjectAssignmentsResponseItem]] = Field(
-        None, title="Assignments"
-    )
+    assignments: Optional[List[GetProjectAssignmentsResponseItem]] = Field(None, title="Assignments")
 
 
 class UnAssignUserResponse(BaseModel):
@@ -131,3 +111,104 @@ class ServiceClientAssignment(BaseModel):
 
 class GetServiceClientAssignmentResponse(BaseModel):
     assignment: ServiceClientAssignment
+
+
+class Technology(BaseModel):
+    technologyId: str = Field(..., title="TechnologyId")
+    projectId: str = Field(..., title="ProjectId")
+    name: str = Field(..., title="Name")
+    description: Optional[str] = Field(None, title="Description")
+    createDate: Optional[str] = Field(None, title="CreateDate")
+    lastUpdateDate: Optional[str] = Field(None, title="LastUpdateDate")
+
+
+class TechnologyPage(BaseModel):
+    technologies: List[Technology]
+
+
+class CreateTechnologyRequest(BaseModel):
+    name: str = Field(..., min_length=1, title="Name")
+    description: Optional[str] = Field(None, title="Description")
+
+    @field_validator("name")
+    @classmethod
+    def require_non_whitespace(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Name must not be blank")
+        return value
+
+
+class UpdateTechnologyRequest(BaseModel):
+    name: str = Field(..., min_length=1, title="Name")
+    description: Optional[str] = Field(None, title="Description")
+
+    @field_validator("name")
+    @classmethod
+    def require_non_whitespace(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Name must not be blank")
+        return value
+
+
+class CreateTechnologyResponse(BaseModel):
+    technologyId: str = Field(..., title="TechnologyId")
+
+
+class CreateProjectAccountRequest(BaseModel):
+    awsAccountId: str = Field(..., min_length=12, max_length=12, pattern=r"^\d{12}$")
+    accountType: str = Field(..., pattern=r"^(USER|TOOLCHAIN)$")
+    name: str = Field(..., min_length=1)
+    description: str = Field(..., min_length=1)
+    technologyId: str = Field(..., min_length=1)
+    stage: str = Field(..., pattern=r"^(dev|qa|prod)$")
+    region: str = Field(..., min_length=1, pattern=r"^[a-z]{2}(?:-[a-z0-9]+)+-\d$")
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("name", "description", "technologyId", "region")
+    @classmethod
+    def require_non_whitespace(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Value must not be blank")
+        return value
+
+
+class ProjectAccount(BaseModel):
+    accountId: str
+    projectId: str
+    awsAccountId: str
+    accountType: str
+    name: str | None
+    description: str | None
+    technologyId: str | None
+    stage: str
+    region: str | None
+    status: str | None
+    lastOnboardingResult: str | None = None
+    lastOnboardingError: str | None = None
+    createDate: str | None = None
+    lastUpdateDate: str | None = None
+
+
+class ProjectAccountPage(BaseModel):
+    accounts: List[ProjectAccount]
+
+
+class CreateProjectAccountResponse(BaseModel):
+    accountId: str
+
+
+class UpdateProjectAccountRequest(BaseModel):
+    accountType: str = Field(..., pattern=r"^(USER|TOOLCHAIN)$")
+    name: str = Field(..., min_length=1)
+    description: str = Field(..., min_length=1)
+    technologyId: str = Field(..., min_length=1)
+    stage: str = Field(..., pattern=r"^(dev|qa|prod)$")
+    region: str = Field(..., min_length=1, pattern=r"^[a-z]{2}(?:-[a-z0-9]+)+-\d$")
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("name", "description", "technologyId", "region")
+    @classmethod
+    def require_non_whitespace(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Value must not be blank")
+        return value

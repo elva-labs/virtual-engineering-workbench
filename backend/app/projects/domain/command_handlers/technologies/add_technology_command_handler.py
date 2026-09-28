@@ -21,13 +21,16 @@ def handle_add_technology_command(
             f"Failed to load project. Project for given ID {cmd.project_id.value} does not exist."
         )
     current_time = datetime.now(timezone.utc).isoformat()
-    tech = technology.Technology(
-        project_id=cmd.project_id.value,
-        name=cmd.name,
-        description=cmd.description,
-        createDate=current_time,
-        lastUpdateDate=current_time,
-    )
+    technology_fields = {
+        "project_id": cmd.project_id.value,
+        "name": cmd.name,
+        "description": cmd.description,
+        "createDate": current_time,
+        "lastUpdateDate": current_time,
+    }
+    if cmd.technology_id is not None:
+        technology_fields["id"] = cmd.technology_id
+    tech = technology.Technology(**technology_fields)
 
     with uow:
         uow.get_repository(technology.TechnologyPrimaryKey, technology.Technology).add(tech)

@@ -17,7 +17,7 @@ def handle_delete_technology_command(
         project_id=cmd.project_id.value, technology_id=cmd.id.value
     )
     if project_accounts:
-        raise domain_exception.DomainException(
+        raise domain_exception.TechnologyInUseException(
             f"Failed to delete technology. Technology for given ID {cmd.id.value} is still associated with AWS accounts."
         )
 

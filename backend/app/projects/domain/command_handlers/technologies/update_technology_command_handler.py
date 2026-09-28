@@ -20,9 +20,9 @@ def handle_update_technology_command(
             f"Failed to load project. Project for given ID {cmd.project_id.value} does not exist."
         )
 
-    expected_techs = technologies_qry_srv.list_technologies(project_id=cmd.project_id.value, page_size=0)
-
-    existing_technology = next((t for t in expected_techs if t.id == cmd.id.value), None)
+    existing_technology = technologies_qry_srv.get_technology_by_id(
+        project_id=cmd.project_id.value, technology_id=cmd.id.value
+    )
     if not existing_technology:
         raise domain_exception.DomainException(
             f"Failed to update technology. Technology for given ID {cmd.id.value} does not exist."

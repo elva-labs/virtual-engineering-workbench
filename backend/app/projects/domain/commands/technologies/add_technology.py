@@ -10,4 +10,5 @@ class AddTechnologyCommand(command_bus.Command):
     name: str
     description: Optional[str] = None
     project_id: project_id_value_object.ProjectIdValueObject
+    technology_id: Optional[str] = None
     model_config = ConfigDict(arbitrary_types_allowed=True)

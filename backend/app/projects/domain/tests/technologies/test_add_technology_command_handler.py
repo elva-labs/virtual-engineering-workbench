@@ -19,3 +19,29 @@ def test_can_add_technology_to_project(handler_dependencies, mock_uow_2, mock_te
     mock_uow_2.commit.assert_called_once()
     message_bus_mock.publish.assert_called_once()
     mock_technologies_repo.add.assert_called_once()
+
+
+def test_reserved_technology_id_is_persisted(handler_dependencies, mock_uow_2, mock_technologies_repo, message_bus_mock):
+    cmd = command.AddTechnologyCommand(
+        project_id=project_id_value_object.from_str("p-1"),
+        name="terraform-managed",
+        technology_id="tech-reserved",
+    )
+    (_, projects_query_service_mock, _) = handler_dependencies
+
+    command_handler.handle_add_technology_command(
+        cmd=cmd, uow=mock_uow_2, projects_qry_srv=projects_query_service_mock, msg_bus=message_bus_mock
+    )
+
+    stored_technology = mock_technologies_repo.add.call_args.args[0]
+    assert stored_technology.id == "tech-reserved"
+    assert message_bus_mock.publish.call_args.args[0].technology_id == "tech-reserved"
+
+
+def test_technology_id_is_generated_when_not_reserved():
+    from app.projects.domain.model.technology import Technology
+
+    tech = Technology(project_id="p-1", name="generated")
+
+    assert isinstance(tech.id, str)
+    assert tech.id.startswith("tech-")

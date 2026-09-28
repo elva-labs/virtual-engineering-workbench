@@ -3,8 +3,13 @@ import json
 import assertpy
 import pytest
 
-from app.projects.domain.command_handlers.project_accounts import fail_project_account_onboarding_command_handler
-from app.projects.domain.commands.project_accounts import fail_project_account_onboarding_command
+from app.projects.domain.command_handlers.project_accounts import (
+    fail_project_account_onboarding_command_handler,
+)
+from app.projects.domain.command_handlers.internal import string_utils
+from app.projects.domain.commands.project_accounts import (
+    fail_project_account_onboarding_command,
+)
 from app.projects.domain.model import project_account
 from app.projects.domain.value_objects import (
     account_error_message_value_object,
@@ -21,8 +26,10 @@ def test_handle_when_account_is_onboarding_should_set_to_failed(
     sample_project_account_factory,
 ):
     # ARRANGE
-    mock_projects_qs.get_project_account_by_id.return_value = sample_project_account_factory(
-        account_status=project_account.ProjectAccountStatusEnum.OnBoarding
+    mock_projects_qs.get_project_account_by_id.return_value = (
+        sample_project_account_factory(
+            account_status=project_account.ProjectAccountStatusEnum.OnBoarding
+        )
     )
 
     # ACT
@@ -37,10 +44,14 @@ def test_handle_when_account_is_onboarding_should_set_to_failed(
 
     mock_account_repo.update_entity.assert_called_once()
     [pk, ent] = mock_account_repo.update_entity.call_args.args
-    assertpy.assert_that(pk).is_equal_to(project_account.ProjectAccountPrimaryKey(projectId="123", id="321"))
+    assertpy.assert_that(pk).is_equal_to(
+        project_account.ProjectAccountPrimaryKey(projectId="123", id="321")
+    )
     assertpy.assert_that(ent.accountStatus).is_equal_to("Failed")
     assertpy.assert_that(ent.lastOnboardingResult).is_equal_to("Failed")
-    assertpy.assert_that(ent.lastOnboardingErrorMessage).is_equal_to("Test: Test cause")
+    assertpy.assert_that(ent.lastOnboardingErrorMessage).is_equal_to(
+        string_utils.DEFAULT_ONBOARDING_ERROR_MESSAGE
+    )
 
 
 def test_handle_when_account_is_reonboarding_should_set_to_active(
@@ -51,8 +62,10 @@ def test_handle_when_account_is_reonboarding_should_set_to_active(
     sample_project_account_factory,
 ):
     # ARRANGE
-    mock_projects_qs.get_project_account_by_id.return_value = sample_project_account_factory(
-        account_status=project_account.ProjectAccountStatusEnum.ReOnboarding
+    mock_projects_qs.get_project_account_by_id.return_value = (
+        sample_project_account_factory(
+            account_status=project_account.ProjectAccountStatusEnum.ReOnboarding
+        )
     )
 
     # ACT
@@ -67,10 +80,14 @@ def test_handle_when_account_is_reonboarding_should_set_to_active(
 
     mock_account_repo.update_entity.assert_called_once()
     [pk, ent] = mock_account_repo.update_entity.call_args.args
-    assertpy.assert_that(pk).is_equal_to(project_account.ProjectAccountPrimaryKey(projectId="123", id="321"))
+    assertpy.assert_that(pk).is_equal_to(
+        project_account.ProjectAccountPrimaryKey(projectId="123", id="321")
+    )
     assertpy.assert_that(ent.accountStatus).is_equal_to("Active")
     assertpy.assert_that(ent.lastOnboardingResult).is_equal_to("Failed")
-    assertpy.assert_that(ent.lastOnboardingErrorMessage).is_equal_to("Test: Test cause")
+    assertpy.assert_that(ent.lastOnboardingErrorMessage).is_equal_to(
+        string_utils.DEFAULT_ONBOARDING_ERROR_MESSAGE
+    )
 
 
 def test_handle_when_error_is_task_failed_should_parse_task_cause(
@@ -84,10 +101,14 @@ def test_handle_when_error_is_task_failed_should_parse_task_cause(
     command = fail_project_account_onboarding_command.FailProjectAccountOnboarding(
         project_id=project_id_value_object.from_str("123"),
         account_id=account_id_value_object.from_str("321"),
-        error=account_error_message_value_object.from_str(error="States.TaskFailed", cause=json.dumps(ecs_task_error)),
+        error=account_error_message_value_object.from_str(
+            error="States.TaskFailed", cause=json.dumps(ecs_task_error)
+        ),
     )
-    mock_projects_qs.get_project_account_by_id.return_value = sample_project_account_factory(
-        account_status=project_account.ProjectAccountStatusEnum.OnBoarding
+    mock_projects_qs.get_project_account_by_id.return_value = (
+        sample_project_account_factory(
+            account_status=project_account.ProjectAccountStatusEnum.OnBoarding
+        )
     )
 
     # ACT
@@ -101,16 +122,16 @@ def test_handle_when_error_is_task_failed_should_parse_task_cause(
     mock_account_repo.update_entity.assert_called_once()
     [pk, ent] = mock_account_repo.update_entity.call_args.args
     assertpy.assert_that(ent.lastOnboardingErrorMessage).is_equal_to(
-        "TaskFailedToStart: Unexpected EC2 error while attempting to Create Network Interface in subnet '': InsufficientFreeAddressesInSubnet"
+        string_utils.ONBOARDING_ERROR_MESSAGES["TaskFailedToStart"]
     )
 
 
 @pytest.mark.parametrize(
-    "error, expected_error",
+    "error",
     [
-        ("Some subnet-0011aabb error", "Some [REDACTED] error"),
-        ("Some arn:aws:iam::001234567890:role/ExampleRole/Session error", "Some [REDACTED] error"),
-        ("Some 001234567890 error", "Some [REDACTED] error"),
+        "Some subnet-0011aabb error",
+        "Some arn:aws:iam::001234567890:role/ExampleRole/Session error",
+        "Some 001234567890 error",
     ],
 )
 def test_handle_when_error_contains_aws_resource_ids_should_sanitize(
@@ -120,18 +141,20 @@ def test_handle_when_error_contains_aws_resource_ids_should_sanitize(
     sample_project_account_factory,
     ecs_task_error_factory,
     error,
-    expected_error,
 ):
     # ARRANGE
     command = fail_project_account_onboarding_command.FailProjectAccountOnboarding(
         project_id=project_id_value_object.from_str("123"),
         account_id=account_id_value_object.from_str("321"),
         error=account_error_message_value_object.from_str(
-            error="States.TaskFailed", cause=json.dumps(ecs_task_error_factory(error_msg=error))
+            error="States.TaskFailed",
+            cause=json.dumps(ecs_task_error_factory(error_msg=error)),
         ),
     )
-    mock_projects_qs.get_project_account_by_id.return_value = sample_project_account_factory(
-        account_status=project_account.ProjectAccountStatusEnum.OnBoarding
+    mock_projects_qs.get_project_account_by_id.return_value = (
+        sample_project_account_factory(
+            account_status=project_account.ProjectAccountStatusEnum.OnBoarding
+        )
     )
 
     # ACT
@@ -144,4 +167,50 @@ def test_handle_when_error_contains_aws_resource_ids_should_sanitize(
     # ASSERT
     mock_account_repo.update_entity.assert_called_once()
     [pk, ent] = mock_account_repo.update_entity.call_args.args
-    assertpy.assert_that(ent.lastOnboardingErrorMessage).is_equal_to(f"TaskFailedToStart: {expected_error}")
+    assertpy.assert_that(ent.lastOnboardingErrorMessage).is_equal_to(
+        string_utils.ONBOARDING_ERROR_MESSAGES["TaskFailedToStart"]
+    )
+
+
+def test_safe_onboarding_error_never_returns_arbitrary_workflow_detail():
+    secret = "AKIA1234567890EXAMPLE password=hunter2"
+    cause = json.dumps(
+        {
+            "StopCode": "UnrecognizedStopCode",
+            "StoppedReason": f"failed with {secret}",
+        }
+    )
+
+    result = string_utils.safe_onboarding_error("UnrecognizedWorkflowError", cause)
+    assertpy.assert_that(result).is_equal_to(
+        string_utils.DEFAULT_ONBOARDING_ERROR_MESSAGE
+    )
+    assertpy.assert_that(result).does_not_contain(secret)
+
+
+@pytest.mark.parametrize("cause", ["[]", '"raw detail"', "{invalid json"])
+def test_safe_onboarding_error_handles_non_object_and_malformed_causes(cause):
+    result = string_utils.safe_onboarding_error("States.TaskFailed", cause)
+    assertpy.assert_that(result).is_equal_to(
+        string_utils.ONBOARDING_ERROR_MESSAGES["States.TaskFailed"]
+    )
+
+
+@pytest.mark.parametrize(
+    "stored, expected",
+    [
+        (
+            "TaskFailedToStart: leaked credential or raw workflow detail",
+            string_utils.ONBOARDING_ERROR_MESSAGES["TaskFailedToStart"],
+        ),
+        (
+            "unrecognized historical workflow detail",
+            string_utils.DEFAULT_ONBOARDING_ERROR_MESSAGE,
+        ),
+        (None, None),
+    ],
+)
+def test_safe_onboarding_error_sanitizes_historic_stored_messages(stored, expected):
+    assertpy.assert_that(string_utils.safe_onboarding_error(stored)).is_equal_to(
+        expected
+    )

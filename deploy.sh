@@ -232,8 +232,8 @@ fi
 prompt AWS_ACCOUNT_ID    "AWS Account ID (12 digits)"          ""
 [[ "$AWS_ACCOUNT_ID" =~ ^[0-9]{12}$ ]] || err "Invalid AWS Account ID: $AWS_ACCOUNT_ID"
 prompt AWS_REGION         "AWS Region"                          "us-east-1"
-ENABLED_WORKBENCH_REGIONS="${ENABLED_WORKBENCH_REGIONS:-$AWS_REGION}"
 prompt ENABLED_WORKBENCH_REGIONS "Enabled workbench regions (comma-separated)" "$AWS_REGION"
+ENABLED_WORKBENCH_REGIONS="${ENABLED_WORKBENCH_REGIONS:-$AWS_REGION}"
 ENABLED_WORKBENCH_REGIONS=$(normalize_workbench_regions "$ENABLED_WORKBENCH_REGIONS") || \
   err "ENABLED_WORKBENCH_REGIONS must be a comma-separated list of AWS regions"
 prompt ENVIRONMENT        "Environment (dev/qa/prod)"           "dev"

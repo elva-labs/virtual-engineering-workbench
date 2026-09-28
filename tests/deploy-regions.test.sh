@@ -20,6 +20,12 @@ if normalize_workbench_regions "us-east-1,not-a-region" >/dev/null 2>&1; then
   fail "expected malformed regions to be rejected"
 fi
 
+for invalid_regions in "" "," "us-east-1," ",us-east-1" "us-east-1,,eu-west-1" "us-east-1, ,eu-west-1"; do
+  if normalize_workbench_regions "$invalid_regions" >/dev/null 2>&1; then
+    fail "expected empty region entries to be rejected: '$invalid_regions'"
+  fi
+done
+
 actual=$(workbench_regions_python_list "us-east-1,eu-north-1")
 [[ "$actual" == '["us-east-1", "eu-north-1"]' ]] || \
   fail "expected a Python list literal; got '$actual'"
@@ -142,5 +148,16 @@ dry_run_output=$(
 saved_regions=$(sed -n 's/^ENABLED_WORKBENCH_REGIONS="\(.*\)"$/\1/p' "$test_root/.deploy-config-dev")
 [[ "$saved_regions" == "us-east-1,eu-north-1" ]] || \
   fail "saved config must contain normalized workbench regions; got '$saved_regions'"
+
+sed '/^ENABLED_WORKBENCH_REGIONS=/d' "$test_root/config.env" > "$test_root/default-regions.env"
+default_output=$(
+  cd "$test_root"
+  PATH="$test_root/bin:$PATH" \
+    AWS_ACCESS_KEY_ID=test \
+    AWS_SECRET_ACCESS_KEY=test \
+    bash ./deploy.sh --config ./default-regions.env --dry-run --yes
+)
+[[ "$default_output" == *"Workbench regions: us-east-1"* ]] || \
+  fail "an omitted region list must default to the primary AWS region"
 
 echo "PASS: deployment region helpers"

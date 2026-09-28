@@ -5,10 +5,11 @@ normalize_workbench_regions() {
   local candidate
   local region
   local normalized=""
-  local -a candidates
+  local remaining="${raw_regions},"
 
-  IFS=',' read -r -a candidates <<< "$raw_regions"
-  for candidate in "${candidates[@]}"; do
+  while [[ -n "$remaining" ]]; do
+    candidate="${remaining%%,*}"
+    remaining="${remaining#*,}"
     region="${candidate#"${candidate%%[![:space:]]*}"}"
     region="${region%"${region##*[![:space:]]}"}"
 

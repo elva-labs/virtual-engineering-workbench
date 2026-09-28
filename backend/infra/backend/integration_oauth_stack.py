@@ -62,6 +62,10 @@ class IntegrationOauthStack(aws_cdk.Stack):
                     "assignment.read": "Allows to read user data in the projects",
                     "client_assignment.read": "Allows to read service-client project assignments",
                     "client_assignment.write": "Allows to manage service-client project assignments",
+                    "technology.read": "Allows service clients to read project technologies",
+                    "technology.write": "Allows service clients to manage project technologies",
+                    "account.read": "Allows service clients to read project accounts",
+                    "account.write": "Allows service clients to manage project accounts",
                 },
             ),
         )
@@ -121,6 +125,10 @@ class IntegrationOauthStack(aws_cdk.Stack):
                         "assignment.read",
                         "client_assignment.read",
                         "client_assignment.write",
+                        "technology.read",
+                        "technology.write",
+                        "account.read",
+                        "account.write",
                     ],
                 ),
                 backend_app_api_oauth_client.AppClientResourceServer(

@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from uuid import uuid4
 
 from app.packaging.domain.commands.image import create_image_command
 from app.packaging.domain.exceptions import domain_exception
@@ -30,8 +31,10 @@ def handle(
             f"allow execution, but is {pipeline_entity.status.value}."
         )
 
+    image_id = command.imageId or image.generate_image_id()
+    client_token = command.clientToken or uuid4().hex
     image_build_version_arn = image_build_version_arn_value_object.from_str(
-        pipeline_srv.start_pipeline_execution(pipeline_arn=pipeline_entity.pipelineArn)
+        pipeline_srv.start_pipeline_execution(pipeline_arn=pipeline_entity.pipelineArn, client_token=client_token)
     ).value
     # Example ARN: arn:aws:imagebuilder:us-east-1:123456789012:image/my-recipe/1.0.0/1
     # Splitting based on character "/" will return my-recipe, 1.0.0 and 1 respectively
@@ -40,6 +43,7 @@ def handle(
     current_time = datetime.now(timezone.utc).isoformat()
     image_entity = image.Image(
         projectId=command.projectId.value,
+        imageId=image_id,
         imageBuildVersion=image_build_version,
         imageBuildVersionArn=image_build_version_arn,
         pipelineId=command.pipelineId.value,

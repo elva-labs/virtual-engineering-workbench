@@ -16,7 +16,7 @@ from app.packaging.domain.exceptions.s2s_exception import (
     ReplayedCreateFailure,
     ResourceReadNotReady,
 )
-from app.packaging.domain.ports.idempotency_service import (
+from app.shared.domain.ports.idempotency_service import (
     IdempotencyScope,
     IdempotencyService,
     Reservation,

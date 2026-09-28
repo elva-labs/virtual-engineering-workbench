@@ -20,7 +20,6 @@ from app.packaging.adapters.query_services import (
 from app.packaging.adapters.repository import dynamo_entity_config
 from app.packaging.adapters.services import (
     aws_component_definition_service,
-    dynamodb_idempotency_service,
     ec2_image_builder_pipeline_service,
     parameter_service,
 )
@@ -73,7 +72,6 @@ from app.packaging.domain.commands.recipe import (
     retire_recipe_version_command,
     update_recipe_version_command,
 )
-from app.packaging.domain.ports.idempotency_service import IdempotencyService
 from app.packaging.domain.ports.service_client_project_access_service import ServiceClientProjectAccessService
 from app.packaging.domain.query_services import (
     component_domain_query_service,
@@ -84,6 +82,7 @@ from app.packaging.domain.query_services import (
     recipe_version_domain_query_service,
 )
 from app.packaging.entrypoints.s2s_api import config
+from app.shared.adapters.idempotency import dynamodb_idempotency_service
 from app.shared.adapters.message_bus import (
     command_bus_metrics,
     event_bridge_message_bus,
@@ -92,6 +91,7 @@ from app.shared.adapters.message_bus import (
 )
 from app.shared.adapters.unit_of_work_v2 import dynamodb_unit_of_work
 from app.shared.api import aws_events_api, bounded_contexts, service_registry
+from app.shared.domain.ports.idempotency_service import IdempotencyService
 from app.shared.instrumentation import power_tools_metrics
 from app.shared.logging import boto_logger
 

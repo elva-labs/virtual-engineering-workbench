@@ -3,8 +3,8 @@ from uuid import UUID
 
 import pytest
 
-from app.packaging.adapters.services.dynamodb_idempotency_service import DynamoDBIdempotencyService
-from app.packaging.domain.ports.idempotency_service import IdempotencyScope, ReservationOutcome
+from app.shared.adapters.idempotency.dynamodb_idempotency_service import DynamoDBIdempotencyService
+from app.shared.domain.ports.idempotency_service import IdempotencyScope, ReservationOutcome
 
 TEST_TABLE_NAME = "test-table"
 NOW = datetime(2026, 9, 18, 12, 0, tzinfo=UTC)

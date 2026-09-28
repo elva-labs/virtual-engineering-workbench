@@ -1,0 +1,27 @@
+meta:
+  name: CreateImage
+  type: http
+  seq: 1
+
+post:
+  url: "{{baseUrl}}/projects/{{projectId}}/images"
+  body:
+    type: json
+    content: |-
+      {
+        "pipelineId": "{{pipelineId}}"
+      }
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Content-Type
+      value: application/json
+    # Keep this UUID for retries of the same build. Generate a new UUID only
+    # when intentionally starting another build.
+    - name: Idempotency-Key
+      value: 8f57d638-5589-4e80-a1c7-90c5a8a2f906
+  params: []
+  scripts:
+    pre-request: ""
+    post-response: ""
+  tests: []

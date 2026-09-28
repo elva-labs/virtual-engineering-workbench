@@ -641,7 +641,9 @@ paths:
     post:
       operationId: CreateImage
       tags: [ALL]
-      parameters: [{$ref: '#/components/parameters/ProjectId'}]
+      parameters:
+        - {$ref: '#/components/parameters/ProjectId'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
       requestBody:
         required: true
         content:
@@ -658,7 +660,7 @@ paths:
         '500': {$ref: '#/components/responses/Problem'}
         '503': {$ref: '#/components/responses/Problem'}
       security: [{ClientCredentials: [clients/packaging/pipeline.execute]}]
-      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-request-validator: body-only
       x-amazon-apigateway-integration: *lambdaIntegration
     get:
       operationId: ListImages

@@ -305,15 +305,25 @@ Create/update/retire returns `202` with `pipelineId` and `Retry-After: 5`. Poll 
 are not mutable through the existing command. As in the UI, omitting `productId`
 on update clears the product association.
 
-Pipeline creates require `Idempotency-Key`. Once the pipeline is `CREATED`, send this to `POST /images`:
+Pipeline and image-build creates require an RFC 4122 UUID `Idempotency-Key`. Retain
+the same key for every retry of one logical build. Once the pipeline is `CREATED`,
+send this to `POST /images`:
 
 ```json
 {"pipelineId": "pipe-example"}
 ```
 
-The response is `202` with the existing internal `imageId`. Image-build POST is
-intentionally not idempotent and is explicitly outside Terraform scope; repeating
-it can launch another billable build. Poll `GET /images/{imageId}`
+For example, generate a UUID once (`8f57d638-5589-4e80-a1c7-90c5a8a2f906`) and
+send it as `Idempotency-Key`; do not generate a new key for a retry. A new key
+intentionally starts a new build.
+
+The response is `202 Accepted` with the reserved internal `imageId`. The same key
+and request replays the original accepted response during the at-least-24-hour
+replay window. The reservation uses a 60-second lease while a request is being
+processed. A conflicting request using the same key with a different request
+returns `409 Conflict`; a concurrent request while the lease is active also
+returns `409 Conflict` indicating the operation is in progress. Poll
+`GET /images/{imageId}`
 with `pipeline.read` until `image.status` becomes `CREATED` or `FAILED`.
 `image.imageUpstreamId` is the resulting AMI ID when available. Builds still run
 through the existing Image Builder and event-processing workflow.

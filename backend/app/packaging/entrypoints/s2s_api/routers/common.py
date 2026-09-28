@@ -4,7 +4,7 @@ from aws_lambda_powertools import Metrics
 from aws_lambda_powertools.event_handler import api_gateway
 
 from app.packaging.domain.exceptions.s2s_exception import InsufficientScope, InvalidIdempotencyKey
-from app.packaging.domain.ports.idempotency_service import IdempotencyScope
+from app.shared.domain.ports.idempotency_service import IdempotencyScope
 
 NO_STORE = {"Cache-Control": "no-store"}
 api_metrics = Metrics(service="PackagingS2S")

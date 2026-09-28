@@ -81,6 +81,424 @@ x-amazon-apigateway-gateway-responses:
       application/json:
         "{ \"message\": \"Server error\", \"validationError\": \"\" }"
 paths:
+  /projects/{projectId}/technologies:
+    get:
+      description: "List technologies in a project"
+      operationId: "ListProjectTechnologies"
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Project technologies"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListProjectTechnologiesResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+      security:
+        - ClientCredentials: ["clients/projects/technology.read"]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        contentHandling: "CONVERT_TO_TEXT"
+        credentials: "{{apigw_invocation_role_arn}}"
+    post:
+      description: "Create a technology in a project"
+      operationId: "CreateProjectTechnology"
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectTechnologyRequest"
+      responses:
+        "201":
+          description: "Technology created"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateProjectTechnologyResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+      security:
+        - ClientCredentials: ["clients/projects/technology.write"]
+      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        contentHandling: "CONVERT_TO_TEXT"
+        credentials: "{{apigw_invocation_role_arn}}"
+  /projects/{projectId}/technologies/{technologyId}:
+    get:
+      description: "Read one technology in a project"
+      operationId: "GetProjectTechnology"
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: technologyId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Technology"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectTechnology"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+      security:
+        - ClientCredentials: ["clients/projects/technology.read"]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        contentHandling: "CONVERT_TO_TEXT"
+        credentials: "{{apigw_invocation_role_arn}}"
+    put:
+      description: "Replace the desired metadata for a technology"
+      operationId: "UpdateProjectTechnology"
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: technologyId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProjectTechnologyRequest"
+      responses:
+        "200":
+          description: "Technology updated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectTechnology"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+      security:
+        - ClientCredentials: ["clients/projects/technology.write"]
+      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        contentHandling: "CONVERT_TO_TEXT"
+        credentials: "{{apigw_invocation_role_arn}}"
+    delete:
+      description: "Delete a technology that is not referenced by a retained account"
+      operationId: "DeleteProjectTechnology"
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: technologyId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: "Technology deleted or already absent"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+      security:
+        - ClientCredentials: ["clients/projects/technology.write"]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        contentHandling: "CONVERT_TO_TEXT"
+        credentials: "{{apigw_invocation_role_arn}}"
+  /projects/{projectId}/accounts:
+    get:
+      description: "List accounts in a project"
+      operationId: "ListProjectAccounts"
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Project accounts"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListProjectAccountsResponse"
+        "403":
+          $ref: "#/components/responses/Problem"
+      security:
+        - ClientCredentials: ["clients/projects/account.read"]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        contentHandling: "CONVERT_TO_TEXT"
+        credentials: "{{apigw_invocation_role_arn}}"
+    post:
+      description: "Start onboarding a project account"
+      operationId: "CreateProjectAccount"
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectAccountRequest"
+      responses:
+        "202":
+          description: "Account onboarding accepted"
+          headers:
+            Retry-After:
+              description: "Seconds to wait before polling the account"
+              schema:
+                type: integer
+                example: 5
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptedProjectAccountResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+      security:
+        - ClientCredentials: ["clients/projects/account.write"]
+      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        contentHandling: "CONVERT_TO_TEXT"
+        credentials: "{{apigw_invocation_role_arn}}"
+  /projects/{projectId}/accounts/{accountId}:
+    get:
+      description: "Read one account in a project"
+      operationId: "GetProjectAccount"
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Project account without runtime parameters"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectAccount"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+      security:
+        - ClientCredentials: ["clients/projects/account.read"]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        contentHandling: "CONVERT_TO_TEXT"
+        credentials: "{{apigw_invocation_role_arn}}"
+    put:
+      description: "Reconcile the complete desired account configuration"
+      operationId: "UpdateProjectAccount"
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProjectAccountRequest"
+      responses:
+        "200":
+          description: "Account configuration already applied without onboarding"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectAccount"
+        "202":
+          description: "Account update accepted"
+          headers:
+            Retry-After:
+              description: "Seconds to wait before polling the account"
+              schema:
+                type: integer
+                example: 5
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptedProjectAccountResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+      security:
+        - ClientCredentials: ["clients/projects/account.write"]
+      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        contentHandling: "CONVERT_TO_TEXT"
+        credentials: "{{apigw_invocation_role_arn}}"
+    delete:
+      description: "Deactivate a project account without offboarding AWS infrastructure"
+      operationId: "DeactivateProjectAccount"
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: "Account deactivated or already inactive"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+      security:
+        - ClientCredentials: ["clients/projects/account.write"]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        contentHandling: "CONVERT_TO_TEXT"
+        credentials: "{{apigw_invocation_role_arn}}"
   /projects:
     get:
       description: "Get all projects"
@@ -505,6 +923,241 @@ paths:
         credentials: "{{apigw_invocation_role_arn}}"
 components:
   schemas:
+    ProjectTechnology:
+      title: ProjectTechnology
+      type: object
+      required:
+        - technologyId
+        - projectId
+        - name
+      properties:
+        technologyId:
+          type: string
+        projectId:
+          type: string
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+          nullable: true
+        createDate:
+          type: string
+          nullable: true
+        lastUpdateDate:
+          type: string
+          nullable: true
+    ListProjectTechnologiesResponse:
+      title: ListProjectTechnologiesResponse
+      type: object
+      required:
+        - technologies
+      properties:
+        technologies:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectTechnology"
+    CreateProjectTechnologyRequest:
+      title: CreateProjectTechnologyRequest
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+        description:
+          type: string
+          nullable: true
+    UpdateProjectTechnologyRequest:
+      title: UpdateProjectTechnologyRequest
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+        description:
+          type: string
+          nullable: true
+    CreateProjectTechnologyResponse:
+      title: CreateProjectTechnologyResponse
+      type: object
+      required:
+        - technologyId
+      properties:
+        technologyId:
+          type: string
+    ProjectAccount:
+      title: ProjectAccount
+      description: Canonical project account. Runtime parameters and credentials are never returned.
+      type: object
+      required:
+        - accountId
+        - projectId
+        - awsAccountId
+        - accountType
+        - name
+        - description
+        - technologyId
+        - stage
+        - region
+        - status
+      properties:
+        accountId:
+          type: string
+        projectId:
+          type: string
+        awsAccountId:
+          type: string
+          pattern: "^[0-9]{12}$"
+        accountType:
+          type: string
+          enum: [USER, TOOLCHAIN]
+        name:
+          type: string
+          minLength: 1
+          nullable: true
+        description:
+          type: string
+          minLength: 1
+          nullable: true
+        technologyId:
+          type: string
+          nullable: true
+        stage:
+          type: string
+          enum: [dev, qa, prod]
+        region:
+          type: string
+          minLength: 1
+          nullable: true
+        status:
+          type: string
+          enum: [Creating, OnBoarding, Active, OffBoarding, ReOnboarding, Archived, Failed, Inactive]
+          nullable: true
+        lastOnboardingResult:
+          type: string
+          enum: [Succeeded, Failed]
+          nullable: true
+        lastOnboardingError:
+          type: string
+          nullable: true
+          description: Sanitized operator-safe onboarding failure summary.
+        createDate:
+          type: string
+          nullable: true
+        lastUpdateDate:
+          type: string
+          nullable: true
+    ListProjectAccountsResponse:
+      title: ListProjectAccountsResponse
+      type: object
+      required:
+        - accounts
+      properties:
+        accounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectAccount"
+    CreateProjectAccountRequest:
+      title: CreateProjectAccountRequest
+      type: object
+      required:
+        - awsAccountId
+        - accountType
+        - name
+        - description
+        - technologyId
+        - stage
+        - region
+      properties:
+        awsAccountId:
+          type: string
+          pattern: "^[0-9]{12}$"
+        accountType:
+          type: string
+          enum: [USER, TOOLCHAIN]
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+          minLength: 1
+        technologyId:
+          type: string
+          minLength: 1
+        stage:
+          type: string
+          enum: [dev, qa, prod]
+        region:
+          type: string
+          minLength: 1
+    UpdateProjectAccountRequest:
+      title: UpdateProjectAccountRequest
+      description: Full desired state; projectId and awsAccountId are immutable and supplied by the path and stored assignment.
+      type: object
+      required:
+        - accountType
+        - name
+        - description
+        - technologyId
+        - stage
+        - region
+      properties:
+        accountType:
+          type: string
+          enum: [USER, TOOLCHAIN]
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+          minLength: 1
+        technologyId:
+          type: string
+          minLength: 1
+        stage:
+          type: string
+          enum: [dev, qa, prod]
+        region:
+          type: string
+          minLength: 1
+    AcceptedProjectAccountResponse:
+      title: AcceptedProjectAccountResponse
+      type: object
+      required:
+        - accountId
+      properties:
+        accountId:
+          type: string
+    ProblemDetails:
+      title: ProblemDetails
+      description: Sanitized API problem. Internal parameters and downstream details are excluded.
+      type: object
+      required:
+        - code
+        - requestId
+        - retryable
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        code:
+          type: string
+        requestId:
+          type: string
+        retryable:
+          type: boolean
     Empty:
       title: "Empty Schema"
       type: "object"
@@ -718,6 +1371,13 @@ components:
       properties:
         assignment:
           $ref: "#/components/schemas/ServiceClientAssignment"
+  responses:
+    Problem:
+      description: Sanitized client or server error.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
   securitySchemes:
     ClientCredentials:
       type: apiKey

@@ -58,6 +58,7 @@ def mocked_test_event() -> str:
         "detail": {
             "eventName": "accountonboarding-request",
             "programAccountId": "8017de89-19f7-4242-9f7c-abcdef123456",
+            "onboardingOperationId": "8a9c01d4-ae90-4c3f-9ec4-5f3ef6a38cb3",
             "accountId": "123456789012",
             "accountType": "workbench-user",
             "programName": "Test",

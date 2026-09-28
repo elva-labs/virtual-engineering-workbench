@@ -1,11 +1,21 @@
 import aws_cdk
 import cdk_nag
 import constructs
-from aws_cdk import Duration, aws_ec2, aws_ecs, aws_iam, aws_lambda, aws_logs
+from aws_cdk import Duration, aws_dynamodb, aws_ec2, aws_ecs, aws_iam, aws_lambda, aws_logs
 from aws_cdk import aws_stepfunctions as sfn
 from aws_cdk import aws_stepfunctions_tasks as sfn_tasks
 
 from infra import config
+
+CLAIM_UPDATE_EXPRESSION = "SET #claimedOperation = :operationId"
+CLAIM_CONDITION_EXPRESSION = (
+    "attribute_exists(PK) AND #operationId = :operationId AND "
+    "(attribute_not_exists(#claimedOperation) OR #claimedOperation <> :operationId)"
+)
+CLAIM_EXPRESSION_ATTRIBUTE_NAMES = {
+    "#operationId": "onboardingOperationId",
+    "#claimedOperation": "onboardingClaimedOperationId",
+}
 
 
 class AccountOnboardingStateMachine(constructs.Construct):
@@ -17,6 +27,7 @@ class AccountOnboardingStateMachine(constructs.Construct):
         account_onboarding_lambda: aws_lambda.Function,
         ecs_cluster: aws_ecs.Cluster,
         task_definition: aws_ecs.TaskDefinition,
+        projects_table: aws_dynamodb.ITable,
     ) -> None:
         """
         Sample expected input for the state machine:
@@ -60,6 +71,45 @@ class AccountOnboardingStateMachine(constructs.Construct):
         # Success State
         success: sfn.Succeed = sfn.Succeed(self, "Success")
 
+        already_claimed: sfn.Succeed = sfn.Succeed(self, "DuplicateOnboardingOperation")
+
+        # The account row is the durable compare-and-set record for each attempt. A
+        # single UpdateItem can claim an operation, so concurrent deliveries race
+        # safely and only the winner reaches the resource-provisioning tasks.
+        claim_operation = sfn_tasks.CallAwsService(
+            self,
+            "ClaimOnboardingOperation",
+            service="dynamodb",
+            action="updateItem",
+            parameters={
+                "TableName": projects_table.table_name,
+                "Key": {
+                    "PK": {
+                        "S": sfn.JsonPath.format("PROJECT#{}", sfn.JsonPath.string_at("$.programId")),
+                    },
+                    "SK": {
+                        "S": sfn.JsonPath.format("ACCOUNT#{}", sfn.JsonPath.string_at("$.programAccountId")),
+                    },
+                },
+                "UpdateExpression": CLAIM_UPDATE_EXPRESSION,
+                "ConditionExpression": CLAIM_CONDITION_EXPRESSION,
+                "ExpressionAttributeNames": CLAIM_EXPRESSION_ATTRIBUTE_NAMES,
+                "ExpressionAttributeValues": {
+                    ":operationId": {"S.$": "$.onboardingOperationId"},
+                },
+            },
+            iam_resources=[projects_table.table_arn],
+            result_path=sfn.JsonPath.DISCARD,
+        )
+        claim_operation.add_catch(
+            already_claimed,
+            errors=[
+                "DynamoDB.ConditionalCheckFailedException",
+                "DynamoDb.ConditionalCheckFailedException",
+            ],
+            result_path=sfn.JsonPath.DISCARD,
+        )
+
         # Setup prerequisites resources task
         setup_prerequisites_resources: sfn_tasks.EcsRunTask = sfn_tasks.EcsRunTask(
             self,
@@ -77,7 +127,10 @@ class AccountOnboardingStateMachine(constructs.Construct):
                     ],
                     container_definition=task_definition.default_container,
                     environment=[
-                        {"name": "AWS_ACCOUNT_ID", "value": sfn.JsonPath.string_at("$.accountId")},
+                        {
+                            "name": "AWS_ACCOUNT_ID",
+                            "value": sfn.JsonPath.string_at("$.accountId"),
+                        },
                         {"name": "REGION", "value": sfn.JsonPath.string_at("$.region")},
                         {
                             "name": "EVENT",
@@ -130,7 +183,10 @@ class AccountOnboardingStateMachine(constructs.Construct):
                     ],
                     container_definition=task_definition.default_container,
                     environment=[
-                        {"name": "AWS_ACCOUNT_ID", "value": sfn.JsonPath.string_at("$.accountId")},
+                        {
+                            "name": "AWS_ACCOUNT_ID",
+                            "value": sfn.JsonPath.string_at("$.accountId"),
+                        },
                         {"name": "REGION", "value": sfn.JsonPath.string_at("$.region")},
                         {
                             "name": "EVENT",
@@ -189,6 +245,10 @@ class AccountOnboardingStateMachine(constructs.Construct):
         setup_prerequisites_resources.add_catch(fail_onboarding)
         setup_static_resources.add_catch(fail_onboarding)
 
+        setup_prerequisites_resources.next(
+            setup_dynamic_resources.next(setup_static_resources.next(complete_onboarding.next(success)))
+        )
+
         # Log Group
         log_group = aws_logs.LogGroup(
             self,
@@ -199,6 +259,12 @@ class AccountOnboardingStateMachine(constructs.Construct):
         )
 
         # State Machine
+        claim_or_legacy_event = sfn.Choice(self, "HasOnboardingOperationId")
+        claim_or_legacy_event.when(
+            sfn.Condition.is_present("$.onboardingOperationId"),
+            claim_operation.next(setup_prerequisites_resources),
+        ).otherwise(setup_prerequisites_resources)
+
         self._state_machine: sfn.StateMachine = sfn.StateMachine(
             self,
             "AccountOnboardingStateMachine",
@@ -206,11 +272,7 @@ class AccountOnboardingStateMachine(constructs.Construct):
             logs=sfn.LogOptions(destination=log_group, level=sfn.LogLevel.ALL),
             tracing_enabled=True,
             definition_body=sfn.DefinitionBody.from_chainable(
-                start.next(
-                    setup_prerequisites_resources.next(
-                        setup_dynamic_resources.next(setup_static_resources.next(complete_onboarding.next(success)))
-                    )
-                ),
+                start.next(claim_or_legacy_event),
             ),
         )
 

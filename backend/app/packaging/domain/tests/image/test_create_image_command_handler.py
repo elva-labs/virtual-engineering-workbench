@@ -150,7 +150,7 @@ def test_create_image_command_handler_should_create_image(
     )
 
     # ACT
-    create_image_command_handler.handle(
+    returned_image_id = create_image_command_handler.handle(
         command=create_image_command_mock,
         pipeline_qry_srv=pipeline_query_service_mock,
         pipeline_srv=pipeline_service_mock,
@@ -158,5 +158,46 @@ def test_create_image_command_handler_should_create_image(
     )
 
     # ASSERT
+    assert returned_image_id == "image-11111111"
     generic_repo_mock.add.assert_called_with(image_entity)
+    pipeline_service_mock.start_pipeline_execution.assert_called_once()
+    assert (
+        pipeline_service_mock.start_pipeline_execution.call_args.kwargs["pipeline_arn"] == pipeline_entity.pipelineArn
+    )
+    assert len(pipeline_service_mock.start_pipeline_execution.call_args.kwargs["client_token"]) == 32
     uow_mock.commit.assert_called()
+
+
+@freeze_time(TEST_DATE)
+def test_create_image_command_handler_should_use_reserved_image_id_and_client_token(
+    generic_repo_mock,
+    get_create_image_command,
+    get_image_entity,
+    get_pipeline_entity,
+    get_test_image_build_version_arn,
+    pipeline_query_service_mock,
+    pipeline_service_mock,
+    uow_mock,
+):
+    image_id = "image-reserved"
+    client_token = "a" * 64
+    command = get_create_image_command(image_id=image_id, client_token=client_token)
+    pipeline_entity = get_pipeline_entity(status=pipeline.PipelineStatus.Created)
+    pipeline_query_service_mock.get_pipeline.return_value = pipeline_entity
+    pipeline_service_mock.start_pipeline_execution.return_value = get_test_image_build_version_arn(
+        build_version=1, recipe_name=pipeline_entity.recipeName, version_name=pipeline_entity.recipeVersionName
+    )
+
+    returned_image_id = create_image_command_handler.handle(
+        command=command,
+        pipeline_qry_srv=pipeline_query_service_mock,
+        pipeline_srv=pipeline_service_mock,
+        uow=uow_mock,
+    )
+
+    assert returned_image_id == image_id
+    generic_repo_mock.add.assert_called_once_with(get_image_entity(image_id=image_id))
+    pipeline_service_mock.start_pipeline_execution.assert_called_once_with(
+        pipeline_arn=pipeline_entity.pipelineArn, client_token=client_token
+    )
+    uow_mock.commit.assert_called_once()

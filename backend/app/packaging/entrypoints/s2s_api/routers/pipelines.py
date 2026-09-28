@@ -11,6 +11,7 @@ from app.packaging.domain.commands.pipeline import (
     retire_pipeline_command,
     update_pipeline_command,
 )
+from app.packaging.domain.model.image import image
 from app.packaging.domain.model.pipeline import pipeline
 from app.packaging.domain.value_objects.image import image_id_value_object, product_id_value_object
 from app.packaging.domain.value_objects.pipeline import (
@@ -23,7 +24,7 @@ from app.packaging.domain.value_objects.pipeline import (
 from app.packaging.domain.value_objects.recipe import recipe_id_value_object
 from app.packaging.domain.value_objects.recipe_version import recipe_version_id_value_object
 from app.packaging.domain.value_objects.shared import project_id_value_object, user_id_value_object
-from app.packaging.entrypoints.s2s_api import bootstrapper, idempotency
+from app.packaging.entrypoints.s2s_api import bootstrapper, idempotency, image_client_token
 from app.packaging.entrypoints.s2s_api.model import api_model
 from app.packaging.entrypoints.s2s_api.routers import common
 
@@ -169,17 +170,27 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
     @tracer.capture_method(capture_response=False, capture_error=False)
     @router.post("/projects/<project_id>/images")
     def create_image(project_id: str, request: api_model.CreateImageRequest):
-        authorize(project_id, EXECUTE_SCOPE)
+        client_id = authorize(project_id, EXECUTE_SCOPE)
         pipeline_in_project(project_id, request.pipelineId)
-        image_id = dependencies.command_bus.handle(
-            create_image_command.CreateImageCommand(
-                projectId=project_id_value_object.from_str(project_id),
-                pipelineId=pipeline_id_value_object.from_str(request.pipelineId),
+        scope = common.idempotency_scope(router, client_id, project_id, "CREATE_IMAGE")
+        result = idempotency.execute_create(
+            service=dependencies.idempotency_service,
+            scope=scope,
+            request=request,
+            resource_id=image.generate_image_id(),
+            resource_exists=lambda resource_id: dependencies.image_domain_qry_srv.get_image(
+                project_id_value_object.from_str(project_id), image_id_value_object.from_str(resource_id)
             )
+            is not None,
+            response_for_id=lambda resource_id: idempotency.StoredCreateResponse(
+                HTTPStatus.ACCEPTED, {"imageId": resource_id}
+            ),
+            create=lambda resource_id: create_image_response(dependencies, project_id, request, scope, resource_id),
+            now=datetime.now(timezone.utc),
         )
         return api_gateway.Response(
-            status_code=HTTPStatus.ACCEPTED,
-            body=api_model.CreateImageResponse(imageId=image_id),
+            status_code=result.status_code,
+            body=result.body,
             headers={**common.NO_STORE, "Retry-After": "5"},
             content_type=content_types.APPLICATION_JSON,
         )
@@ -226,3 +237,21 @@ def create_pipeline_response(
         )
     )
     return idempotency.StoredCreateResponse(HTTPStatus.ACCEPTED, {"pipelineId": pipeline_id})
+
+
+def create_image_response(
+    dependencies: bootstrapper.Dependencies,
+    project_id: str,
+    request: api_model.CreateImageRequest,
+    scope: idempotency.IdempotencyScope,
+    image_id: str,
+) -> idempotency.StoredCreateResponse:
+    dependencies.command_bus.handle(
+        create_image_command.CreateImageCommand(
+            projectId=project_id_value_object.from_str(project_id),
+            pipelineId=pipeline_id_value_object.from_str(request.pipelineId),
+            imageId=image_id,
+            clientToken=image_client_token.derive_image_client_token(scope, image_id),
+        )
+    )
+    return idempotency.StoredCreateResponse(HTTPStatus.ACCEPTED, {"imageId": image_id})

@@ -1010,8 +1010,7 @@ def test_create_authorization_failure_happens_before_reservation(
     mocked_dependencies.idempotency_service.reserve.assert_not_called()
 
 
-def test_create_image_does_not_require_idempotency_key(monkeypatch, mocked_dependencies, lambda_context, client_event):
-    mocked_dependencies.command_bus.handle.return_value = "imag-1"
+def test_create_image_requires_idempotency_key(monkeypatch, mocked_dependencies, lambda_context, client_event):
     response = load_handler(monkeypatch, mocked_dependencies).handler(
         client_event(
             "POST",
@@ -1022,8 +1021,10 @@ def test_create_image_does_not_require_idempotency_key(monkeypatch, mocked_depen
         lambda_context,
     )
 
-    assert response["statusCode"] == 202
+    assert response["statusCode"] == 400
+    assert json.loads(response["body"])["code"] == "INVALID_IDEMPOTENCY_KEY"
     mocked_dependencies.idempotency_service.reserve.assert_not_called()
+    mocked_dependencies.command_bus.handle.assert_not_called()
 
 
 def test_create_component_rejects_malformed_idempotency_key(

@@ -6,7 +6,9 @@ from app.shared.adapters.message_bus import message_bus
 
 
 class ProjectAccountOnBoardingRestarted(message_bus.Message):
-    event_name: Literal["accountonboarding-request"] = Field("accountonboarding-request", alias="eventName")
+    event_name: Literal["accountonboarding-request"] = Field(
+        "accountonboarding-request", alias="eventName"
+    )
     program_account_id: str = Field(..., alias="programAccountId")
     account_id: str = Field(..., alias="accountId")
     account_type: str = Field(..., alias="accountType")
@@ -14,4 +16,5 @@ class ProjectAccountOnBoardingRestarted(message_bus.Message):
     account_program_id: str = Field(..., alias="programId")
     account_environment: str = Field(..., alias="accountEnvironment")
     region: str = Field(..., alias="region")
+    onboarding_operation_id: str | None = Field(None, alias="onboardingOperationId")
     variables: Optional[dict[str, str]] = Field(None, alias="variables")

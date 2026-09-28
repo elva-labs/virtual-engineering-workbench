@@ -1,6 +1,17 @@
 import json
 import re
 
+ONBOARDING_ERROR_MESSAGES = {
+    "TaskFailedToStart": "Onboarding task failed to start.",
+    "EssentialContainerExited": "An onboarding container exited unexpectedly.",
+    "States.Timeout": "Onboarding timed out.",
+    "States.TaskFailed": "An onboarding task failed.",
+    "States.Permissions": "Onboarding lacked required permissions.",
+}
+DEFAULT_ONBOARDING_ERROR_MESSAGE = (
+    "Account onboarding failed. Consult VEW onboarding logs for details."
+)
+
 
 def sanitize_aws_resource_ids(text: str) -> str:
 
@@ -23,8 +34,36 @@ def sanitize_aws_resource_ids(text: str) -> str:
     return re.sub(combined_pattern, "[REDACTED]", text)
 
 
-def try_parse_json(text: str) -> dict | None:
+def try_parse_json(text: str) -> object | None:
     try:
         return json.loads(text)
     except json.JSONDecodeError:
         return None
+
+
+def safe_onboarding_error(error: str | None, cause: str | None = None) -> str | None:
+    """Return a fixed operator message without propagating workflow error detail.
+
+    Pass both Step Functions error and cause when handling a new failure. Pass a
+    previously stored message alone when rendering old account records.
+    """
+    if not error and not cause:
+        return None
+
+    if cause:
+        cause_value = try_parse_json(cause)
+        stop_code = (
+            cause_value.get("StopCode") if isinstance(cause_value, dict) else None
+        )
+        if isinstance(stop_code, str) and stop_code in ONBOARDING_ERROR_MESSAGES:
+            return ONBOARDING_ERROR_MESSAGES[stop_code]
+
+    if error in ONBOARDING_ERROR_MESSAGES:
+        return ONBOARDING_ERROR_MESSAGES[error]
+
+    if error:
+        for code, safe_message in ONBOARDING_ERROR_MESSAGES.items():
+            if error == safe_message or error.startswith(f"{code}:"):
+                return safe_message
+
+    return DEFAULT_ONBOARDING_ERROR_MESSAGE

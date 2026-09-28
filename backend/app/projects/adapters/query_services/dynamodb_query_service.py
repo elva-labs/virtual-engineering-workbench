@@ -15,11 +15,7 @@ from app.projects.domain.model import (
     technology,
     user,
 )
-from app.projects.domain.ports import (
-    enrolment_query_service,
-    projects_query_service,
-    technologies_query_service,
-)
+from app.projects.domain.ports import enrolment_query_service, projects_query_service, technologies_query_service
 from app.shared.adapters.boto import paging_utils
 from app.shared.adapters.unit_of_work_v2 import dynamodb_repo_config
 
@@ -213,6 +209,7 @@ class DynamoDBProjectsQueryService(projects_query_service.ProjectsQueryService):
     def get_project_account_by_id(self, project_id: str, account_id: str) -> project_account.ProjectAccount | None:
         result = self._dynamodb_client.get_item(
             TableName=self._table_name,
+            ConsistentRead=True,
             Key={
                 "PK": f"{dynamo_entity_config.DBPrefix.PROJECT.value}#{project_id}",
                 "SK": f"{dynamo_entity_config.DBPrefix.ACCOUNT.value}#{account_id}",
@@ -404,6 +401,18 @@ class DynamoDBTechnologiesQueryService(technologies_query_service.TechnologiesQu
         super().__init__()
         self._table_name = table_name
         self._dynamodb_client = dynamodb_client
+
+    def get_technology_by_id(self, project_id: str, technology_id: str) -> technology.Technology | None:
+        result = self._dynamodb_client.get_item(
+            TableName=self._table_name,
+            ConsistentRead=True,
+            Key={
+                "PK": f"{dynamo_entity_config.DBPrefix.PROJECT}#{project_id}",
+                "SK": f"{dynamo_entity_config.DBPrefix.TECHNOLOGY}#{technology_id}",
+            },
+        )
+        item = result.get("Item")
+        return technology.Technology.model_validate(item) if item else None
 
     def list_technologies(self, project_id: str, page_size: int) -> List[technology.Technology]:
         technologies: list = []

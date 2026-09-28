@@ -1,18 +1,13 @@
 from datetime import datetime, timezone
+from uuid import uuid4
 
+from app.projects.domain.command_handlers.project_accounts import account_onboarding_publisher
 from app.projects.domain.commands.project_accounts import reonboard_project_account_command
-from app.projects.domain.events.project_accounts import project_account_on_boarding_restarted
 from app.projects.domain.exceptions import domain_exception
 from app.projects.domain.model import project_account
 from app.projects.domain.ports import projects_query_service
-from app.projects.domain.value_objects import account_type_value_object
 from app.shared.adapters.message_bus import message_bus
 from app.shared.adapters.unit_of_work_v2 import unit_of_work
-
-ACCOUNT_TYPES = {
-    account_type_value_object.AccountTypeEnum.USER: "workbench-user",
-    account_type_value_object.AccountTypeEnum.TOOLCHAIN: "workbench-toolchain",
-}
 
 
 def handle(
@@ -43,9 +38,46 @@ def handle(
     if not account:
         raise domain_exception.DomainException("Account does not exist.")
 
+    account_repo = unit_of_work.get_repository(project_account.ProjectAccountPrimaryKey, project_account.ProjectAccount)
+    if account.accountStatus in (
+        project_account.ProjectAccountStatusEnum.OnBoarding,
+        project_account.ProjectAccountStatusEnum.ReOnboarding,
+    ):
+        if account.onboardingPublicationStatus == project_account.ProjectAccountOnboardingPublicationStatus.Published:
+            return
+        if not account.onboardingOperationId:
+            account.onboardingOperationId = str(uuid4())
+            account.onboardingPublicationStatus = project_account.ProjectAccountOnboardingPublicationStatus.Pending
+            with unit_of_work:
+                account_repo.update_entity(
+                    project_account.ProjectAccountPrimaryKey(projectId=command.project_id.value, id=account.id),
+                    account,
+                )
+                unit_of_work.commit()
+        account_onboarding_publisher.publish_restart(
+            account,
+            project,
+            message_bus,
+            web_application_account_id,
+            web_application_environment,
+            web_application_region,
+            image_service_account_id,
+            catalog_service_account_id,
+        )
+        account.onboardingPublicationStatus = project_account.ProjectAccountOnboardingPublicationStatus.Published
+        with unit_of_work:
+            account_repo.update_entity(
+                project_account.ProjectAccountPrimaryKey(projectId=command.project_id.value, id=account.id),
+                account,
+            )
+            unit_of_work.commit()
+        return
+
     current_time = datetime.now(timezone.utc).isoformat()
 
     account.lastUpdateDate = current_time
+    account.onboardingOperationId = str(uuid4())
+    account.onboardingPublicationStatus = project_account.ProjectAccountOnboardingPublicationStatus.Pending
     account.accountStatus = (
         project_account.ProjectAccountStatusEnum.OnBoarding
         if account.accountStatus != project_account.ProjectAccountStatusEnum.Active
@@ -53,9 +85,7 @@ def handle(
     )
 
     with unit_of_work:
-        unit_of_work.get_repository(
-            project_account.ProjectAccountPrimaryKey, project_account.ProjectAccount
-        ).update_entity(
+        account_repo.update_entity(
             project_account.ProjectAccountPrimaryKey(
                 projectId=command.project_id.value,
                 id=command.account_id.value,
@@ -64,23 +94,20 @@ def handle(
         )
         unit_of_work.commit()
 
-    message_bus.publish(
-        project_account_on_boarding_restarted.ProjectAccountOnBoardingRestarted(
-            programAccountId=command.account_id.value,
-            accountId=account.awsAccountId,
-            accountType=ACCOUNT_TYPES[account.accountType],
-            programId=project.projectId,
-            programName=project.projectName,
-            accountEnvironment=account.stage,
-            region=account.region,
-            variables={
-                "account": account.awsAccountId,
-                "environment": web_application_environment,
-                "region": account.region,
-                "web-application-account-id": web_application_account_id,
-                "web-application-region": web_application_region,
-                "image-service-account": image_service_account_id,
-                "catalog-service-account": catalog_service_account_id,
-            },
-        )
+    account_onboarding_publisher.publish_restart(
+        account,
+        project,
+        message_bus,
+        web_application_account_id,
+        web_application_environment,
+        web_application_region,
+        image_service_account_id,
+        catalog_service_account_id,
     )
+    account.onboardingPublicationStatus = project_account.ProjectAccountOnboardingPublicationStatus.Published
+    with unit_of_work:
+        account_repo.update_entity(
+            project_account.ProjectAccountPrimaryKey(projectId=command.project_id.value, id=account.id),
+            account,
+        )
+        unit_of_work.commit()

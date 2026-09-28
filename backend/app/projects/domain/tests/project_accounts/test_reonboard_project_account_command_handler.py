@@ -3,17 +3,23 @@ import assertpy
 from app.projects.domain.command_handlers.project_accounts import (
     reonboard_project_account_command_handler as command_handler,
 )
-from app.projects.domain.events.project_accounts import project_account_on_boarding_restarted
+from app.projects.domain.events.project_accounts import (
+    project_account_on_boarding_restarted,
+)
 from app.projects.domain.model import project_account
 from app.projects.domain.value_objects import account_type_value_object
 
 
 def test_reonboard_project_account_should_publish_event(
-    mock_reonboard_project_account_command, sample_project, handler_dependencies, mock_uow_2, mock_account_repo
+    mock_reonboard_project_account_command,
+    sample_project,
+    handler_dependencies,
+    mock_uow_2,
+    mock_account_repo,
 ):
     # ARRANGE
     cmd = mock_reonboard_project_account_command
-    (_, projects_query_service_mock, message_bus_mock) = handler_dependencies
+    _, projects_query_service_mock, message_bus_mock = handler_dependencies
 
     projects_query_service_mock.get_project_by_id.return_value = sample_project
     mock_account_repo.get.return_value = project_account.ProjectAccount(
@@ -52,11 +58,14 @@ def test_reonboard_project_account_should_publish_event(
     event_obj_dict = event_obj.model_dump(by_alias=True)
 
     assertpy.assert_that(event_obj_dict).contains_entry({"accountId": "001234567890"})
-    assertpy.assert_that(event_obj_dict).contains_entry({"accountType": "workbench-user"})
+    assertpy.assert_that(event_obj_dict).contains_entry(
+        {"accountType": "workbench-user"}
+    )
     assertpy.assert_that(event_obj_dict).contains_entry({"accountEnvironment": "dev"})
     assertpy.assert_that(event_obj_dict).contains_entry({"programId": "123"})
     assertpy.assert_that(event_obj_dict).contains_entry({"programName": "Test"})
     assertpy.assert_that(event_obj_dict).contains_entry({"region": "eu-west-1"})
+    assertpy.assert_that(event_obj_dict.get("onboardingOperationId")).is_not_empty()
     assertpy.assert_that(event_obj_dict).contains_entry(
         {
             "variables": {
@@ -73,11 +82,15 @@ def test_reonboard_project_account_should_publish_event(
 
 
 def test_can_onboard_new_account_to_existing_project(
-    mock_reonboard_project_account_command, sample_project, handler_dependencies, mock_uow_2, mock_account_repo
+    mock_reonboard_project_account_command,
+    sample_project,
+    handler_dependencies,
+    mock_uow_2,
+    mock_account_repo,
 ):
     # ARRANGE
     cmd = mock_reonboard_project_account_command
-    (_, projects_query_service_mock, message_bus_mock) = handler_dependencies
+    _, projects_query_service_mock, message_bus_mock = handler_dependencies
 
     projects_query_service_mock.get_project_by_id.return_value = sample_project
     mock_account_repo.get.return_value = project_account.ProjectAccount(
@@ -107,8 +120,8 @@ def test_can_onboard_new_account_to_existing_project(
     )
 
     # ASSERT
-    mock_uow_2.commit.assert_called_once()
-    (key, ent) = mock_account_repo.update_entity.call_args.args
+    assertpy.assert_that(mock_uow_2.commit.call_count).is_equal_to(2)
+    key, ent = mock_account_repo.update_entity.call_args.args
     assertpy.assert_that(key.model_dump()).is_equal_to(
         {
             "projectId": "123",
@@ -116,3 +129,5 @@ def test_can_onboard_new_account_to_existing_project(
         }
     )
     assertpy.assert_that(ent.accountStatus).is_equal_to("OnBoarding")
+    assertpy.assert_that(ent.onboardingOperationId).is_not_empty()
+    assertpy.assert_that(ent.onboardingPublicationStatus).is_equal_to("Published")

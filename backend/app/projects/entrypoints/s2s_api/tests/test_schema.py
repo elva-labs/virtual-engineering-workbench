@@ -64,10 +64,55 @@ def test_api_schema_should_have_auth_configured(api_schema):
 def test_service_client_assignment_routes_use_dedicated_scopes(api_schema):
     operations = api_schema["paths"]["/projects/{projectId}/clients/{clientId}"]
 
-    assert operations["get"]["security"] == [
-        {"ClientCredentials": ["clients/projects/client_assignment.read"]}
+    assert operations["get"]["security"] == [{"ClientCredentials": ["clients/projects/client_assignment.read"]}]
+    for method in ("put", "delete"):
+        assert operations[method]["security"] == [{"ClientCredentials": ["clients/projects/client_assignment.write"]}]
+
+
+def test_technology_routes_use_dedicated_scopes_and_idempotent_create(api_schema):
+    paths = api_schema["paths"]
+    assert paths["/projects/{projectId}/technologies"]["get"]["security"] == [
+        {"ClientCredentials": ["clients/projects/technology.read"]}
+    ]
+    create = paths["/projects/{projectId}/technologies"]["post"]
+    assert create["security"] == [{"ClientCredentials": ["clients/projects/technology.write"]}]
+    assert create["parameters"][-1]["name"] == "Idempotency-Key"
+    assert "201" in create["responses"]
+    assert paths["/projects/{projectId}/technologies/{technologyId}"]["get"]["security"] == [
+        {"ClientCredentials": ["clients/projects/technology.read"]}
     ]
     for method in ("put", "delete"):
-        assert operations[method]["security"] == [
-            {"ClientCredentials": ["clients/projects/client_assignment.write"]}
+        assert paths["/projects/{projectId}/technologies/{technologyId}"][method]["security"] == [
+            {"ClientCredentials": ["clients/projects/technology.write"]}
         ]
+    assert paths["/projects/{projectId}/technologies/{technologyId}"]["delete"]["responses"]["409"]
+    for request_schema in ("CreateProjectTechnologyRequest", "UpdateProjectTechnologyRequest"):
+        assert api_schema["components"]["schemas"][request_schema]["properties"]["name"]["pattern"] == r"\S"
+
+
+def test_project_account_routes_use_dedicated_scopes_and_async_headers(api_schema):
+    paths = api_schema["paths"]
+    assert paths["/projects/{projectId}/accounts"]["get"]["security"] == [
+        {"ClientCredentials": ["clients/projects/account.read"]}
+    ]
+    create = paths["/projects/{projectId}/accounts"]["post"]
+    assert create["security"] == [{"ClientCredentials": ["clients/projects/account.write"]}]
+    assert create["parameters"][-1]["name"] == "Idempotency-Key"
+    assert create["responses"]["202"]["headers"]["Retry-After"]["schema"]["example"] == 5
+    account_path = paths["/projects/{projectId}/accounts/{accountId}"]
+    assert account_path["get"]["security"] == [{"ClientCredentials": ["clients/projects/account.read"]}]
+    assert account_path["put"]["security"] == [{"ClientCredentials": ["clients/projects/account.write"]}]
+    assert account_path["put"]["responses"]["202"]["headers"]["Retry-After"]["schema"]["example"] == 5
+    assert account_path["put"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"] == (
+        "#/components/schemas/ProjectAccount"
+    )
+    assert account_path["delete"]["security"] == [{"ClientCredentials": ["clients/projects/account.write"]}]
+    assert set(account_path["delete"]["responses"]) == {"204", "403", "409"}
+
+
+def test_project_account_schema_excludes_runtime_parameters_and_problem_is_sanitized(api_schema):
+    schemas = api_schema["components"]["schemas"]
+    assert "parameters" not in schemas["ProjectAccount"]["properties"]
+    for field in ("name", "description", "technologyId", "region", "status"):
+        assert schemas["ProjectAccount"]["properties"][field]["nullable"] is True
+    assert set(schemas["ProblemDetails"]["required"]) == {"code", "requestId", "retryable"}

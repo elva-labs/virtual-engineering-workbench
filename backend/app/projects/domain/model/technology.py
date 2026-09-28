@@ -7,10 +7,6 @@ from pydantic import Field
 from app.shared.adapters.unit_of_work_v2 import unit_of_work
 
 
-def generate_id():
-    return uuid_to_str
-
-
 def uuid_to_str():
     tech_id = "tech-"
     for _ in range(5):
@@ -24,7 +20,7 @@ class TechnologyPrimaryKey(unit_of_work.PrimaryKey):
 
 
 class Technology(unit_of_work.Entity):
-    id: str = Field(default_factory=generate_id(), title="Id")
+    id: str = Field(default_factory=uuid_to_str, title="Id")
     project_id: str | None = Field(None, title="ProjectId")
     name: str = Field(..., title="Name")
     description: Optional[str] = Field(None, title="Description")

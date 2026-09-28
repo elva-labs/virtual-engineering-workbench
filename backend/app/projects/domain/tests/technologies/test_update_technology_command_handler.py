@@ -20,7 +20,7 @@ def test_can_update_technology_to_project(
     technologies_query_service_mock = mock.create_autospec(
         spec=technologies_query_service.TechnologiesQueryService, instance=True
     )
-    technologies_query_service_mock.list_technologies.return_value = sample_technologies
+    technologies_query_service_mock.get_technology_by_id.return_value = sample_technologies[0]
 
     # ACT
     command_handler.handle_update_technology_command(

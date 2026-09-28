@@ -203,13 +203,15 @@ def test_should_delete_pipeline(get_test_ec2_image_builder_pipeline_srv, mock_mo
 def test_should_start_pipeline_execution(get_test_ec2_image_builder_pipeline_srv, mock_moto_calls):
     # ARRANGE
     pipeline_id = GlobalVariables.TEST_PIPELINE_ID.value
+    client_token = "example-explicit-image-execution-token"
 
     # ACT
     response = get_test_ec2_image_builder_pipeline_srv.start_pipeline_execution(
         pipeline_arn=(
             f"arn:aws:imagebuilder:{GlobalVariables.TEST_REGION.value}:"
             f"{GlobalVariables.TEST_AMI_FACTORY_AWS_ACCOUNT_ID.value}:image-pipeline/{pipeline_id}"
-        )
+        ),
+        client_token=client_token,
     )
 
     # ASSERT
@@ -217,7 +219,8 @@ def test_should_start_pipeline_execution(get_test_ec2_image_builder_pipeline_srv
         imagePipelineArn=(
             f"arn:aws:imagebuilder:{GlobalVariables.TEST_REGION.value}:"
             f"{GlobalVariables.TEST_AMI_FACTORY_AWS_ACCOUNT_ID.value}:image-pipeline/{pipeline_id}"
-        )
+        ),
+        clientToken=client_token,
     )
     assertpy.assert_that(response).is_equal_to(
         (

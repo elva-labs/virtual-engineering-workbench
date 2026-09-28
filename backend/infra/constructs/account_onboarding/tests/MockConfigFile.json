@@ -3,16 +3,25 @@
     "AccountOnboardingStateMachine": {
       "TestCases": {
         "AccountOnboardingSuccess": {
+          "ClaimOnboardingOperation": "MockClaimOnboardingOperation",
           "SetupStaticResources": "MockSetupStaticResources",
           "SetupDynamicResources": "MockSetupDynamicResources"
         },
         "AccountOnboardingFail": {
+          "ClaimOnboardingOperation": "MockClaimOnboardingOperation",
           "SetupStaticResources": "MockSetupStaticResourcesFail"
         }
       }
     }
   },
   "MockedResponses": {
+    "MockClaimOnboardingOperation": {
+      "0": {
+        "Return": {
+          "Payload": {}
+        }
+      }
+    },
     "MockSetupStaticResources": {
       "0": {
         "Return": {

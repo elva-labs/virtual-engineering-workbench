@@ -13,7 +13,8 @@ export class DCVFileLoginType extends DCVLoginType {
       '[connect]\n' +
       `host=${loginRequest.connectAddress}\n` +
       `port=${this.getPort(context)}\n` +
-      `user=${loginRequest.userDomain.toLocaleLowerCase()}\\${username.toLocaleLowerCase()}\n` +
+      (context.authToken ? '' :
+        `user=${loginRequest.userDomain.toLocaleLowerCase()}\\${username.toLocaleLowerCase()}\n`) +
       `sessionid=${this.getSessionId(context)}\n` +
       `authtoken=${this.getAuthToken(context)}\n\n` +
       '[version]\n' +

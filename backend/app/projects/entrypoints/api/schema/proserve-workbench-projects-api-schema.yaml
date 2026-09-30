@@ -1782,6 +1782,43 @@ paths:
         passthroughBehavior: "when_no_match"
         contentHandling: "CONVERT_TO_TEXT"
         credentials: "{{apigw_invocation_role_arn}}"
+  /internal/projects/{projectId}/technologies/{technologyId}:
+    get:
+      description: "Get a technology of a project via internal API (Publishing S2S product create)"
+      operationId: "GetInternalProjectTechnology"
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: technologyId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "200 response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetTechnologyResponse"
+        "404":
+          description: "Technology not found"
+      security:
+        - sigv4: []
+      x-amazon-apigateway-request-validator: "params-only"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        contentHandling: "CONVERT_TO_TEXT"
+        credentials: "{{apigw_invocation_role_arn}}"
   /internal/users:
     get:
       description: "Get all users"
@@ -2548,6 +2585,14 @@ components:
           enum:
             - ACTIVE
             - REVOKED
+    GetTechnologyResponse:
+      title: GetTechnologyResponse
+      type: object
+      required:
+        - technology
+      properties:
+        technology:
+          $ref: "#/components/schemas/Technology"
     GetServiceClientAssignmentResponse:
       title: GetServiceClientAssignmentResponse
       type: object

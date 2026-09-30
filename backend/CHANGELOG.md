@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Component versions can be retired through the declarative API while released content remains immutable.
 
+### Fixed
+
+- API Gateway's request validator now accepts `null` for fields the OpenAPI schemas declare `nullable`; it validates against JSON Schema draft 4, which ignores `nullable`, and answered `400` before the request reached the handler.
+
 ## [0.0.0] - 2022-08-17
 
 ### Added

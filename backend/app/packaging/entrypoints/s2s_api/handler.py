@@ -11,7 +11,14 @@ from aws_lambda_powertools.utilities import typing
 from app.packaging.domain.exceptions import domain_exception
 from app.packaging.domain.exceptions.s2s_exception import InvalidComponentDefinition, S2SException
 from app.packaging.entrypoints.s2s_api import bootstrapper, config, problem_details
-from app.packaging.entrypoints.s2s_api.routers import common, component_versions, components, pipelines, recipes
+from app.packaging.entrypoints.s2s_api.routers import (
+    base_images,
+    common,
+    component_versions,
+    components,
+    pipelines,
+    recipes,
+)
 from app.shared.middleware import authorization
 from app.shared.middleware.metric import metric_handlers
 from app.shared.middleware.metric.types import MetricDimensionNames
@@ -32,6 +39,7 @@ app.include_router(components.init(dependencies))
 app.include_router(component_versions.init(dependencies))
 app.include_router(recipes.init(dependencies))
 app.include_router(pipelines.init(dependencies))
+app.include_router(base_images.init(dependencies))
 
 
 @app.exception_handler(RequestValidationError)

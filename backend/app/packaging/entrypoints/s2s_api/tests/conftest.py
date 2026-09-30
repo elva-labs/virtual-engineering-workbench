@@ -5,6 +5,7 @@ from unittest import mock
 import pytest
 from openapi_spec_validator.readers import read_from_filename
 
+from app.packaging.domain.model.recipe import base_image_channels
 from app.packaging.domain.ports.idempotency_service import Reservation, ReservationOutcome
 from app.packaging.domain.ports.service_client_project_access_service import ServiceClientProjectAccessService
 from app.shared.api import secrets_manager_api
@@ -93,6 +94,8 @@ def client_event():
 @pytest.fixture()
 def mocked_dependencies():
     dependencies = SimpleNamespace(
+        base_image_channels=base_image_channels.BaseImageChannels(),
+        base_image_parameter_service=None,
         project_access_service=mock.create_autospec(ServiceClientProjectAccessService),
         command_bus=mock.Mock(),
         recipe_domain_qry_srv=mock.Mock(),

@@ -8,6 +8,7 @@ import constructs
 from aws_cdk import aws_apigateway, aws_dynamodb, aws_ec2, aws_events, aws_iam, aws_pipes_alpha, aws_scheduler, aws_ssm
 
 from app.packaging import domain
+from app.packaging.domain.model.recipe import base_image_channels
 from app.shared.api import bounded_contexts
 from infra import config, constants
 from infra.auth import packaging_auth, packaging_auth_schema
@@ -101,6 +102,25 @@ class Entrypoint(enum.StrEnum):
     S2S_API = "s2s-api"
 
 
+def with_base_images(mapping: dict, base_images: dict) -> dict:
+    """The system configuration mapping plus the base image OS entries: the channel's parameter instead of
+    the source OS's public one, everything else as for the source OS (base_image_channels)."""
+    channels = base_image_channels.BaseImageChannels.from_dict(base_images)
+    if not channels.enabled:
+        return mapping
+    result = json.loads(json.dumps(mapping))
+    for architecture in channels.architectures:
+        entries = result.get(channels.platform, {}).get(architecture)
+        if not entries or channels.source_os_version not in entries:
+            continue
+        for channel in base_image_channels.CHANNELS:
+            entries[channels.os_version_of(channel)] = {
+                **entries[channels.source_os_version],
+                "ami_ssm_param_name": channels.parameter_name(channel, architecture),
+            }
+    return result
+
+
 class PackagingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
     def __init__(
         self,
@@ -135,12 +155,13 @@ class PackagingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
             constants.AUDIT_LOGGING_KEY_NAME_SSM_PARAM_NAME.format(environment=app_config.environment),
         ).string_value
 
+        base_images = app_config.component_specific.get("base-images", {})
         system_configuration_mapping = aws_ssm.StringParameter(
             self,
             "SystemConfigurationMapping",
             description="System Configuration Mapping.",
             parameter_name=f"/{app_config.format_resource_name('shared')}/system-configuration-mapping",
-            string_value=json.dumps(SYSTEM_CONFIGURATION_MAPPING),
+            string_value=json.dumps(with_base_images(SYSTEM_CONFIGURATION_MAPPING, base_images)),
             tier=aws_ssm.ParameterTier.ADVANCED,
         )
         pipelines_configuration_mapping = aws_ssm.StringParameter(
@@ -265,6 +286,7 @@ class PackagingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                         "INSTANCE_SECURITY_GROUP_NAME": PRODUCT_PACKAGING_INSTANCE_SECURITY_GROUP_NAME,
                         "POWERTOOLS_SERVICE_NAME": VEW_SERVICE,
                         "SYSTEM_CONFIGURATION_MAPPING_PARAM_NAME": system_configuration_mapping.parameter_name,
+                        "BASE_IMAGE_CHANNELS": json.dumps(base_images),
                         "PIPELINES_CONFIGURATION_MAPPING_PARAM_NAME": pipelines_configuration_mapping.parameter_name,
                         "TABLE_NAME": self._storage.table.table_name,
                         "TOPIC_NAME": PRODUCT_PACKAGING_TOPIC_NAME,
@@ -361,6 +383,7 @@ class PackagingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                         "TOPIC_NAME": PRODUCT_PACKAGING_TOPIC_NAME,
                         "PIPELINES_CONFIGURATION_MAPPING_PARAM_NAME": pipelines_configuration_mapping.parameter_name,
                         "SYSTEM_CONFIGURATION_MAPPING_PARAM_NAME": system_configuration_mapping.parameter_name,
+                        "BASE_IMAGE_CHANNELS": json.dumps(base_images),
                         "AUDIT_LOGGING_KEY_NAME": audit_logging_key_name,
                         "API_BASE_PATH": constants.CUSTOM_DNS_S2S_API_PATH_PACKAGING,
                         "STRIP_PREFIXES": constants.CUSTOM_DNS_S2S_API_PATH_PACKAGING,
@@ -426,6 +449,7 @@ class PackagingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                         "INSTANCE_SECURITY_GROUP_NAME": PRODUCT_PACKAGING_INSTANCE_SECURITY_GROUP_NAME,
                         "POWERTOOLS_SERVICE_NAME": VEW_SERVICE,
                         "SYSTEM_CONFIGURATION_MAPPING_PARAM_NAME": system_configuration_mapping.parameter_name,
+                        "BASE_IMAGE_CHANNELS": json.dumps(base_images),
                         "PIPELINES_CONFIGURATION_MAPPING_PARAM_NAME": pipelines_configuration_mapping.parameter_name,
                         "TABLE_NAME": self._storage.table.table_name,
                         "VOLUME_SIZE": str(app_config.component_specific.get("volume-size")),
@@ -481,6 +505,7 @@ class PackagingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                         "INSTANCE_SECURITY_GROUP_NAME": PRODUCT_PACKAGING_INSTANCE_SECURITY_GROUP_NAME,
                         "POWERTOOLS_SERVICE_NAME": VEW_SERVICE,
                         "SYSTEM_CONFIGURATION_MAPPING_PARAM_NAME": system_configuration_mapping.parameter_name,
+                        "BASE_IMAGE_CHANNELS": json.dumps(base_images),
                         "PIPELINES_CONFIGURATION_MAPPING_PARAM_NAME": pipelines_configuration_mapping.parameter_name,
                         "TABLE_NAME": self._storage.table.table_name,
                         "SSM_RUN_COMMAND_TIMEOUT": str(app_config.component_specific.get("ssm-run-command-timeout")),
@@ -559,6 +584,7 @@ class PackagingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                         "TABLE_NAME": self._storage.table.table_name,
                         "TOPIC_NAME": PRODUCT_PACKAGING_TOPIC_NAME,
                         "SYSTEM_CONFIGURATION_MAPPING_PARAM_NAME": system_configuration_mapping.parameter_name,
+                        "BASE_IMAGE_CHANNELS": json.dumps(base_images),
                     },
                     permissions=[
                         lambda lambda_f: self._storage.table.grant_read_write_data(lambda_f),

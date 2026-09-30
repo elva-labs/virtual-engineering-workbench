@@ -193,6 +193,10 @@ class ReonboardProjectAccountResponse(BaseModel):
     pass
 
 
+class GetTechnologyResponse(BaseModel):
+    technology: Technology = Field(..., title="Technology")
+
+
 class GetTechnologiesResponse(BaseModel):
     nextToken: Optional[Dict[str, Any]] = Field(None, title="LastEvaluatedKey token")
     technologies: List[Technology] = Field(..., title="Technologies")

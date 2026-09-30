@@ -1,0 +1,509 @@
+openapi: 3.0.1
+info:
+  title: Virtual Engineering Workbench Publishing S2S API
+  version: 1.0.0
+  description: >-
+    Project-scoped products, product versions, and version promotion to a stage for service
+    clients, using internal IDs.
+servers:
+  - url: https://{Host}/clients/publishing
+    variables:
+      Host:
+        default: example.invalid
+x-amazon-apigateway-request-validators:
+  lambda-only:
+    validateRequestBody: false
+    validateRequestParameters: false
+  all:
+    validateRequestBody: true
+    validateRequestParameters: true
+  params-only:
+    validateRequestBody: false
+    validateRequestParameters: true
+  body-only:
+    validateRequestBody: true
+    validateRequestParameters: false
+x-amazon-apigateway-request-validator: params-only
+x-amazon-apigateway-gateway-responses:
+  DEFAULT_4XX: &clientProblem400
+    responseParameters: &problemHeaders
+      gatewayresponse.header.Content-Type: "'application/problem+json'"
+      gatewayresponse.header.Cache-Control: "'no-store'"
+    responseTemplates:
+      application/problem+json: >-
+        {"type":"https://problems.virtual-engineering-workbench.dev/api-gateway-error","title":"Client Error","status":400,"detail":$context.error.messageString,"code":"$context.error.responseType","requestId":"$context.requestId","retryable":false}
+  BAD_REQUEST_BODY: *clientProblem400
+  BAD_REQUEST_PARAMETERS: *clientProblem400
+  UNAUTHORIZED: &clientProblem401
+    responseParameters: *problemHeaders
+    responseTemplates:
+      application/problem+json: >-
+        {"type":"https://problems.virtual-engineering-workbench.dev/api-gateway-error","title":"Client Error","status":401,"detail":$context.error.messageString,"code":"$context.error.responseType","requestId":"$context.requestId","retryable":false}
+  ACCESS_DENIED: &clientProblem403
+    responseParameters: *problemHeaders
+    responseTemplates:
+      application/problem+json: >-
+        {"type":"https://problems.virtual-engineering-workbench.dev/api-gateway-error","title":"Client Error","status":403,"detail":$context.error.messageString,"code":"$context.error.responseType","requestId":"$context.requestId","retryable":false}
+  EXPIRED_TOKEN: *clientProblem403
+  INVALID_API_KEY: *clientProblem403
+  INVALID_SIGNATURE: *clientProblem403
+  MISSING_AUTHENTICATION_TOKEN: *clientProblem403
+  WAF_FILTERED: *clientProblem403
+  RESOURCE_NOT_FOUND: &clientProblem404
+    responseParameters: *problemHeaders
+    responseTemplates:
+      application/problem+json: >-
+        {"type":"https://problems.virtual-engineering-workbench.dev/api-gateway-error","title":"Client Error","status":404,"detail":$context.error.messageString,"code":"$context.error.responseType","requestId":"$context.requestId","retryable":false}
+  REQUEST_TOO_LARGE: &clientProblem413
+    responseParameters: *problemHeaders
+    responseTemplates:
+      application/problem+json: >-
+        {"type":"https://problems.virtual-engineering-workbench.dev/api-gateway-error","title":"Client Error","status":413,"detail":$context.error.messageString,"code":"$context.error.responseType","requestId":"$context.requestId","retryable":false}
+  UNSUPPORTED_MEDIA_TYPE: &clientProblem415
+    responseParameters: *problemHeaders
+    responseTemplates:
+      application/problem+json: >-
+        {"type":"https://problems.virtual-engineering-workbench.dev/api-gateway-error","title":"Client Error","status":415,"detail":$context.error.messageString,"code":"$context.error.responseType","requestId":"$context.requestId","retryable":false}
+  THROTTLED: &clientProblem429
+    responseParameters: *problemHeaders
+    responseTemplates:
+      application/problem+json: >-
+        {"type":"https://problems.virtual-engineering-workbench.dev/api-gateway-error","title":"Client Error","status":429,"detail":$context.error.messageString,"code":"$context.error.responseType","requestId":"$context.requestId","retryable":false}
+  QUOTA_EXCEEDED: *clientProblem429
+  DEFAULT_5XX: &serverProblem500
+    responseParameters: *problemHeaders
+    responseTemplates:
+      application/problem+json: >-
+        {"type":"https://problems.virtual-engineering-workbench.dev/api-gateway-error","title":"Server Error","status":500,"detail":"API Gateway could not process the request.","code":"$context.error.responseType","requestId":"$context.requestId","retryable":true}
+  API_CONFIGURATION_ERROR: *serverProblem500
+  AUTHORIZER_CONFIGURATION_ERROR: *serverProblem500
+  AUTHORIZER_FAILURE: *serverProblem500
+  INTEGRATION_FAILURE: &serverProblem504
+    responseParameters: *problemHeaders
+    responseTemplates:
+      application/problem+json: >-
+        {"type":"https://problems.virtual-engineering-workbench.dev/api-gateway-error","title":"Server Error","status":504,"detail":"API Gateway could not process the request.","code":"$context.error.responseType","requestId":"$context.requestId","retryable":true}
+  INTEGRATION_TIMEOUT: *serverProblem504
+paths:
+  /projects/{projectId}/products:
+    get:
+      operationId: ListProducts
+      tags: [ALL]
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200': {$ref: '#/components/responses/ProductPage'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '422': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
+        '500': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+      security:
+        - ClientCredentials: [clients/publishing/product.read]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration: &lambdaIntegration
+        type: aws_proxy
+        httpMethod: POST
+        uri: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations
+        credentials: '{{apigw_invocation_role_arn}}'
+        passthroughBehavior: when_no_match
+        contentHandling: CONVERT_TO_TEXT
+        responses:
+          default:
+            statusCode: '200'
+    post:
+      operationId: CreateProduct
+      tags: [ALL]
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CreateProductRequest'}
+      responses:
+        '201': {$ref: '#/components/responses/CreateProduct'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '422': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
+        '500': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+      security:
+        - ClientCredentials: [clients/publishing/product.write]
+      x-amazon-apigateway-request-validator: body-only
+      x-amazon-apigateway-integration: *lambdaIntegration
+  /projects/{projectId}/products/{productId}:
+    get:
+      operationId: GetProduct
+      tags: [ALL]
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200': {$ref: '#/components/responses/Product'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '422': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
+        '500': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+      security:
+        - ClientCredentials: [clients/publishing/product.read]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration: *lambdaIntegration
+    put:
+      operationId: UpdateProduct
+      tags: [ALL]
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ProductId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UpdateProductRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/Product'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '422': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
+        '500': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+      security:
+        - ClientCredentials: [clients/publishing/product.write]
+      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-integration: *lambdaIntegration
+    delete:
+      operationId: ArchiveProduct
+      tags: [ALL]
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '202': {$ref: '#/components/responses/ProductAction'}
+        '204': {$ref: '#/components/responses/NoContent'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '422': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
+        '500': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+      security:
+        - ClientCredentials: [clients/publishing/product.write]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration: *lambdaIntegration
+  /projects/{projectId}/products/{productId}/versions:
+    get:
+      operationId: ListProductVersions
+      tags: [ALL]
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200': {$ref: '#/components/responses/ProductVersionPage'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '422': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
+        '500': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+      security:
+        - ClientCredentials: [clients/publishing/version.read]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration: *lambdaIntegration
+  /projects/{projectId}/products/{productId}/versions/{versionId}/stages/{stage}:
+    get:
+      operationId: GetVersionPromotion
+      tags: [ALL]
+      parameters: &promotionParameters
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ProductId'
+        - $ref: '#/components/parameters/VersionId'
+        - $ref: '#/components/parameters/Stage'
+      responses:
+        '200': {$ref: '#/components/responses/VersionPromotion'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '422': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
+        '500': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+      security:
+        - ClientCredentials: [clients/publishing/version.read]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration: *lambdaIntegration
+    put:
+      operationId: PromoteVersion
+      tags: [ALL]
+      parameters: *promotionParameters
+      responses:
+        '200': {$ref: '#/components/responses/VersionPromotion'}
+        '202': {$ref: '#/components/responses/VersionPromotionStarted'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '422': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
+        '500': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+      security:
+        - ClientCredentials: [clients/publishing/version.promote]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration: *lambdaIntegration
+    delete:
+      operationId: ForgetVersionPromotion
+      tags: [ALL]
+      parameters: *promotionParameters
+      responses:
+        '204': {$ref: '#/components/responses/NoContent'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '422': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
+        '500': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+      security:
+        - ClientCredentials: [clients/publishing/version.promote]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration: *lambdaIntegration
+components:
+  parameters:
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema: {type: string, minLength: 1}
+    ProductId:
+      name: productId
+      in: path
+      required: true
+      schema: {type: string, minLength: 1}
+    VersionId:
+      name: versionId
+      in: path
+      required: true
+      schema: {type: string, minLength: 1}
+    Stage:
+      name: stage
+      in: path
+      required: true
+      schema: {type: string, enum: [DEV, QA, PROD]}
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    CreateProduct:
+      description: Created product identifier.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/CreateProductResponse'}
+    Product:
+      description: Product.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Product'}
+    ProductPage:
+      description: Products of the project, archived ones included.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ProductPage'}
+    ProductAction:
+      description: Archiving started or in progress; poll the product until its status is ARCHIVED.
+      headers:
+        Retry-After:
+          schema: {type: string, default: '5'}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/CreateProductResponse'}
+    ProductVersionPage:
+      description: Versions of the product with their stages.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ProductVersionPage'}
+    VersionPromotion:
+      description: The version in the stage, one distribution per account.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/VersionPromotion'}
+    VersionPromotionStarted:
+      description: Promotion started or in progress; poll until status is CREATED.
+      headers:
+        Retry-After:
+          schema: {type: string, default: '30'}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/VersionPromotion'}
+    NoContent:
+      description: The product is archived or does not exist; a promotion is forgotten, not undone.
+    Problem:
+      description: RFC problem response.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+  schemas:
+    ProductType:
+      type: string
+      enum: [WORKBENCH, VIRTUAL_TARGET, CONTAINER]
+    ProductStatus:
+      type: string
+      enum: [CREATING, CREATED, FAILED, PAUSED, ARCHIVING, ARCHIVED]
+    ProductName:
+      type: string
+      pattern: '^[A-Za-z0-9_ -]{1,50}$'
+    ProductDescription:
+      type: string
+      pattern: '^[A-Za-z0-9_ -]{0,100}$'
+    CreateProductRequest:
+      type: object
+      additionalProperties: false
+      required: [productName, productType, technologyId]
+      properties:
+        productName: {$ref: '#/components/schemas/ProductName'}
+        productType: {$ref: '#/components/schemas/ProductType'}
+        productDescription: {$ref: '#/components/schemas/ProductDescription'}
+        technologyId: {type: string, minLength: 1}
+    UpdateProductRequest:
+      type: object
+      additionalProperties: false
+      required: [productName]
+      properties:
+        productName: {$ref: '#/components/schemas/ProductName'}
+        productDescription: {$ref: '#/components/schemas/ProductDescription'}
+    CreateProductResponse:
+      type: object
+      required: [productId]
+      properties:
+        productId: {type: string}
+    Product:
+      type: object
+      required: [projectId, productId, productName, productType, technologyId, technologyName, status, createDate, lastUpdateDate]
+      properties:
+        projectId: {type: string}
+        productId: {type: string}
+        productName: {type: string}
+        productType: {$ref: '#/components/schemas/ProductType'}
+        productDescription: {type: string}
+        technologyId: {type: string}
+        technologyName: {type: string}
+        status: {$ref: '#/components/schemas/ProductStatus'}
+        recommendedVersionId: {type: string, nullable: true}
+        availableStages:
+          type: array
+          items: {type: string, enum: [DEV, QA, PROD]}
+        createDate: {type: string}
+        lastUpdateDate: {type: string}
+    ProductPage:
+      type: object
+      required: [products]
+      properties:
+        products:
+          type: array
+          items: {$ref: '#/components/schemas/Product'}
+    VersionStageState:
+      type: object
+      required: [stage, status]
+      properties:
+        stage: {type: string, enum: [DEV, QA, PROD]}
+        status: {type: string}
+    ProductVersion:
+      type: object
+      required: [versionId, versionName, versionType, stages]
+      properties:
+        versionId: {type: string}
+        versionName: {type: string}
+        versionType: {type: string}
+        stages:
+          type: array
+          items: {$ref: '#/components/schemas/VersionStageState'}
+    ProductVersionPage:
+      type: object
+      required: [versions]
+      properties:
+        versions:
+          type: array
+          items: {$ref: '#/components/schemas/ProductVersion'}
+    VersionDistribution:
+      type: object
+      required: [awsAccountId, region, status]
+      properties:
+        awsAccountId: {type: string}
+        region: {type: string}
+        status: {type: string}
+    VersionPromotion:
+      type: object
+      required: [projectId, productId, versionId, versionName, stage, status, distributions]
+      properties:
+        projectId: {type: string}
+        productId: {type: string}
+        versionId: {type: string}
+        versionName: {type: string}
+        stage: {type: string, enum: [DEV, QA, PROD]}
+        status: {type: string}
+        distributions:
+          type: array
+          items: {$ref: '#/components/schemas/VersionDistribution'}
+    ProblemDetails:
+      type: object
+      required: [type, title, status, detail, code, retryable]
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        code:
+          type: string
+        requestId:
+          type: string
+          nullable: true
+        retryable:
+          type: boolean
+  securitySchemes:
+    ClientCredentials:
+      type: apiKey
+      name: Authorization
+      in: header
+      x-amazon-apigateway-authtype: cognito_user_pools
+      x-amazon-apigateway-authorizer:
+        type: cognito_user_pools
+        providerARNs:
+          - arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/{{user_pool_id}}

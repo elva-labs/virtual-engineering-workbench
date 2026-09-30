@@ -24,6 +24,7 @@ from infra.constructs import (
     backend_app_entrypoints,
     backend_app_event_bus,
     backend_app_openapi,
+    backend_app_openapi_oauth,
     backend_app_storage,
     shared_layer,
 )
@@ -61,6 +62,7 @@ class Entrypoint(enum.StrEnum):
     AMI_SHARING = "ami-sharing"
     PACKAGING_EVENTS = "packaging-events"
     PRODUCT_VERSION_SYNC_EVENTS = "product-version-sync-events"
+    S2S_API = "s2s-api"
 
 
 class PublishingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
@@ -121,6 +123,9 @@ class PublishingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
             self,
             "PublishingAppStorage",
             app_config,
+            # S2S create idempotency records expire after 24 hours; nothing else in this table
+            # carries ExpireDate.
+            enable_ttl=True,
         )
         self._storage.table.add_global_secondary_index(
             index_name=GSI_NAME_ENTITIES,
@@ -154,6 +159,7 @@ class PublishingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
         ami_sharing_handler_name = app_config.format_resource_name(Entrypoint.AMI_SHARING)
         packaging_event_handler_name = app_config.format_resource_name(Entrypoint.PACKAGING_EVENTS)
         self._product_sync_events = app_config.format_resource_name(Entrypoint.PRODUCT_VERSION_SYNC_EVENTS)
+        s2s_api_handler_name = app_config.format_resource_name(Entrypoint.S2S_API)
 
         self._backend_app = backend_app_entrypoints.BackendAppEntrypoints(
             self,
@@ -226,6 +232,42 @@ class PublishingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                     provisioned_concurrency=app_config.component_specific["api-lambda-provisioned-concurrency"],
                     timeout=aws_cdk.Duration.seconds(5),
                     memory_size=1792,
+                ),
+                # Products, product versions and promotions for service clients.
+                backend_app_entrypoints.AppEntryPoint(
+                    name=s2s_api_handler_name,
+                    app_root="app",
+                    lambda_root="app/publishing",
+                    entry="app/publishing/entrypoints/s2s_api",
+                    environment={
+                        "TABLE_NAME": self._storage.table.table_name,
+                        "GSI_NAME_ENTITIES": GSI_NAME_ENTITIES,
+                        "DOMAIN_EVENT_BUS_ARN": self._event_bus.event_bus_arn,
+                        "AUDIT_LOGGING_KEY_NAME": audit_logging_key_name,
+                        "API_BASE_PATH": constants.CUSTOM_DNS_S2S_API_PATH_PUBLISHING,
+                        "STRIP_PREFIXES": constants.CUSTOM_DNS_S2S_API_PATH_PUBLISHING,
+                    },
+                    permissions=[
+                        lambda lambda_f: lambda_f.add_to_role_policy(
+                            statement=aws_iam.PolicyStatement(
+                                actions=["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"],
+                                effect=aws_iam.Effect.ALLOW,
+                                resources=[audit_logging_key_arn],
+                            )
+                        ),
+                        lambda lambda_f: self._storage.table.grant_read_write_data(lambda_f),
+                        lambda lambda_f: self._event_bus.grant_put_events_to(lambda_f),
+                    ],
+                    reserved_concurrency=None,
+                    provisioned_concurrency=None,
+                    timeout=aws_cdk.Duration.seconds(10),
+                    memory_size=512,
+                    cross_bc_api_access={
+                        bounded_contexts.BoundedContext.PROJECTS: [
+                            ("GET", "/internal/projects/*/clients/*"),
+                            ("GET", "/internal/projects/*/technologies/*"),
+                        ]
+                    },
                 ),
                 backend_app_entrypoints.AppEntryPoint(
                     name=domain_event_handler_name,
@@ -499,6 +541,32 @@ class PublishingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
             ),
         )
 
+        # API Gateway for service to service access. No stage cache: a read right after a write must
+        # see the write.
+        cognito_user_pool_id = aws_ssm.StringParameter.value_for_string_parameter(
+            self,
+            app_config.environment_config["cognito-userpool-id-ssm-param"].format(environment=app_config.environment),
+        )
+        self._s2s_open_api = backend_app_openapi_oauth.BackendAppOpenApiOauth(
+            self,
+            "ServiceIntegrationPublishingOpenApi",
+            app_config,
+            handler=self._backend_app.app_entries_function_aliases[s2s_api_handler_name],
+            schema_directory="app/publishing/entrypoints/s2s_api/schema/",
+            schema="proserve-workbench-s2s-publishing-api-schema.yaml",
+            api_version="v1",
+            version_description="First release of the Publishing component S2S API",
+            user_pool_id=cognito_user_pool_id,
+            cache_enabled=False,
+            waf_acl_arn=api_acl_arn if not provision_private_endpoint else None,
+            endpoint_type=(
+                aws_apigateway.EndpointType.PRIVATE
+                if provision_private_endpoint
+                else aws_apigateway.EndpointType.REGIONAL
+            ),
+            vpc_endpoint=vpc_endpoint if provision_private_endpoint else None,
+        )
+
         # Ami sharing step function
         self._ami_sharing_state_machine = ami_sharing_state_machine.AmiSharingStateMachine(
             self,
@@ -704,6 +772,7 @@ class PublishingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
             .with_lambda_functions(self._backend_app.app_entries.values())
             .with_dynamodb_table(self._storage.table)
             .with_api_gateway(self._open_api.api)
+            .with_api_gateway(self._s2s_open_api.api)
             .with_step_functions([self._ami_sharing_state_machine.state_machine])
             .with_command_monitoring(domain_module=domain)
             .with_domain_event_monitoring(domain_module=domain)
@@ -725,6 +794,10 @@ class PublishingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
     @property
     def api(self) -> backend_app_openapi.BackendAppOpenApi:
         return self._open_api
+
+    @property
+    def s2s_api(self) -> backend_app_openapi_oauth.BackendAppOpenApiOauth:
+        return self._s2s_open_api
 
     @property
     def publishing_table(self) -> backend_app_storage.BackendAppStorage:

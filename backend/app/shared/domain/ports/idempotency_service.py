@@ -53,3 +53,14 @@ class IdempotencyService(ABC):
         response_body: dict,
         now: datetime,
     ) -> None: ...
+
+    @abstractmethod
+    def release(
+        self,
+        scope: IdempotencyScope,
+        request_hash: str,
+        resource_id: str,
+        now: datetime,
+    ) -> None:
+        """Ends the lease of an attempt that failed without an answer, so a retry with the same key
+        recovers at once (checking whether the resource was created) instead of waiting for the lease."""

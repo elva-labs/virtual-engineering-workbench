@@ -3,6 +3,7 @@ import enum
 from app.authorization.domain.read_models import (
     project_assignment,
     project_group_assignment,
+    project_settings,
 )
 from app.shared.adapters.unit_of_work_v2 import (
     dynamodb_repo_config,
@@ -12,6 +13,7 @@ from app.shared.adapters.unit_of_work_v2 import (
 
 class DBPrefix(enum.StrEnum):
     PROJECT = "PROJECT"
+    SETTINGS = "SETTINGS"
     USER = "USER"
     GROUP = "GROUP"
 
@@ -31,11 +33,33 @@ class EntityConfigurator(dynamodb_repository.DynamoDBEntityConfiguratorBase):
             project_assignment.Assignment,
             self.project_assignment_entity_config,
         )
+        self.register_cfg(
+            project_settings.ProjectSettingsPrimaryKey,
+            project_settings.ProjectSettings,
+            self.project_settings_entity_config,
+        )
 
         self.register_cfg(
             project_group_assignment.GroupAssignmentPrimaryKey,
             project_group_assignment.GroupAssignment,
             self.group_assignment_entity_config,
+        )
+
+    def project_settings_entity_config(self, cfg):
+        # PK PROJECT#<id>, SK SETTINGS#<id>: disjoint from the assignments (PK USER#, SK PROJECT#) and
+        # from their inverted index queries (SK PROJECT#, PK begins with USER#).
+        cfg.partition_key(
+            name="PK",
+            value_template=lambda project_id: f"{DBPrefix.PROJECT}#{project_id}",
+            values_from_entity=lambda ent: ent.projectId,
+            values_from_primary_key=lambda pk: pk.projectId,
+        )
+
+        cfg.sort_key(
+            name="SK",
+            value_template=lambda project_id: f"{DBPrefix.SETTINGS}#{project_id}",
+            values_from_entity=lambda ent: ent.projectId,
+            values_from_primary_key=lambda pk: pk.projectId,
         )
 
     def group_assignment_entity_config(self, cfg):

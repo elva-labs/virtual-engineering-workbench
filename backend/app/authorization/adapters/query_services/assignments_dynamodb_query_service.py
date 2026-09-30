@@ -6,6 +6,7 @@ from app.authorization.domain.ports import assignments_query_service
 from app.authorization.domain.read_models import (
     project_assignment,
     project_group_assignment,
+    project_settings,
 )
 
 
@@ -36,6 +37,18 @@ class AssignmentsDynamoDBQueryService(assignments_query_service.AssignmentsQuery
             ret_val.extend([project_assignment.Assignment.model_validate(item) for item in page["Items"]])
 
         return ret_val
+
+    def get_project_settings(self, project_id: str) -> project_settings.ProjectSettings:
+        response = self.__dynamodb_client.get_item(
+            TableName=self.__table_name,
+            Key={
+                "PK": f"{dynamo_entity_config.DBPrefix.PROJECT.value}#{project_id}",
+                "SK": f"{dynamo_entity_config.DBPrefix.SETTINGS.value}#{project_id}",
+            },
+        )
+        if item := response.get("Item"):
+            return project_settings.ProjectSettings.model_validate(item)
+        return project_settings.ProjectSettings(projectId=project_id)
 
     def get_project_assignments(self, project_id: str) -> list[project_assignment.Assignment]:
         paginator = self.__dynamodb_client.get_paginator("query")

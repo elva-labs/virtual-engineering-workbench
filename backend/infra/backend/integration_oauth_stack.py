@@ -90,6 +90,21 @@ class IntegrationOauthStack(aws_cdk.Stack):
             ),
         )
 
+        publishing_resource_server = backend_app_api_resource_server.BackendAppApiResourceServer(
+            self,
+            "PublishingResourceServer",
+            user_pool,
+            resource_server=backend_app_api_resource_server.ResourceServer(
+                identifier="clients/publishing",
+                scopes={
+                    "product.read": "Allows service clients to read products",
+                    "product.write": "Allows service clients to create, update and archive products",
+                    "version.read": "Allows service clients to read product versions and their stages",
+                    "version.promote": "Allows service clients to promote a product version to a stage",
+                },
+            ),
+        )
+
         publishing_compound_resource_server = backend_app_api_resource_server.BackendAppApiResourceServer(
             self,
             "PublishingCompoundResourceServer",
@@ -144,6 +159,10 @@ class IntegrationOauthStack(aws_cdk.Stack):
                         "pipeline.write",
                         "pipeline.execute",
                     ],
+                ),
+                backend_app_api_oauth_client.AppClientResourceServer(
+                    resource_server=publishing_resource_server,
+                    scopes=["product.read", "product.write", "version.read", "version.promote"],
                 ),
                 backend_app_api_oauth_client.AppClientResourceServer(
                     resource_server=publishing_compound_resource_server,

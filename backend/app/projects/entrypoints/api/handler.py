@@ -757,6 +757,23 @@ def get_service_client_assignment_internal(
 
 
 @tracer.capture_method
+@app.get("/internal/projects/<project_id>/technologies/<technology_id>")
+def get_technology_internal(
+    project_id: str, technology_id: str
+) -> api_gateway.Response[api_model.GetTechnologyResponse]:
+    # Publishing's S2S product create resolves the technology a service client names.
+    technology = dependencies.technologies_query_service.get_technology_by_id(project_id, technology_id)
+    if technology is None or technology.project_id != project_id:
+        raise NotFoundError("Technology not found")
+
+    return api_gateway.Response(
+        status_code=HTTPStatus.OK,
+        body=api_model.GetTechnologyResponse(technology=api_model.Technology.model_validate(technology.model_dump())),
+        content_type=content_types.APPLICATION_JSON,
+    )
+
+
+@tracer.capture_method
 @app.get("/internal/user/assignments")
 def get_user_assignments_internal() -> dict:
     """Returns a list of user projects and assignments."""

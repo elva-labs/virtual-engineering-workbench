@@ -2,7 +2,7 @@ from http import HTTPStatus
 
 from aws_lambda_powertools import logging, tracing
 from aws_lambda_powertools.event_handler import api_gateway
-from aws_lambda_powertools.event_handler.exceptions import NotFoundError
+from aws_lambda_powertools.event_handler.exceptions import NotFoundError, ServiceError
 from aws_lambda_powertools.event_handler.middlewares.openapi_validation import RequestValidationError
 from aws_lambda_powertools.utilities import typing
 from aws_xray_sdk.core import patch_all
@@ -67,6 +67,20 @@ def handle_validation_error(error: RequestValidationError):
 @app.exception_handler(NotFoundError)
 def handle_not_found(error: NotFoundError):
     return problem_details.api_response(s2s_exception.ResourceNotFound(), _request_id())
+
+
+@app.exception_handler(ServiceError)
+def handle_service_error(error: ServiceError):
+    # Match the sanitized problem contract used by the existing S2S routes.
+    failures = {
+        HTTPStatus.BAD_REQUEST: s2s_exception.InvalidRequest,
+        HTTPStatus.UNAUTHORIZED: s2s_exception.Unauthorized,
+        HTTPStatus.FORBIDDEN: s2s_exception.ProjectAccessDenied,
+        HTTPStatus.NOT_FOUND: s2s_exception.ResourceNotFound,
+        HTTPStatus.CONFLICT: s2s_exception.ResourceConflict,
+    }
+    failure = failures.get(error.status_code, s2s_exception.S2SException)
+    return problem_details.api_response(failure(), _request_id())
 
 
 @app.exception_handler(domain_exception.DomainException)

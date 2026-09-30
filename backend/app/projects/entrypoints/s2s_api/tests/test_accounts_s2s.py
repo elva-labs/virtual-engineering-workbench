@@ -229,6 +229,8 @@ def test_account_list_and_exact_read_use_safe_canonical_projection(monkeypatch, 
         "status",
         "lastOnboardingResult",
         "lastOnboardingError",
+        "onboardingRevision",
+        "onboardedAt",
         "createDate",
         "lastUpdateDate",
     }
@@ -787,3 +789,69 @@ def test_handler_maps_domain_exception_to_sanitized_422(monkeypatch):
     assert "private workflow message" not in response.body
     assert response.headers["Content-Type"] == problem_details.PROBLEM_CONTENT_TYPE
     assert response.headers["Cache-Control"] == "no-store"
+
+
+def test_update_passes_onboarding_revision_and_returns_it(monkeypatch, lambda_context):
+    # ADR 0022: vew_project_account.onboarding_revision re-runs onboarding from Terraform.
+    account = _account(accountStatus="Active", lastOnboardingResult="Succeeded")
+    dependencies, project_queries, _ = _dependencies()
+    project_queries.get_project_account_by_id.return_value = account
+    monkeypatch.setattr(common, "authorize", Mock(return_value="client-1"))
+
+    def update(command):
+        project_queries.update_commands.append(command)
+        account.onboardingRevision = command.onboarding_revision
+
+    _set_update_handler(dependencies, update)
+    app = _resolver(dependencies)
+    result = app.resolve(
+        _event(
+            "/projects/project-1/accounts/account-record-id",
+            "PUT",
+            body=_update_request_body(onboardingRevision="spoke-stacks-2026-10-01"),
+            scope="clients/projects/account.write",
+        ),
+        lambda_context,
+    )
+
+    assert result["statusCode"] == HTTPStatus.OK
+    assert project_queries.update_commands[0].onboarding_revision == "spoke-stacks-2026-10-01"
+    assert json.loads(result["body"])["onboardingRevision"] == "spoke-stacks-2026-10-01"
+
+
+def test_update_without_onboarding_revision_sends_none(monkeypatch, lambda_context):
+    account = _account(accountStatus="Active", lastOnboardingResult="Succeeded")
+    dependencies, project_queries, _ = _dependencies()
+    project_queries.get_project_account_by_id.return_value = account
+    monkeypatch.setattr(common, "authorize", Mock(return_value="client-1"))
+    _set_update_handler(dependencies, project_queries.update_commands.append)
+
+    _resolver(dependencies).resolve(
+        _event(
+            "/projects/project-1/accounts/account-record-id",
+            "PUT",
+            body=_update_request_body(),
+            scope="clients/projects/account.write",
+        ),
+        lambda_context,
+    )
+
+    assert project_queries.update_commands[0].onboarding_revision is None
+
+
+def test_update_rejects_malformed_onboarding_revision(monkeypatch, lambda_context):
+    dependencies, project_queries, _ = _dependencies()
+    monkeypatch.setattr(common, "authorize", Mock(return_value="client-1"))
+
+    result = _resolver(dependencies).resolve(
+        _event(
+            "/projects/project-1/accounts/account-record-id",
+            "PUT",
+            body=_update_request_body(onboardingRevision="has spaces/and slashes"),
+            scope="clients/projects/account.write",
+        ),
+        lambda_context,
+    )
+
+    assert result["statusCode"] in (HTTPStatus.BAD_REQUEST, HTTPStatus.UNPROCESSABLE_ENTITY)
+    assert project_queries.update_commands == []

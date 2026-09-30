@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a project-scoped OAuth S2S API for declarative component and component-version publishing.
 - Added external-ID mappings, optimistic revisions, idempotent reconciliation operations, and lifecycle event recovery.
 - Added service-client project assignments and dedicated Packaging read, write, release, and operation scopes.
+- Added a project-scoped OAuth S2S Publishing API for products (create, update, archive) and product version promotion to a stage, with `clients/publishing` product and version scopes.
 
 ### Changed
 

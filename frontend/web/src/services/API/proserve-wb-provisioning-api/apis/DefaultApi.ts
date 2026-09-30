@@ -34,6 +34,8 @@ import type {
   StopProvisionedProductsRequest,
   UpdateProvisionedProductRequest,
   UpdateUserProfileRequest,
+  WorkbenchLifecycleResponse,
+  WorkbenchLifecycleUserSettings,
 } from '../models';
 import {
     GetAllProvisionedProductsResponseFromJSON,
@@ -74,6 +76,10 @@ import {
     UpdateProvisionedProductRequestToJSON,
     UpdateUserProfileRequestFromJSON,
     UpdateUserProfileRequestToJSON,
+    WorkbenchLifecycleResponseFromJSON,
+    WorkbenchLifecycleResponseToJSON,
+    WorkbenchLifecycleUserSettingsFromJSON,
+    WorkbenchLifecycleUserSettingsToJSON,
 } from '../models';
 
 export interface AuthorizeUserIpAddressRequest {
@@ -256,6 +262,19 @@ export interface StartProvisionedProductRequest {
 export interface StartProvisionedProductCORSRequest {
     projectId: string;
     provisionedProductId: string;
+}
+
+export interface GetProvisionedProductLifecycleRequest {
+    authorization: string;
+    projectId: string;
+    provisionedProductId: string;
+}
+
+export interface UpdateProvisionedProductLifecycleRequest {
+    authorization: string;
+    projectId: string;
+    provisionedProductId: string;
+    workbenchLifecycleUserSettings: WorkbenchLifecycleUserSettings;
 }
 
 export interface StopProvisionedProductRequest {
@@ -1721,6 +1740,105 @@ export class DefaultApi extends runtime.BaseAPI {
      */
     async startProvisionedProductCORS(requestParameters: StartProvisionedProductCORSRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<object> {
         const response = await this.startProvisionedProductCORSRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * The workbench\'s stop rules
+     */
+    async getProvisionedProductLifecycleRaw(requestParameters: GetProvisionedProductLifecycleRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<WorkbenchLifecycleResponse>> {
+        if (requestParameters.authorization === null || requestParameters.authorization === undefined) {
+            throw new runtime.RequiredError('authorization','Required parameter requestParameters.authorization was null or undefined when calling getProvisionedProductLifecycle.');
+        }
+
+        if (requestParameters.projectId === null || requestParameters.projectId === undefined) {
+            throw new runtime.RequiredError('projectId','Required parameter requestParameters.projectId was null or undefined when calling getProvisionedProductLifecycle.');
+        }
+
+        if (requestParameters.provisionedProductId === null || requestParameters.provisionedProductId === undefined) {
+            throw new runtime.RequiredError('provisionedProductId','Required parameter requestParameters.provisionedProductId was null or undefined when calling getProvisionedProductLifecycle.');
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (requestParameters.authorization !== undefined && requestParameters.authorization !== null) {
+            headerParameters['Authorization'] = String(requestParameters.authorization);
+        }
+
+        if (this.configuration && this.configuration.apiKey) {
+            headerParameters["AmazonVerifiedPermissions"] = this.configuration.apiKey("AmazonVerifiedPermissions"); // AVP-Request-Authorizer authentication
+        }
+
+        const response = await this.request({
+            path: `/projects/{projectId}/products/provisioned/{provisionedProductId}/lifecycle`.replace(`{${"projectId"}}`, encodeURIComponent(String(requestParameters.projectId))).replace(`{${"provisionedProductId"}}`, encodeURIComponent(String(requestParameters.provisionedProductId))),
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => WorkbenchLifecycleResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * The workbench\'s stop rules
+     */
+    async getProvisionedProductLifecycle(requestParameters: GetProvisionedProductLifecycleRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<WorkbenchLifecycleResponse> {
+        const response = await this.getProvisionedProductLifecycleRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Change the owner\'s stop-rule choices
+     */
+    async updateProvisionedProductLifecycleRaw(requestParameters: UpdateProvisionedProductLifecycleRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<WorkbenchLifecycleResponse>> {
+        if (requestParameters.authorization === null || requestParameters.authorization === undefined) {
+            throw new runtime.RequiredError('authorization','Required parameter requestParameters.authorization was null or undefined when calling updateProvisionedProductLifecycle.');
+        }
+
+        if (requestParameters.projectId === null || requestParameters.projectId === undefined) {
+            throw new runtime.RequiredError('projectId','Required parameter requestParameters.projectId was null or undefined when calling updateProvisionedProductLifecycle.');
+        }
+
+        if (requestParameters.provisionedProductId === null || requestParameters.provisionedProductId === undefined) {
+            throw new runtime.RequiredError('provisionedProductId','Required parameter requestParameters.provisionedProductId was null or undefined when calling updateProvisionedProductLifecycle.');
+        }
+
+        if (requestParameters.workbenchLifecycleUserSettings === null || requestParameters.workbenchLifecycleUserSettings === undefined) {
+            throw new runtime.RequiredError('workbenchLifecycleUserSettings','Required parameter requestParameters.workbenchLifecycleUserSettings was null or undefined when calling updateProvisionedProductLifecycle.');
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+        if (requestParameters.authorization !== undefined && requestParameters.authorization !== null) {
+            headerParameters['Authorization'] = String(requestParameters.authorization);
+        }
+
+        if (this.configuration && this.configuration.apiKey) {
+            headerParameters["AmazonVerifiedPermissions"] = this.configuration.apiKey("AmazonVerifiedPermissions"); // AVP-Request-Authorizer authentication
+        }
+
+        const response = await this.request({
+            path: `/projects/{projectId}/products/provisioned/{provisionedProductId}/lifecycle`.replace(`{${"projectId"}}`, encodeURIComponent(String(requestParameters.projectId))).replace(`{${"provisionedProductId"}}`, encodeURIComponent(String(requestParameters.provisionedProductId))),
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: WorkbenchLifecycleUserSettingsToJSON(requestParameters.workbenchLifecycleUserSettings),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => WorkbenchLifecycleResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Change the owner\'s stop-rule choices
+     */
+    async updateProvisionedProductLifecycle(requestParameters: UpdateProvisionedProductLifecycleRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<WorkbenchLifecycleResponse> {
+        const response = await this.updateProvisionedProductLifecycleRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

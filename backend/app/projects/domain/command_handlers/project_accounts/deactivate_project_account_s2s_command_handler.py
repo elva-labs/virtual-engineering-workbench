@@ -27,9 +27,10 @@ def handle(
 
     account.accountStatus = project_account.ProjectAccountStatusEnum.Inactive
     account.lastUpdateDate = datetime.now(timezone.utc).isoformat()
-    account_repo = unit_of_work.get_repository(project_account.ProjectAccountPrimaryKey, project_account.ProjectAccount)
     with unit_of_work:
-        account_repo.update_entity(
+        unit_of_work.get_repository(
+            project_account.ProjectAccountPrimaryKey, project_account.ProjectAccount
+        ).update_entity(
             project_account.ProjectAccountPrimaryKey(projectId=project_id, id=account_id),
             account,
         )

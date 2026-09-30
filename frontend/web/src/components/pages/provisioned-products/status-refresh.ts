@@ -13,7 +13,7 @@ export const TRANSITIONAL_STATUSES: ReadonlySet<string> = new Set([
   'CONFIGURATION_IN_PROGRESS',
 ]);
 
-export const STATUS_REFRESH_INTERVAL_MS = 10_000;
+export const STATUS_REFRESH_INTERVAL_MS = 5_000;
 // SWR does not poll when refreshInterval is 0.
 export const NO_STATUS_REFRESH = 0;
 

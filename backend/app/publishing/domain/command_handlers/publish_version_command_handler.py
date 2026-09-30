@@ -1,16 +1,13 @@
 import logging
 from datetime import datetime, timezone
 
-import jinja2
-from jinja2.sandbox import SandboxedEnvironment
-
 from app.publishing.domain.commands import publish_version_command
 from app.publishing.domain.events import (
     product_version_published,
     product_version_update_started,
 )
 from app.publishing.domain.exceptions import domain_exception
-from app.publishing.domain.model import product, version
+from app.publishing.domain.model import product, product_template, version
 from app.publishing.domain.ports import (
     catalog_query_service,
     catalog_service,
@@ -305,12 +302,10 @@ def _handle_ami_product(
         )
     ami_ids_per_region = {ami.region: ami.copiedAmiId for ami in shared_amis}
 
-    env = SandboxedEnvironment(loader=jinja2.BaseLoader())
-    jinja_template = env.from_string(template.decode())
-
-    rendered_text = jinja_template.render(
+    return product_template.render(
+        template.decode(),
         product_name=prod.productName,
         product_version=vers.versionName,
         ami_ids=ami_ids_per_region,
+        architecture=vers.architecture,
     )
-    return rendered_text

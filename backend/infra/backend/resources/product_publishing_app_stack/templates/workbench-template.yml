@@ -4,8 +4,11 @@ AWSTemplateFormatVersion: 2010-09-09
 Description: Version {{ product_version }} template for {{ product_name }} Workbench
 Mappings:
   RegionMap:
-    us-east-1:
-      AMIId: "{{ ami_ids['us-east-1'] }}"
+  # One entry per region the version's image is available in (rendered by publish_version_command_handler).
+{%- for region, ami_id in ami_ids | dictsort %}
+    {{ region }}:
+      AMIId: "{{ ami_id }}"
+{%- endfor %}
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterLabels:
@@ -60,7 +63,34 @@ Parameters:
   VpcIdSSM:
     Default: /workbench/vpc/vpc-id
     Type: AWS::SSM::Parameter::Value<String>
+  # The spoke's workbench group (provisioning enablement pp-sg): a connection gateway in the spoke is
+  # admitted to it. Resolved in the spoke; the AWS:: type makes it a technical parameter.
+  WorkbenchSecurityGroupIdSSM:
+    Default: /proserve/wb/provisioning-enablement/pp-sg
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::SecurityGroup::Id>
+  # The spoke's role cleanup function (provisioning enablement stack), see InstanceRoleCleanup.
+  RoleCleanupFunctionArnSSM:
+    Default: /proserve/wb/provisioning-enablement/workbench-role-cleanup-function-arn
+    Type: AWS::SSM::Parameter::Value<String>
 Resources:
+  # Deleted after the Workbench (which depends on it) and before InstanceRole (which it depends on).
+  # The keep lists repeat InstanceRole's own policies; everything else on the role is removed, so
+  # policies attached from outside (e.g. an SSM Quick Setup patch policy) cannot block the deletion.
+  InstanceRoleCleanup:
+    Properties:
+      ServiceToken: !Ref RoleCleanupFunctionArnSSM
+      RoleName: !Ref InstanceRole
+      KeepManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/ProvisionedProductInstanceProfilePermissionsPolicyV2
+      KeepInlinePolicyNames:
+        - AllowCloudWatchLogs
+        - AllowCloudWatchMetrics
+        - Ec2DescribeTagsUserTID
+        - Ec2PublishEvents
+        - AllowEcsExec
+        - S3ForNiceDcvLicense
+    Type: Custom::InstanceRoleCleanup
   InstanceProfile:
     Properties:
       Roles:
@@ -170,6 +200,7 @@ Resources:
     Type: AWS::EC2::SecurityGroup
   # kics-scan ignore-block - Detailed monitoring is a per-customer cost decision; instances monitored via CloudWatch agent and SSM
   Workbench:
+    DependsOn: InstanceRoleCleanup
     Properties:
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
@@ -193,6 +224,7 @@ Resources:
       SecurityGroupIds:
         - !GetAtt SecurityGroup.GroupId
         - !Ref UserSecurityGroupId
+        - !Ref WorkbenchSecurityGroupIdSSM
       UserData:
         Fn::Base64: !Sub |
             ###############################

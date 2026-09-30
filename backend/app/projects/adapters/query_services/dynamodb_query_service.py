@@ -11,6 +11,7 @@ from app.projects.domain.model import (
     project,
     project_account,
     project_assignment,
+    project_group_assignment,
     service_client_assignment,
     technology,
     user,
@@ -51,6 +52,56 @@ class DynamoDBProjectsQueryService(projects_query_service.ProjectsQueryService):
         self._gsi_aws_accounts = gsi_aws_accounts
         self._gsi_entities = gsi_entities
         self._default_page_size = default_page_size
+
+    def get_project_group_assignment(self, project_id: str, group_id: str) -> project_group_assignment.ProjectGroupAssignment | None:
+        result = self._dynamodb_client.get_item(
+            TableName=self._table_name, ConsistentRead=True,
+            Key={"PK": f"GROUP#{group_id}", "SK": f"PROJECT#{project_id}"},
+        )
+        item = result.get("Item")
+        return project_group_assignment.ProjectGroupAssignment.model_validate(item) if item else None
+
+    def get_group_assignments(self, group_ids: list[str]) -> list[project_group_assignment.ProjectGroupAssignment]:
+        assignments = []
+        for group_id in dict.fromkeys(group_ids):
+            params = {"TableName": self._table_name, "KeyConditionExpression": Key("PK").eq(f"GROUP#{group_id}") & Key("SK").begins_with("PROJECT#")}
+            while True:
+                result = self._dynamodb_client.query(**params)
+                assignments.extend(
+                    project_group_assignment.ProjectGroupAssignment.model_validate(item)
+                    for item in result.get("Items", []) if not item.get("isDeleted", False)
+                )
+                if not result.get("LastEvaluatedKey"):
+                    break
+                params["ExclusiveStartKey"] = result["LastEvaluatedKey"]
+        return assignments
+
+    def list_project_group_assignments(self, project_id: str, include_deleted: bool = False) -> list[project_group_assignment.ProjectGroupAssignment]:
+        assignments = []
+        params = {"TableName": self._table_name, "IndexName": self._gsi_inverted_primary_key,
+                  "KeyConditionExpression": Key("SK").eq(f"PROJECT#{project_id}") & Key("PK").begins_with("GROUP#")}
+        while True:
+            result = self._dynamodb_client.query(**params)
+            assignments.extend(
+                project_group_assignment.ProjectGroupAssignment.model_validate(item)
+                for item in result.get("Items", []) if include_deleted or not item.get("isDeleted", False)
+            )
+            if not result.get("LastEvaluatedKey"):
+                break
+            params["ExclusiveStartKey"] = result["LastEvaluatedKey"]
+        return assignments
+
+    def list_service_client_assignments(self, project_id: str) -> list[service_client_assignment.ServiceClientAssignment]:
+        assignments = []
+        params = {"TableName": self._table_name, "IndexName": self._gsi_inverted_primary_key,
+                  "KeyConditionExpression": Key("SK").eq(f"PROJECT#{project_id}") & Key("PK").begins_with("CLIENT#")}
+        while True:
+            result = self._dynamodb_client.query(**params)
+            assignments.extend(service_client_assignment.ServiceClientAssignment.model_validate(item) for item in result.get("Items", []))
+            if not result.get("LastEvaluatedKey"):
+                break
+            params["ExclusiveStartKey"] = result["LastEvaluatedKey"]
+        return assignments
 
     def get_service_client_assignment(
         self, project_id: str, client_id: str

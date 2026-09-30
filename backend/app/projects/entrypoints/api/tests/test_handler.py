@@ -32,7 +32,7 @@ from app.projects.domain.commands.users import (
     reassign_user_command,
     unassign_user_command,
 )
-from app.projects.domain.model import project_assignment, service_client_assignment
+from app.projects.domain.model import project_assignment, project_group_assignment, service_client_assignment
 from app.projects.domain.ports import projects_query_service
 from app.projects.entrypoints.api import bootstrapper
 from app.projects.entrypoints.api.model import api_model
@@ -93,6 +93,120 @@ def test_get_projects(lambda_context, authenticated_event, get_mock_dependencies
     assertpy.assert_that(((response.assignments or [])[0].roles or [])[0]).is_equal_to(
         project_assignment.Role.PLATFORM_USER.value
     )
+    assert response.effectiveAccess is not None
+    assert any(access.projectId == "project-4" and access.roles == ["PLATFORM_USER"] for access in response.effectiveAccess)
+
+
+def _group_assignment(project_id="project-5", deleted=False):
+    return project_group_assignment.ProjectGroupAssignment(
+        projectId=project_id,
+        groupId="f883a15c-90e0-4341-9a23-ef4f18937b4d",
+        roles=[project_assignment.Role.ADMIN],
+        version=1,
+        isDeleted=deleted,
+        createDate="2026-01-01T00:00:00Z",
+        lastUpdateDate="2026-01-01T00:00:00Z",
+    )
+
+
+def test_get_projects_group_only_and_paginated_union(lambda_context, authenticated_event, get_mock_dependencies):
+    from app.projects.entrypoints.api import handler
+
+    handler.dependencies = get_mock_dependencies
+    handler.dependencies.user_info_client = lambda token: {"custom:entra_groups": [
+        "f883a15c-90e0-4341-9a23-ef4f18937b4d"
+    ]}
+    handler.dependencies.projects_query_service.get_group_assignments = lambda ids: [_group_assignment()] if ids else []
+
+    pages = []
+    next_token = None
+    while True:
+        query = {"pageSize": "2"}
+        if next_token:
+            query["nextToken"] = json.dumps(next_token)
+        event = authenticated_event(None, "/projects", "GET", query)
+        result = handler.handler(event, lambda_context)
+        assert result["statusCode"] == 200
+        response = api_model.GetProjectsResponse.model_validate_json(result["body"])
+        pages.append(response)
+        next_token = response.nextToken
+        if not next_token:
+            break
+
+    assert [project.projectId for page in pages for project in page.projects] == [f"project-{i}" for i in range(6)]
+    assert [assignment.projectId for assignment in pages[-1].assignments or []] == ["project-4"]
+    assert pages[-1].effectiveAccess == [
+        api_model.EffectiveProjectAccess(projectId="project-4", roles=["PLATFORM_USER"]),
+        api_model.EffectiveProjectAccess(projectId="project-5", roles=["ADMIN"]),
+    ]
+
+
+def test_get_projects_missing_trusted_claim_keeps_direct_grant(lambda_context, authenticated_event, get_mock_dependencies):
+    from app.projects.entrypoints.api import handler
+
+    handler.dependencies = get_mock_dependencies
+    handler.dependencies.user_info_client = lambda token: {"custom:entra_groups": "invalid"}
+    handler.dependencies.projects_query_service.get_group_assignments = lambda ids: [_group_assignment()] if ids else []
+    event = authenticated_event(None, "/projects", "GET", {"pageSize": "25"})
+    event["headers"]["X-Entra-Groups"] = _group_assignment().groupId
+
+    response = api_model.GetProjectsResponse.model_validate_json(handler.handler(event, lambda_context)["body"])
+    assert {access.projectId: access.roles for access in response.effectiveAccess or []} == {
+        "project-4": ["PLATFORM_USER"]
+    }
+
+
+def test_get_projects_unions_direct_and_group_roles(lambda_context, authenticated_event, get_mock_dependencies):
+    from app.projects.entrypoints.api import handler
+
+    handler.dependencies = get_mock_dependencies
+    handler.dependencies.user_info_client = lambda token: {"custom:entra_groups": [
+        "f883a15c-90e0-4341-9a23-ef4f18937b4d"
+    ]}
+    handler.dependencies.projects_query_service.get_group_assignments = lambda ids: [_group_assignment("project-4")]
+    event = authenticated_event(None, "/projects", "GET", {"pageSize": "25"})
+
+    response = api_model.GetProjectsResponse.model_validate_json(handler.handler(event, lambda_context)["body"])
+    access = next(access for access in response.effectiveAccess or [] if access.projectId == "project-4")
+    assert access.roles == ["ADMIN", "PLATFORM_USER"]
+    direct = next(assignment for assignment in response.assignments or [] if assignment.projectId == "project-4")
+    assert direct.roles == ["PLATFORM_USER"]
+
+
+def test_get_projects_user_info_failure_grants_no_group_roles(lambda_context, authenticated_event, get_mock_dependencies):
+    from app.projects.entrypoints.api import handler
+
+    def unavailable(_token):
+        raise RuntimeError("UserInfo unavailable")
+
+    handler.dependencies = get_mock_dependencies
+    handler.dependencies.user_info_client = unavailable
+    event = authenticated_event(None, "/projects", "GET", {"pageSize": "25"})
+    response = api_model.GetProjectsResponse.model_validate_json(handler.handler(event, lambda_context)["body"])
+    assert {access.projectId: access.roles for access in response.effectiveAccess or []} == {
+        "project-4": ["PLATFORM_USER"]
+    }
+
+
+def test_get_project_groups_separates_active_and_tombstones(lambda_context, authenticated_event, get_mock_dependencies):
+    from app.projects.entrypoints.api import handler
+
+    handler.dependencies = get_mock_dependencies
+    active = _group_assignment("project-4")
+    deleted = _group_assignment("project-4", deleted=True)
+    handler.dependencies.projects_query_service.list_project_group_assignments = (
+        lambda project_id, include_deleted=False: [active, deleted] if include_deleted else [active]
+    )
+
+    human = authenticated_event(None, "/projects/project-4/groups", "GET")
+    response = api_model.GetProjectGroupsResponse.model_validate_json(handler.handler(human, lambda_context)["body"])
+    assert len(response.assignments) == 1
+    assert response.assignments[0].groupId == active.groupId
+
+    internal = authenticated_event(None, "/internal/projects/project-4/groups", "GET", {"includeDeleted": "true"})
+    response = api_model.GetProjectGroupsResponse.model_validate_json(handler.handler(internal, lambda_context)["body"])
+    assert len(response.assignments) == 2
+    assert response.assignments[-1].isDeleted is True
 
 
 def test_create_project(lambda_context, authenticated_event, mock_command_handlers, get_mock_dependencies):
@@ -379,6 +493,7 @@ def test_get_project_users_should_return_all_users(lambda_context, authenticated
                         }
                     ],
                     "userEmail": "biff.tannen@example.com",
+                    "userDisplayName": "Biff Tannen",
                 }
             ],
             "nextToken": None,

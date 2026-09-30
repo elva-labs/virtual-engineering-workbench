@@ -2476,7 +2476,7 @@ components:
         type: "request"
         authorizerUri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{authorization_bc_handler_arn}}/invocations"
         authorizerCredentials: "{{apigw_invocation_role_arn}}"
-        authorizerResultTtlInSeconds: 1800
+        authorizerResultTtlInSeconds: 0
         identitySource: "method.request.header.Authorization, context.path, context.httpMethod"
     sigv4:
       type: "apiKey"

@@ -4,7 +4,9 @@ from app.projects.domain.model import (
     enrolment,
     project,
     project_account,
+    project_create_request,
     project_assignment,
+    project_group_assignment,
     service_client_assignment,
     technology,
     user,
@@ -19,6 +21,8 @@ class DBPrefix(enum.StrEnum):
     TECHNOLOGY = "TECHNOLOGY"
     ENROLMENT = "ENROLMENT"
     CLIENT = "CLIENT"
+    GROUP = "GROUP"
+    IDEMPOTENCY = "IDEMPOTENCY"
 
 
 class EntityConfigurator(dynamodb_repository.DynamoDBEntityConfiguratorBase):
@@ -44,6 +48,11 @@ class EntityConfigurator(dynamodb_repository.DynamoDBEntityConfiguratorBase):
             self.project_account_entity_config,
         )
         self.register_cfg(
+            project_create_request.ProjectCreateRequestPrimaryKey,
+            project_create_request.ProjectCreateRequest,
+            self.project_create_request_entity_config,
+        )
+        self.register_cfg(
             project.ProjectPrimaryKey,
             project.Project,
             self.project_entity_config,
@@ -52,6 +61,11 @@ class EntityConfigurator(dynamodb_repository.DynamoDBEntityConfiguratorBase):
             project_assignment.AssignmentPrimaryKey,
             project_assignment.Assignment,
             self.project_assignment_entity_config,
+        )
+        self.register_cfg(
+            project_group_assignment.ProjectGroupAssignmentPrimaryKey,
+            project_group_assignment.ProjectGroupAssignment,
+            self.project_group_assignment_entity_config,
         )
         self.register_cfg(
             technology.TechnologyPrimaryKey,
@@ -72,6 +86,18 @@ class EntityConfigurator(dynamodb_repository.DynamoDBEntityConfiguratorBase):
             service_client_assignment.ServiceClientAssignmentPrimaryKey,
             service_client_assignment.ServiceClientAssignment,
             self.service_client_assignment_entity_config,
+        )
+
+    def project_create_request_entity_config(
+        self, cfg: dynamodb_repo_config.GenericDynamoDBRepositoryConfig[project_create_request.ProjectCreateRequestPrimaryKey, project_create_request.ProjectCreateRequest]
+    ):
+        cfg.partition_key(
+            name="PK", value_template=lambda client_id: f"{DBPrefix.IDEMPOTENCY}#CREATE_PROJECT#{client_id}",
+            values_from_entity=lambda ent: ent.clientId, values_from_primary_key=lambda pk: pk.clientId,
+        )
+        cfg.sort_key(
+            name="SK", value_template=lambda key: f"KEY#{key}",
+            values_from_entity=lambda ent: ent.idempotencyKey, values_from_primary_key=lambda pk: pk.idempotencyKey,
         )
 
     def service_client_assignment_entity_config(
@@ -158,6 +184,27 @@ class EntityConfigurator(dynamodb_repository.DynamoDBEntityConfiguratorBase):
             values_from_entity=lambda ent: ent.projectId,
             values_from_primary_key=lambda pk: pk.projectId,
         )
+
+    def project_group_assignment_entity_config(
+        self,
+        cfg: dynamodb_repo_config.GenericDynamoDBRepositoryConfig[
+            project_group_assignment.ProjectGroupAssignmentPrimaryKey,
+            project_group_assignment.ProjectGroupAssignment,
+        ],
+    ):
+        cfg.partition_key(
+            name="PK",
+            value_template=lambda group_id: f"{DBPrefix.GROUP}#{group_id}",
+            values_from_entity=lambda ent: ent.groupId,
+            values_from_primary_key=lambda pk: pk.groupId,
+        )
+        cfg.sort_key(
+            name="SK",
+            value_template=lambda project_id: f"{DBPrefix.PROJECT}#{project_id}",
+            values_from_entity=lambda ent: ent.projectId,
+            values_from_primary_key=lambda pk: pk.projectId,
+        )
+        cfg.enable_optimistic_concurrency_control()
 
     def technology_entity_config(
         self,

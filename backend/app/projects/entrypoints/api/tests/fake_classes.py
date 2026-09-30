@@ -26,6 +26,18 @@ class FakeProjectsQueryService(projects_query_service.ProjectsQueryService):
     def __init__(self):
         pass
 
+    def get_project_group_assignment(self, project_id: str, group_id: str):
+        return None
+
+    def get_group_assignments(self, group_ids: list[str]):
+        return []
+
+    def list_project_group_assignments(self, project_id: str, include_deleted: bool = False):
+        return []
+
+    def list_service_client_assignments(self, project_id: str):
+        return []
+
     def get_service_client_assignment(
         self, project_id: str, client_id: str
     ) -> service_client_assignment.ServiceClientAssignment | None:
@@ -41,7 +53,7 @@ class FakeProjectsQueryService(projects_query_service.ProjectsQueryService):
             [
                 project_assignment.Assignment(
                     userId="TID",
-                    projectId="PID",
+                    projectId="project-4",
                     roles=[project_assignment.Role.PLATFORM_USER],
                     activeDirectoryGroups=[
                         user.ActiveDirectoryGroup(
@@ -62,7 +74,7 @@ class FakeProjectsQueryService(projects_query_service.ProjectsQueryService):
         assignments = []
         for i in range(5):
             current_time = datetime.datetime.now(datetime.timezone.utc).isoformat()
-            project_id = str(uuid.uuid4())
+            project_id = f"project-{i}"
             new_project = project.Project(
                 projectId=project_id,
                 projectName="test-name",
@@ -85,7 +97,7 @@ class FakeProjectsQueryService(projects_query_service.ProjectsQueryService):
         else:
             assignments = []
 
-        return projects, {"PK": str(uuid.uuid4()), "SK": str(uuid.uuid4())}, assignments
+        return projects, None, assignments
 
     def list_project_accounts(
         self,
@@ -181,6 +193,7 @@ class FakeProjectsQueryService(projects_query_service.ProjectsQueryService):
                 ],
                 activeDirectoryGroupStatus=user.UserADStatus.PENDING,
                 userEmail="biff.tannen@example.com",
+                userDisplayName="Biff Tannen",
             )
         ]
 

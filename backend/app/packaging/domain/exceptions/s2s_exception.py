@@ -85,3 +85,17 @@ class InsufficientScope(S2SException):
             code="INSUFFICIENT_SCOPE",
             retryable=False,
         )
+
+
+class ReleasingProjectOnly(S2SException):
+    def __init__(self) -> None:
+        super().__init__(
+            "Only the deployment's releasing project releases base images.",
+            code="RELEASING_PROJECT_ONLY",
+            retryable=False,
+        )
+
+
+class BaseImageNotReleasedToRequiredChannel(S2SException):
+    def __init__(self, detail: str) -> None:
+        super().__init__(detail, code="BASE_IMAGE_NOT_RELEASED_TO_REQUIRED_CHANNEL", retryable=False)

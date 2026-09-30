@@ -365,6 +365,35 @@ class ImageResponse(BaseModel):
     image: Image
 
 
+class BaseImageStatus(Enum):
+    RELEASED = "RELEASED"
+    NOT_RELEASED = "NOT_RELEASED"
+
+
+class BaseImage(BaseModel):
+    architecture: str
+    channel: str
+    osVersion: str
+    parameterName: str
+    status: BaseImageStatus
+    # The releasing project; with imageId the body of a release (PUT).
+    projectId: str
+    imageId: str | None = None
+    amiId: str | None = None
+    previousAmiId: str | None = None
+
+
+class BaseImagePage(BaseModel):
+    baseImages: list[BaseImage]
+
+
+class ReleaseBaseImageRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    projectId: str = Field(..., min_length=1)
+    imageId: str = Field(..., min_length=1)
+
+
 class RecipeResponse(BaseModel):
     recipe: Recipe
 

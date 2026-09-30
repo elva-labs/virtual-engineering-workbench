@@ -132,3 +132,57 @@ def test_get_versions_ready_for_provisioning_filters_technical_parameters(
     )
     assertpy.assert_that(versions[0].parameters).is_length(1)
     assertpy.assert_that(versions[0].parameters[0].isTechnicalParameter).is_false()
+
+
+@pytest.mark.parametrize(
+    "roles,expected_stages",
+    [
+        (["PLATFORM_USER"], ["PROD"]),
+        (["BETA_USER"], ["QA", "PROD"]),
+        (["PRODUCT_CONTRIBUTOR"], ["DEV", "QA", "PROD"]),
+    ],
+)
+def test_get_versions_ready_for_provisioning_returns_only_stages_the_role_may_consume(
+    roles, expected_stages, versions_query_service_mock, mock_product_version
+):
+    # ARRANGE: a direct API call without a stage filter
+    versions_query_service_mock.get_product_version_distributions.return_value = [
+        mock_product_version(stage=version.VersionStage.DEV),
+        mock_product_version(stage=version.VersionStage.QA),
+        mock_product_version(stage=version.VersionStage.PROD),
+    ]
+    versions_domain_qry_srv = versions_domain_query_service.VersionsDomainQueryService(
+        version_qry_srv=versions_query_service_mock,
+    )
+
+    # ACT
+    versions = versions_domain_qry_srv.get_versions_ready_for_provisioning(
+        product_id=product_id_value_object.from_str("prod-123"),
+        stage=None,
+        region=None,
+        user_roles=roles,
+    )
+
+    # ASSERT
+    assertpy.assert_that([str(v.stage) for v in versions]).is_equal_to(expected_stages)
+
+
+def test_get_versions_ready_for_provisioning_returns_nothing_for_another_projects_product(
+    versions_query_service_mock, mock_product_version
+):
+    # ARRANGE: versions are keyed by product only; the path's project must own them
+    versions_query_service_mock.get_product_version_distributions.return_value = [mock_product_version()]
+    versions_domain_qry_srv = versions_domain_query_service.VersionsDomainQueryService(
+        version_qry_srv=versions_query_service_mock,
+    )
+
+    # ACT
+    versions = versions_domain_qry_srv.get_versions_ready_for_provisioning(
+        product_id=product_id_value_object.from_str("prod-123"),
+        stage=None,
+        region=None,
+        project_id="proj-of-someone-else",
+    )
+
+    # ASSERT
+    assertpy.assert_that(versions).is_empty()

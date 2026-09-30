@@ -68,6 +68,8 @@ def require_auth_context(app: APIGatewayRestResolver, next_middleware: NextMiddl
                 stages=set(json.loads(authorizer_auth_context["stages"])),
                 userRoles=list(json.loads(authorizer_auth_context["userRoles"])),
                 userDomains=list(json.loads(authorizer_auth_context["userDomains"])),
+                # Entra groups of the sign-in; absent from older authorizers.
+                userGroups=set(json.loads(authorizer_auth_context.get("userGroups") or "[]")),
             )
         # service to service OAuth API request
         elif "claims" in authorizer_auth_context:

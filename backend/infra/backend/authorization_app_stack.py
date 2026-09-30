@@ -228,6 +228,8 @@ class AuthorizationAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                 "UserReAssigned",
                 "UserUnAssigned",
                 "ProjectGroupAssignmentChanged",
+                # Carries the project's management mode for the authorizer (externally managed projects).
+                "ProjectUpdated",
             ],
         )
 

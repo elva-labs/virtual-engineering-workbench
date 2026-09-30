@@ -15,12 +15,8 @@ class Empty(BaseModel):
 
 
 class Project(BaseModel):
-    projectId: str = Field(
-        ..., description="Unique ID of the project.", title="ProjectId"
-    )
-    projectName: Optional[str] = Field(
-        None, description="Name of the project.", title="ProjectName"
-    )
+    projectId: str = Field(..., description="Unique ID of the project.", title="ProjectId")
+    projectName: Optional[str] = Field(None, description="Name of the project.", title="ProjectName")
     isActive: bool = Field(..., description="Whether the project is active", title="IsActive")
     projectDescription: Optional[str] = Field(
         None, description="Description of the project.", title="ProjectDescription"
@@ -31,6 +27,25 @@ class Project(BaseModel):
         description="Point in time where project is last updated.",
         title="LastUpdateDate",
     )
+    managedBy: Optional[str] = Field(
+        None, description="The external tool that manages the project, if any.", title="ManagedBy"
+    )
+    managedSource: Optional[str] = Field(
+        None, description="Where the project's configuration lives, if externally managed.", title="ManagedSource"
+    )
+
+
+class ProjectManagement(BaseModel):
+    """An external tool manages the project's configuration; the user APIs refuse changes to it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    managedBy: str = Field(..., pattern=r"^[a-z0-9][a-z0-9-]{0,63}$", title="ManagedBy")
+    source: str = Field(..., min_length=1, max_length=256, title="Source")
+
+
+class ProjectManagementResponse(ProjectManagement):
+    projectId: str = Field(..., title="ProjectId")
 
 
 class ProjectMutationRequest(BaseModel):

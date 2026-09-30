@@ -231,6 +231,8 @@ class CreateProjectAccountRequest(BaseModel):
     technologyId: str = Field(..., min_length=1)
     stage: str = Field(..., pattern=r"^(dev|qa|prod)$")
     region: str = Field(..., min_length=1, pattern=r"^[a-z]{2}(?:-[a-z0-9]+)+-\d$")
+    # Opaque; a new value re-runs onboarding of the unchanged configuration (ADR 0022).
+    onboardingRevision: str | None = Field(None, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9._:-]+$")
     model_config = ConfigDict(extra="forbid")
 
     @field_validator("name", "description", "technologyId", "region")
@@ -254,6 +256,8 @@ class ProjectAccount(BaseModel):
     status: str | None
     lastOnboardingResult: str | None = None
     lastOnboardingError: str | None = None
+    onboardingRevision: str | None = None
+    onboardedAt: str | None = None
     createDate: str | None = None
     lastUpdateDate: str | None = None
 
@@ -273,6 +277,8 @@ class UpdateProjectAccountRequest(BaseModel):
     technologyId: str = Field(..., min_length=1)
     stage: str = Field(..., pattern=r"^(dev|qa|prod)$")
     region: str = Field(..., min_length=1, pattern=r"^[a-z]{2}(?:-[a-z0-9]+)+-\d$")
+    # Opaque; a new value re-runs onboarding of the unchanged configuration (ADR 0022).
+    onboardingRevision: str | None = Field(None, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9._:-]+$")
     model_config = ConfigDict(extra="forbid")
 
     @field_validator("name", "description", "technologyId", "region")

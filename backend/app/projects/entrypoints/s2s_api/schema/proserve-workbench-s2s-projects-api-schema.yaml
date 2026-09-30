@@ -1578,6 +1578,13 @@ components:
         lastUpdateDate:
           type: string
           nullable: true
+        onboardingRevision:
+          type: string
+          nullable: true
+        onboardedAt:
+          type: string
+          nullable: true
+          description: When onboarding first succeeded. Set once and never cleared, also not by deactivation.
     ListProjectAccountsResponse:
       title: ListProjectAccountsResponse
       type: object
@@ -1621,6 +1628,12 @@ components:
         region:
           type: string
           minLength: 1
+        onboardingRevision:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: '^[A-Za-z0-9._:-]+$'
+          description: Opaque revision set by an external manager. A new value re-runs onboarding of the unchanged configuration (for example to roll out updated spoke stacks); omitting it keeps the stored revision.
     UpdateProjectAccountRequest:
       title: UpdateProjectAccountRequest
       description: Full desired state; projectId and awsAccountId are immutable and supplied by the path and stored assignment.
@@ -1651,6 +1664,12 @@ components:
         region:
           type: string
           minLength: 1
+        onboardingRevision:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: '^[A-Za-z0-9._:-]+$'
+          description: Opaque revision set by an external manager. A new value re-runs onboarding of the unchanged configuration (for example to roll out updated spoke stacks); omitting it keeps the stored revision.
     AcceptedProjectAccountResponse:
       title: AcceptedProjectAccountResponse
       type: object

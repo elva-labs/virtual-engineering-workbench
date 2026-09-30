@@ -232,3 +232,98 @@ def test_account_update_rejects_inactive_account(sample_project):
 
     dependencies[1].update_entity.assert_not_called()
     dependencies[4].publish.assert_not_called()
+
+
+def _identical_command(**overrides):
+    values = {
+        "account_name": account_name_value_object.from_str("Old account"),
+        "account_description": account_description_value_object.from_str("Old description"),
+        "account_type": account_type_value_object.from_str("USER"),
+        "technology": account_technology_id_value_object.from_str("tech-old"),
+        "stage": project_account.ProjectAccountStageEnum.DEV,
+        "region": region_value_object.from_str("us-east-1"),
+    }
+    values.update(overrides)
+    return _command(**values)
+
+
+def _old_technology(dependencies):
+    dependencies[3].get_technology_by_id.return_value = technology.Technology(
+        id="tech-old", project_id="123", name="Old technology"
+    )
+
+
+def test_new_onboarding_revision_reonboards_unchanged_configuration(sample_project):
+    # ADR 0022: Terraform bumps vew_project_account.onboarding_revision to roll out new spoke stacks.
+    account = _account(onboardingRevision="r1")
+    dependencies = _dependencies(account, sample_project)
+    _old_technology(dependencies)
+
+    _handle(_identical_command(onboarding_revision="r2"), dependencies)
+
+    _, account_repo, _, _, bus = dependencies
+    assert account.onboardingRevision == "r2"
+    assert account.accountStatus == project_account.ProjectAccountStatusEnum.ReOnboarding
+    assert account.onboardingOperationId != "operation-old"
+    assert isinstance(
+        bus.publish.call_args.args[0], project_account_on_boarding_restarted.ProjectAccountOnBoardingRestarted
+    )
+    assert len(account_repo.update_entity.call_args_list) == 2
+
+
+def test_same_onboarding_revision_is_a_noop(sample_project):
+    dependencies = _dependencies(_account(onboardingRevision="r1"), sample_project)
+    _old_technology(dependencies)
+
+    _handle(_identical_command(onboarding_revision="r1"), dependencies)
+
+    _, account_repo, _, _, bus = dependencies
+    account_repo.update_entity.assert_not_called()
+    bus.publish.assert_not_called()
+
+
+def test_omitted_onboarding_revision_keeps_the_stored_one(sample_project):
+    # The portal never sends a revision; it must neither clear it nor re-onboard.
+    account = _account(onboardingRevision="r1")
+    dependencies = _dependencies(account, sample_project)
+    _old_technology(dependencies)
+
+    _handle(_identical_command(account_name=account_name_value_object.from_str("Renamed")), dependencies)
+
+    _, account_repo, _, _, bus = dependencies
+    assert account.onboardingRevision == "r1"
+    assert account.accountStatus == project_account.ProjectAccountStatusEnum.Active
+    account_repo.update_entity.assert_called_once()
+    bus.publish.assert_not_called()
+
+
+def test_first_onboarding_revision_is_recorded_without_reonboarding(sample_project):
+    # Adopting the attribute (an account onboarded before it existed, or an import into Terraform)
+    # records the revision; only a later change asks VEW to onboard again.
+    account = _account()
+    dependencies = _dependencies(account, sample_project)
+    _old_technology(dependencies)
+
+    _handle(_identical_command(onboarding_revision="r1"), dependencies)
+
+    _, account_repo, _, _, bus = dependencies
+    assert account.onboardingRevision == "r1"
+    assert account.accountStatus == project_account.ProjectAccountStatusEnum.Active
+    assert account.onboardingOperationId == "operation-old"
+    account_repo.update_entity.assert_called_once()
+    bus.publish.assert_not_called()
+
+
+def test_retry_during_revision_reonboarding_resumes_instead_of_conflicting(sample_project):
+    account = _account(
+        onboardingRevision="r2",
+        accountStatus=project_account.ProjectAccountStatusEnum.ReOnboarding,
+        onboardingOperationId="pending-operation",
+        onboardingPublicationStatus=project_account.ProjectAccountOnboardingPublicationStatus.Pending,
+    )
+    dependencies = _dependencies(account, sample_project)
+    _old_technology(dependencies)
+
+    _handle(_identical_command(onboarding_revision="r2"), dependencies)
+
+    assert dependencies[4].publish.call_args.args[0].onboarding_operation_id == "pending-operation"

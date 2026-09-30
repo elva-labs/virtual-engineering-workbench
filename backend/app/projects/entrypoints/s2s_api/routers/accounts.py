@@ -52,6 +52,8 @@ def _account_response(
         status=(str(account.accountStatus) if account.accountStatus is not None else None),
         lastOnboardingResult=(str(account.lastOnboardingResult) if account.lastOnboardingResult is not None else None),
         lastOnboardingError=safe_error,
+        onboardingRevision=account.onboardingRevision,
+        onboardedAt=account.onboardedAt,
         createDate=account.createDate,
         lastUpdateDate=account.lastUpdateDate,
     )
@@ -136,6 +138,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
                 technology=technology_id,
                 region=region,
                 reserved_account_id=resource_id,
+                onboarding_revision=request.onboardingRevision,
             )
 
         def create(resource_id: str) -> idempotency.StoredCreateResponse:
@@ -239,6 +242,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             technology=account_technology_id_value_object.from_str(request.technologyId),
             stage=project_account.ProjectAccountStageEnum(request.stage),
             region=region,
+            onboarding_revision=request.onboardingRevision,
         )
         try:
             dependencies.command_bus.handle(command)

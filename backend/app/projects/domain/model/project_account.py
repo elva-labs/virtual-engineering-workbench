@@ -67,3 +67,11 @@ class ProjectAccount(unit_of_work.Entity):
         exclude_if=lambda value: value is None,
     )
     parameters: dict[str, str] | None = Field(None, title="Parameters")
+    # Set by an external manager (Terraform: vew_project_account.onboarding_revision). A new value
+    # re-runs onboarding, e.g. to roll updated account stacks out; VEW never interprets it.
+    onboardingRevision: str | None = Field(
+        None, title="OnboardingRevision", exclude_if=lambda value: value is None
+    )
+    # When onboarding first succeeded; set once and never cleared (deactivation keeps it), so external
+    # tooling can gate on "this account was onboarded" without a latch of its own.
+    onboardedAt: str | None = Field(None, title="OnboardedAt", exclude_if=lambda value: value is None)

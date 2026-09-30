@@ -87,6 +87,7 @@ def bootstrap(  # noqa: C901
                 authorizer_steps.CognitoAuthorizer(auth_srv=cognito_srv, logger=logger, metrics=metrics_client),
                 authorizer_steps.ProjectsBCContextEnricher(
                     assignments_query_service=assignments_qs,
+                    platform_admin_groups=app_config.get_platform_admin_groups(),
                 ),
                 authorizer_steps.AmazonVerifiedPermissionsAuthorizer(
                     authz_service=verified_permissions_srv,

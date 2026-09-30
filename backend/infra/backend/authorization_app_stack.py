@@ -122,6 +122,9 @@ class AuthorizationAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                         "JWKS_URI": f"https://cognito-idp.{user_pool_region}.amazonaws.com/{user_pool_id}/.well-known/jwks.json",
                         "JWK_TIMEOUT": "3",
                         "USER_ROLE_STAGE_ACCESS_SSM_PARAM": user_role_stage_access_param_name,
+                        "PLATFORM_ADMIN_GROUPS": json.dumps(
+                            app_config.component_specific.get("platform-admin-groups", [])
+                        ),
                     },
                     permissions=[
                         lambda lambda_f: lambda_f.add_to_role_policy(

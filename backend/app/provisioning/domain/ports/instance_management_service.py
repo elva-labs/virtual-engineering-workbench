@@ -37,6 +37,11 @@ class InstanceManagementService(ABC):
     def stop_instance(self, user_id: str, aws_account_id: str, region: str, instance_id: str) -> str: ...
 
     @abstractmethod
+    def set_instance_tags(
+        self, user_id: str, aws_account_id: str, region: str, instance_id: str, tags: dict[str, str]
+    ) -> None: ...
+
+    @abstractmethod
     def get_user_security_group_id(self, user_id: str, aws_account_id: str, region: str, vpc_id: str) -> str | None: ...
 
     @abstractmethod

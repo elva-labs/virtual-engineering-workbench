@@ -61,4 +61,6 @@ def test_projects_s2s_resource_reads_bypass_api_gateway_cache():
         "/projects/{projectId}/technologies/{technologyId}/GET",
         "/projects/{projectId}/accounts/GET",
         "/projects/{projectId}/accounts/{accountId}/GET",
+        "/projects/{projectId}/management/GET",
+        "/projects/{projectId}/workbench-lifecycle/GET",
     ]

@@ -47,3 +47,7 @@ class AppConfig(config.VEWBaseConfig):
     def get_resource_tags(self) -> dict[str, str]:
         """Tags to stamp on resources this deployment provisions at runtime."""
         return json.loads(os.environ.get("RESOURCE_TAGS", "{}"))
+
+    def get_workbench_lifecycle_defaults(self) -> dict:
+        """The deployment's workbench stop policy defaults (infra/config.py workbench-lifecycle); {} = built-in."""
+        return json.loads(os.environ.get("WORKBENCH_LIFECYCLE_DEFAULTS") or "{}")

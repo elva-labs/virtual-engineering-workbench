@@ -23,6 +23,7 @@ from app.provisioning.entrypoints.scheduled_jobs_handler.scheduled_job_events im
     provisioned_product_batch_stop_job,
     provisioned_product_cleanup_job,
     provisioned_product_sync_job,
+    workbench_lifecycle_job,
 )
 from app.shared.middleware import event_handler
 from app.shared.middleware.custom_events import scheduled_job_event
@@ -169,6 +170,14 @@ def provisioned_product_batch_stop_handler(
     dependencies.command_bus.handle(
         initiate_provisioned_product_batch_stop_command.InitiateProvisionedProductBatchStopCommand()
     )
+
+
+@app.handle(workbench_lifecycle_job.WorkbenchLifecycleJob)
+def workbench_lifecycle_handler(event: workbench_lifecycle_job.WorkbenchLifecycleJob):
+    # The nightly workbench stop and delivering the inactivity timeout to the instances.
+    if event.action == "nightly-stop":
+        return dependencies.workbench_lifecycle_srv.nightly_stop(dry_run=event.dryRun)
+    return dependencies.workbench_lifecycle_srv.reconcile_tags(dry_run=event.dryRun)
 
 
 @tracer.capture_lambda_handler  # type: ignore

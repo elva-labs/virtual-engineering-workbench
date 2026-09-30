@@ -52,6 +52,9 @@ S2S_CACHE_EXPLICIT_DISABLE = [
     "/projects/{projectId}/technologies/{technologyId}/GET",
     "/projects/{projectId}/accounts/GET",
     "/projects/{projectId}/accounts/{accountId}/GET",
+    # Terraform reads its own writes: project settings are never served from the stage cache.
+    "/projects/{projectId}/management/GET",
+    "/projects/{projectId}/workbench-lifecycle/GET",
 ]
 
 

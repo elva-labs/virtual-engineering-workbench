@@ -18,6 +18,8 @@ import {
   GetProvisionedProductUserSecretResponse,
   GetAllProvisionedProductsResponse,
   GetProvisioningLimitResponse,
+  WorkbenchLifecycleResponse,
+  WorkbenchLifecycleUserSettings,
 } from './proserve-wb-provisioning-api';
 import { getAccessToken } from '..';
 
@@ -205,6 +207,35 @@ export const provisioningAPI = {
       authorization: `Bearer ${access}`,
       projectId,
       provisionedProductId,
+    });
+  },
+
+  // The workbench's stop rules: the owner's choices within what the program allows.
+  getProvisionedProductLifecycle: async (
+    projectId: string,
+    provisionedProductId: string
+  ): Promise<WorkbenchLifecycleResponse> => {
+    const access = await getAccessToken();
+    const api = prepareClient();
+    return api.getProvisionedProductLifecycle({
+      authorization: `Bearer ${access}`,
+      projectId,
+      provisionedProductId,
+    });
+  },
+
+  updateProvisionedProductLifecycle: async (
+    projectId: string,
+    provisionedProductId: string,
+    settings: WorkbenchLifecycleUserSettings
+  ): Promise<WorkbenchLifecycleResponse> => {
+    const access = await getAccessToken();
+    const api = prepareClient();
+    return api.updateProvisionedProductLifecycle({
+      authorization: `Bearer ${access}`,
+      projectId,
+      provisionedProductId,
+      workbenchLifecycleUserSettings: settings,
     });
   },
 

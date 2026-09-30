@@ -161,3 +161,29 @@ def test_set_management_marks_unmarks_and_keeps_it_on_update(
     assert (stored.managedBy, stored.managedSource) == (None, None)
     with pytest.raises(KeyError):
         service.set_management("proj-missing", "terraform", "x")
+
+
+def test_set_workbench_lifecycle_stores_replaces_and_resets(
+    mock_ddb_repo, mock_dynamodb, test_table_name
+):
+    from app.projects.domain.model import workbench_lifecycle
+
+    query = query_service(mock_dynamodb, test_table_name)
+    events = Mock()
+    service = ProjectLifecycleService(mock_ddb_repo, query, events)
+    with patch(
+        "app.projects.domain.model.project.generate_project_id",
+        return_value="proj-lifecycle",
+    ):
+        service.create("client-1", str(uuid4()), "Lifecycle", None, True)
+
+    policy = workbench_lifecycle.WorkbenchLifecycle(
+        weekendStop=False, allowUserIdleTimeout=True, userIdleTimeoutMinMinutes=10, userIdleTimeoutMaxMinutes=240
+    )
+    service.set_workbench_lifecycle("proj-lifecycle", policy)
+    assert query.get_project_by_id("proj-lifecycle").workbenchLifecycle == policy
+
+    service.set_workbench_lifecycle("proj-lifecycle", None)
+    assert query.get_project_by_id("proj-lifecycle").workbenchLifecycle is None
+    with pytest.raises(KeyError):
+        service.set_workbench_lifecycle("proj-missing", policy)

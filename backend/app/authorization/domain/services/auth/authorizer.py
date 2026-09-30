@@ -121,6 +121,8 @@ class Authorizer:
                 "stages": json.dumps(sorted(list(stages))),
                 "userRoles": json.dumps(sorted(auth_context.roles or [])),
                 "userDomains": json.dumps(sorted(auth_context.domains or [])),
+                # The sign-in's trusted Entra group ids, so backend Lambdas need no second UserInfo call.
+                "userGroups": json.dumps(sorted(auth_context.trusted_group_ids or [])),
                 # Context values must be strings; "" = managed in the portal.
                 "projectManagedBy": auth_context.project_managed_by or "",
                 "projectManagedSource": auth_context.project_managed_source or "",

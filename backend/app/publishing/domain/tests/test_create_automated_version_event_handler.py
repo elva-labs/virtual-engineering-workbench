@@ -209,7 +209,12 @@ def test_handle_creates_automated_version_successfully_for_container_product(
     assert added_version.componentVersionDetails is None
 
 
-def test_handle_raises_exception_when_no_released_version_found(
+@patch(
+    "app.publishing.domain.model.version.generate_version_id",
+    return_value="vers-11111111",
+)
+@freeze_time("2023-06-20")
+def test_handle_creates_initial_version_when_product_has_no_version(
     mock_unit_of_work,
     mock_message_bus,
     mock_portfolios_qry_srv,
@@ -229,32 +234,40 @@ def test_handle_raises_exception_when_no_released_version_found(
     mock_product_repo = Mock()
     mock_product_repo.get.return_value = mock_product_entity
 
+    mock_repo = Mock()
+
     def get_repository_side_effect(pk_param, entity_param):
         if entity_param == product.Product:
             return mock_product_repo
-        return Mock()
+        return mock_repo
 
     mock_unit_of_work.get_repository.side_effect = get_repository_side_effect
 
     mock_versions_qry_srv.get_latest_version_name_and_id.return_value = (None, None)
 
-    # ACT & ASSERT
-    with pytest.raises(domain_exception.DomainException, match="No released version found"):
-        call_handler(
-            ami_id,
-            product_id,
-            project_id,
-            "PATCH",
-            mock_template_domain_qry_srv,
-            mock_logger,
-            mock_unit_of_work,
-            mock_message_bus,
-            mock_portfolios_qry_srv,
-            mock_versions_qry_srv,
-            mock_param_service,
-            mock_stack_srv,
-            mock_file_service,
-        )
+    # ACT
+    call_handler(
+        ami_id,
+        product_id,
+        project_id,
+        "PATCH",
+        mock_template_domain_qry_srv,
+        mock_logger,
+        mock_unit_of_work,
+        mock_message_bus,
+        mock_portfolios_qry_srv,
+        mock_versions_qry_srv,
+        mock_param_service,
+        mock_stack_srv,
+        mock_file_service,
+    )
+
+    # ASSERT: the first build of a new product becomes its first version, as in the portal
+    added_version = mock_repo.add.call_args[0][0]
+    assert added_version.versionName == "1.0.0-rc.1"
+    assert added_version.originalAmiId == ami_id
+    assert added_version.stage == version.VersionStage.DEV
+    mock_message_bus.publish.assert_called_once()
 
 
 def test_handle_raises_exception_when_product_not_created(

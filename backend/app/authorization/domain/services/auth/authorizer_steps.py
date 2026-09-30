@@ -8,18 +8,11 @@ from aws_lambda_powertools import Logger, Metrics
 from aws_lambda_powertools.metrics import MetricUnit
 from pydantic import ConfigDict
 
-from app.authorization.domain.ports import (
-    assignments_query_service,
-    authentication_service,
-    authorization_service,
-)
+from app.authorization.domain.ports import assignments_query_service, authentication_service, authorization_service
 from app.authorization.domain.read_models import project_assignment
+from app.authorization.domain.read_models import project_assignment as project_assignment_model
 from app.authorization.domain.services.auth import authorizer
-
-from app.shared.identity.entra_groups import group_ids, effective_roles
-
-# An alias for methods whose arguments shadow the module name.
-project_assignment_model = project_assignment
+from app.shared.identity.entra_groups import effective_roles, group_ids
 
 USER_ID_CLAIM_NAME = "custom:user_tid"
 

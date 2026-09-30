@@ -5,6 +5,7 @@ from aws_xray_sdk.core import patch_all
 
 from app.authorization.domain.integration_events.projects import (
     enrolment_approved,
+    project_group_assignment_changed,
     user_assigned,
     user_reassigned,
     user_unassigned,
@@ -45,6 +46,13 @@ def user_reassigned_ep(event: user_reassigned.UserReAssigned):
 @app.handle(user_unassigned.UserUnAssigned)
 def user_unassigned_ep(event: user_unassigned.UserUnAssigned):
     dependencies.user_unassigned_handler(event)
+
+
+@app.handle(project_group_assignment_changed.ProjectGroupAssignmentChanged)
+def project_group_assignment_changed_ep(
+    event: project_group_assignment_changed.ProjectGroupAssignmentChanged,
+):
+    dependencies.project_group_assignment_changed_handler(event)
 
 
 @tracer.capture_lambda_handler  # type: ignore

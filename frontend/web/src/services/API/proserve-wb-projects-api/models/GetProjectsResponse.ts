@@ -56,6 +56,8 @@ export interface GetProjectsResponse {
      * @memberof GetProjectsResponse
      */
     assignments?: Array<ProjectAssignment>;
+    /** Effective direct and group-derived roles for the caller, keyed by project. */
+    effectiveAccess?: Array<{ projectId: string; roles: Array<string> }>;
     /**
      *
      * @type {Array<ProjectEnrolment>}
@@ -87,6 +89,7 @@ export function GetProjectsResponseFromJSONTyped(json: any, ignoreDiscriminator:
         'nextToken': !exists(json, 'nextToken') ? undefined : json['nextToken'],
         'projects': ((json['projects'] as Array<any>).map(ProjectFromJSON)),
         'assignments': !exists(json, 'assignments') ? undefined : ((json['assignments'] as Array<any>).map(ProjectAssignmentFromJSON)),
+        'effectiveAccess': !exists(json, 'effectiveAccess') ? undefined : json['effectiveAccess'],
         'enrolments': !exists(json, 'enrolments') ? undefined : ((json['enrolments'] as Array<any>).map(ProjectEnrolmentFromJSON)),
     };
 }
@@ -103,6 +106,7 @@ export function GetProjectsResponseToJSON(value?: GetProjectsResponse | null): a
         'nextToken': value.nextToken,
         'projects': ((value.projects as Array<any>).map(ProjectToJSON)),
         'assignments': value.assignments === undefined ? undefined : ((value.assignments as Array<any>).map(ProjectAssignmentToJSON)),
+        'effectiveAccess': value.effectiveAccess,
         'enrolments': value.enrolments === undefined ? undefined : ((value.enrolments as Array<any>).map(ProjectEnrolmentToJSON)),
     };
 }

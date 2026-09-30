@@ -55,6 +55,10 @@ def handle_reassign_user_command(  # noqa: C901
                     new_user_roles = {role.value for role in cmd.roles} & initiating_user_role_permissions
                     existing_user_roles = {role for role in user_assignment.roles} - initiating_user_role_permissions
                     user_assignment.roles = [*new_user_roles, *existing_user_roles]
+                    if cmd.user_email is not None:
+                        user_assignment.userEmail = cmd.user_email
+                    if cmd.user_display_name is not None:
+                        user_assignment.userDisplayName = cmd.user_display_name
 
                     unit_of_work.get_repository(
                         project_assignment.AssignmentPrimaryKey, project_assignment.Assignment

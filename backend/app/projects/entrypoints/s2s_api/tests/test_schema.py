@@ -116,3 +116,15 @@ def test_project_account_schema_excludes_runtime_parameters_and_problem_is_sanit
     for field in ("name", "description", "technologyId", "region", "status"):
         assert schemas["ProjectAccount"]["properties"][field]["nullable"] is True
     assert set(schemas["ProblemDetails"]["required"]) == {"code", "requestId", "retryable"}
+
+
+def test_management_routes_use_dedicated_scopes(api_schema):
+    paths = api_schema["paths"]
+    assert paths["/projects"]["post"]["security"] == [{"ClientCredentials": ["clients/projects/program.write"]}]
+    for method in ("put", "delete"):
+        assert paths["/projects/{projectId}"][method]["security"] == [{"ClientCredentials": ["clients/projects/program.write"]}]
+    assert paths["/projects/{projectId}"]["get"]["security"] == [{"ClientCredentials": ["clients/projects/program.read"]}]
+    for method in ("get",):
+        assert paths["/projects/{projectId}/groups/{groupId}"][method]["security"] == [{"ClientCredentials": ["clients/projects/group_assignment.read"]}]
+    for method in ("put", "delete"):
+        assert paths["/projects/{projectId}/groups/{groupId}"][method]["security"] == [{"ClientCredentials": ["clients/projects/group_assignment.write"]}]

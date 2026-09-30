@@ -37,6 +37,9 @@ def init(dependencies: bootstrapper.Dependencies) -> Router:
     @tracer.capture_method
     @router.put("/projects/<project_id>/clients/<client_id>")
     def put_service_client_assignment(project_id: str, client_id: str):
+        access.require_bootstrap_or_project_access(
+            router, dependencies.projects_query_service, project_id
+        )
         granted_by = router.context["user_principal"].user_name
         if client_id == granted_by:
             raise ForbiddenError("Service clients cannot assign themselves to projects")
@@ -62,7 +65,9 @@ def init(dependencies: bootstrapper.Dependencies) -> Router:
         assignment = dependencies.projects_query_service.get_service_client_assignment(project_id, client_id)
         if assignment is None:
             raise NotFoundError("Service client assignment not found")
-        return _response(client_id, project_id, api_model.Status(assignment.status.value))
+        return _response(
+            client_id, project_id, api_model.Status(assignment.status.value)
+        )
 
     @tracer.capture_method
     @router.delete("/projects/<project_id>/clients/<client_id>")

@@ -65,3 +65,11 @@ def test_internal_service_client_assignment_route_uses_sigv4(api_schema):
     operation = api_schema["paths"]["/internal/projects/{projectId}/clients/{clientId}"]["get"]
 
     assert operation["security"] == [{"sigv4": []}]
+
+
+def test_group_routes_and_effective_access_contract(api_schema):
+    human = api_schema["paths"]["/projects/{projectId}/groups"]["get"]
+    internal = api_schema["paths"]["/internal/projects/{projectId}/groups"]["get"]
+    assert human["operationId"] == "GetProjectGroups"
+    assert internal["security"] == [{"sigv4": []}]
+    assert "effectiveAccess" in api_schema["components"]["schemas"]["GetProjectsResponse"]["properties"]

@@ -247,6 +247,7 @@ def test_project_assignment_repo_should_add_entity(
             "projectId": "proj-0000",
             "roles": ["PLATFORM_USER"],
             "userEmail": "bough@example.com",
+            "userDisplayName": None,
             "userId": "u-0000",
         }
     )
@@ -293,6 +294,7 @@ def test_project_assignment_repo_should_update_entity(
             "projectId": "proj-0000",
             "roles": ["ADMIN"],
             "userEmail": "bough@example.com",
+            "userDisplayName": None,
             "userId": "u-0000",
         }
     )

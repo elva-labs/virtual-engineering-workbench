@@ -29,6 +29,7 @@ class ProjectsBCActions(enum.StrEnum):
     GetProjectEnrolments = "GetProjectEnrolments"
     GetProjects = "GetProjects"
     GetProjectUsers = "GetProjectUsers"
+    GetProjectGroups = "GetProjectGroups"
     GetSwaggerSpec = "GetSwaggerSpec"
     GetTechnologies = "GetTechnologies"
     GetUserRoles = "GetUserRoles"

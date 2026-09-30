@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The workbench status sync runs every 5 minutes (`sync-job-cron-minute`, default `2/5`) instead of hourly, and the portal polls every 5 seconds while a workbench changes.
 - Server-side role checks (the internal user-assignment route that launch reads, and `GET /projects/{projectId}/users/{userId}`) include the roles Entra group grants give, read from the user's Cognito record; a user reached only through a group could not launch.
 - The authorizer passes the sign-in's trusted Entra groups on as `userGroups`, so the Projects API needs no second UserInfo call.
 - Project member lists fill a missing email or display name from the identity provider on read.
@@ -27,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Project account create, update, re-onboard and S2S deactivate took their repository before entering the unit of work, which has repositories only inside its context, so every live call failed; the test doubles now enforce the same.
+- A product template gets only the image in its own distribution's account (another account's copy in the same region could win), and each distribution's rendered template is stored under its own account and stage, since distributions of one version publish concurrently.
+- The status sync closes a removal whose Service Catalog product is already gone after 5 minutes (a launch that failed before its stack existed never sends a stack event), and a settled workbench whose product was removed outside VEW after 10 minutes instead of 30.
 - Stage access is enforced by the backend: a role may list and launch only the stages it may consume (`PLATFORM_USER` PROD, `BETA_USER` QA and PROD, contributors and above all stages). It used to shape only the product listing, so a direct API call could reach DEV or QA releases.
 - Launching refuses a version whose project account is not `Active`.
 - Product version listings return only versions of the project in the path.

@@ -35,9 +35,10 @@ def handle(
         projectId=project_id,
         id=command.account_id.value,
     )
-    account_repo = unit_of_work.get_repository(project_account.ProjectAccountPrimaryKey, project_account.ProjectAccount)
     with unit_of_work:
-        account = account_repo.get(account_key)
+        account = unit_of_work.get_repository(
+            project_account.ProjectAccountPrimaryKey, project_account.ProjectAccount
+        ).get(account_key)
     if not account:
         raise domain_exception.DomainException("Account does not exist.")
 
@@ -73,7 +74,6 @@ def handle(
         account=account,
         project=project,
         account_key=account_key,
-        account_repo=account_repo,
         unit_of_work=unit_of_work,
         message_bus=message_bus,
         metadata_changed=metadata_changed,
@@ -109,18 +109,17 @@ def handle(
     account.lastUpdateDate = datetime.now(timezone.utc).isoformat()
 
     if not operational_changed:
-        _persist(unit_of_work, account_repo, account_key, account)
+        _persist(unit_of_work, account_key, account)
         return
 
     account.accountStatus = project_account.ProjectAccountStatusEnum.ReOnboarding
     account.onboardingOperationId = str(uuid4())
     account.onboardingPublicationStatus = project_account.ProjectAccountOnboardingPublicationStatus.Pending
-    _persist(unit_of_work, account_repo, account_key, account)
+    _persist(unit_of_work, account_key, account)
     _publish_and_mark(
         account,
         project,
         unit_of_work,
-        account_repo,
         account_key,
         message_bus,
         web_application_account_id,
@@ -140,9 +139,11 @@ def _get_project_with_technology(project_id, technology_id, projects_query_servi
     return project
 
 
-def _persist(unit_of_work, account_repo, account_key, account) -> None:
+def _persist(unit_of_work, account_key, account) -> None:
     with unit_of_work:
-        account_repo.update_entity(account_key, account)
+        unit_of_work.get_repository(
+            project_account.ProjectAccountPrimaryKey, project_account.ProjectAccount
+        ).update_entity(account_key, account)
         unit_of_work.commit()
 
 
@@ -150,7 +151,6 @@ def _resume_inflight_onboarding(
     account,
     project,
     account_key,
-    account_repo,
     unit_of_work,
     message_bus,
     metadata_changed,
@@ -179,12 +179,11 @@ def _resume_inflight_onboarding(
         or account.onboardingPublicationStatus != project_account.ProjectAccountOnboardingPublicationStatus.Pending
     ):
         account.onboardingPublicationStatus = project_account.ProjectAccountOnboardingPublicationStatus.Pending
-        _persist(unit_of_work, account_repo, account_key, account)
+        _persist(unit_of_work, account_key, account)
     _publish_and_mark(
         account,
         project,
         unit_of_work,
-        account_repo,
         account_key,
         message_bus,
         web_application_account_id,
@@ -200,7 +199,6 @@ def _publish_and_mark(
     account,
     project,
     unit_of_work,
-    account_repo,
     account_key,
     message_bus,
     web_application_account_id,
@@ -220,4 +218,4 @@ def _publish_and_mark(
         catalog_service_account_id,
     )
     account.onboardingPublicationStatus = project_account.ProjectAccountOnboardingPublicationStatus.Published
-    _persist(unit_of_work, account_repo, account_key, account)
+    _persist(unit_of_work, account_key, account)

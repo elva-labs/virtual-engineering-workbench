@@ -67,7 +67,25 @@ class ProvisionedProductStateSyncAggregate(aggregate.Aggregate):
     def __is_stale(self):
         """Sync is only processing provisioned products that where created 1 hour before to avoid race condition."""
 
-        minutes = 180 if self._provisioned_product.status == product_status.ProductStatus.Updating else 30
+        # A workbench being removed whose Service Catalog product is already gone has been terminated:
+        # Service Catalog drops the product only once termination completed. When the launch failed
+        # before CloudFormation created a stack, no stack event ever reports that, so do not wait.
+        status = self._provisioned_product.status
+        if status == product_status.ProductStatus.Deprovisioning:
+            minutes = 5
+        elif status == product_status.ProductStatus.Updating:
+            minutes = 180
+        elif status in (
+            product_status.ProductStatus.Provisioning,
+            product_status.ProductStatus.ConfigurationInProgress,
+        ):
+            # A launch or its configuration may legitimately run for a while before Service Catalog
+            # lists the product (or before configuration completes).
+            minutes = 30
+        else:
+            # A settled workbench (running, stopped, ...) whose Service Catalog product is gone was
+            # removed outside VEW: there is no launch race to wait for.
+            minutes = 10
 
         return datetime.now(timezone.utc) - datetime.fromisoformat(self._provisioned_product.lastUpdateDate).replace(
             tzinfo=timezone.utc

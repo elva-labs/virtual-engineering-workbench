@@ -69,7 +69,34 @@ Parameters:
   VpcIdSSM:
     Default: /workbench/vpc/vpc-id
     Type: AWS::SSM::Parameter::Value<String>
+  # The spoke's workbench group (provisioning enablement pp-sg): a connection gateway in the spoke is
+  # admitted to it. Resolved in the spoke; the AWS:: type makes it a technical parameter.
+  WorkbenchSecurityGroupIdSSM:
+    Default: /proserve/wb/provisioning-enablement/pp-sg
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::SecurityGroup::Id>
+  # The spoke's role cleanup function (provisioning enablement stack), see InstanceRoleCleanup.
+  RoleCleanupFunctionArnSSM:
+    Default: /proserve/wb/provisioning-enablement/workbench-role-cleanup-function-arn
+    Type: AWS::SSM::Parameter::Value<String>
 Resources:
+  # Deleted after the Workbench (which depends on it) and before InstanceRole (which it depends on).
+  # The keep lists repeat InstanceRole's own policies; everything else on the role is removed, so
+  # policies attached from outside (e.g. an SSM Quick Setup patch policy) cannot block the deletion.
+  InstanceRoleCleanup:
+    Properties:
+      ServiceToken: !Ref RoleCleanupFunctionArnSSM
+      RoleName: !Ref InstanceRole
+      KeepManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/ProvisionedProductInstanceProfilePermissionsPolicyV2
+      KeepInlinePolicyNames:
+        - AllowCloudWatchLogs
+        - AllowCloudWatchMetrics
+        - Ec2DescribeTagsUserTID
+        - Ec2PublishEvents
+        - AllowEcsExec
+        - S3ForNiceDcvLicense
+    Type: Custom::InstanceRoleCleanup
   InstanceProfile:
     Properties:
       Roles:
@@ -192,6 +219,7 @@ Resources:
         skip:
           - id: CKV_AWS_46
             comment: "UserData only fetches a short-lived IMDSv2 session token and instance tags at boot; it contains no stored credentials."
+    DependsOn: InstanceRoleCleanup
     Properties:
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
@@ -221,6 +249,7 @@ Resources:
       SecurityGroupIds:
         - !GetAtt SecurityGroup.GroupId
         - !Ref UserSecurityGroupId
+        - !Ref WorkbenchSecurityGroupIdSSM
       UserData:
         Fn::Base64: !Sub |
             ###############################

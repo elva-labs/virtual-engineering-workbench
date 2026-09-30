@@ -44,7 +44,7 @@ function getOSImage(osVersion: string) {
 }
 
 export function ProvisionedProductDetails(props: ProvisionedProductDetailsProps) {
-  const { headerActions, ...provProdDetailsProps } = props;
+  const { headerActions, extraSections, ...provProdDetailsProps } = props;
   const { getPathFor } = useNavigationPaths();
   const {
     provisionedProduct,
@@ -136,6 +136,7 @@ export function ProvisionedProductDetails(props: ProvisionedProductDetailsProps)
             ]
           }
         />
+        {extraSections ?? null}
       </SpaceBetween>
     );
   }

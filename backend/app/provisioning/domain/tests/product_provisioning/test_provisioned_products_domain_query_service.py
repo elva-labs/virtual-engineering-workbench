@@ -294,6 +294,8 @@ def test_get_provisioned_virtual_target_should_return_virtual_target(
             "isRetired": False,
             "provisionedCompoundProductId": None,
             "deploymentOption": None,
+            "lifecycleSettings": None,
+            "appliedAutostopTag": None,
             "keyPairId": None,
         }
     )

@@ -756,6 +756,108 @@ paths:
         passthroughBehavior: when_no_match
         contentHandling: CONVERT_TO_TEXT
         credentials: "{{apigw_invocation_role_arn}}"
+  /projects/{projectId}/workbench-lifecycle:
+    get:
+      description: "The project's workbench stop policy and user permissions (vew_project_workbench_lifecycle read and import); 404 while it uses the deployment's defaults"
+      operationId: "GetProjectWorkbenchLifecycle"
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Workbench lifecycle settings"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectWorkbenchLifecycleResponse"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+      security:
+        - ClientCredentials: ["clients/projects/program.read"]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        contentHandling: "CONVERT_TO_TEXT"
+        credentials: "{{apigw_invocation_role_arn}}"
+    put:
+      description: "Set the project's workbench stop policy and what its users may change (upsert of the whole setting)"
+      operationId: "PutProjectWorkbenchLifecycle"
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectWorkbenchLifecycle"
+      responses:
+        "200":
+          description: "Workbench lifecycle settings"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectWorkbenchLifecycleResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+      security:
+        - ClientCredentials: ["clients/projects/program.write"]
+      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        contentHandling: "CONVERT_TO_TEXT"
+        credentials: "{{apigw_invocation_role_arn}}"
+    delete:
+      description: "Back to the deployment's defaults; idempotent"
+      operationId: "DeleteProjectWorkbenchLifecycle"
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: "Platform defaults (again), or no such project"
+        "403":
+          $ref: "#/components/responses/Problem"
+      security:
+        - ClientCredentials: ["clients/projects/program.write"]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        contentHandling: "CONVERT_TO_TEXT"
+        credentials: "{{apigw_invocation_role_arn}}"
   /projects/{projectId}/enrolments:
     post:
       description: "Request to be enrolled to a program"
@@ -1820,6 +1922,97 @@ components:
           type: array
           items:
             type: string
+    ProjectWorkbenchLifecycle:
+      title: ProjectWorkbenchLifecycle
+      description: A program's workbench stop rules and what its users may change. Omitted fields take their defaults.
+      type: object
+      additionalProperties: false
+      properties:
+        alwaysOn:
+          title: AlwaysOn
+          type: boolean
+          description: Bypass idle, nightly and weekend stops (the project accepts the cost).
+        idleStopMinutes:
+          title: IdleStopMinutes
+          type: integer
+          nullable: true
+          minimum: 10
+          maximum: 1440
+          description: Stop after this many idle minutes; null = the deployment's default.
+        nightlyStop:
+          title: NightlyStop
+          type: boolean
+          nullable: true
+          description: Stop running workbenches at the nightly stop time; null = the deployment's default.
+        weekendStop:
+          title: WeekendStop
+          type: boolean
+          nullable: true
+        allowUserDisableNightlyStop:
+          title: AllowUserDisableNightlyStop
+          type: boolean
+          description: Users may switch off the nightly stop for their own workbench.
+        allowUserIdleTimeout:
+          title: AllowUserIdleTimeout
+          type: boolean
+          description: Users may set their own inactivity timeout, within the bounds below.
+        userIdleTimeoutMinMinutes:
+          title: UserIdleTimeoutMinMinutes
+          type: integer
+          minimum: 10
+          maximum: 1440
+        userIdleTimeoutMaxMinutes:
+          title: UserIdleTimeoutMaxMinutes
+          type: integer
+          minimum: 10
+          maximum: 1440
+    ProjectWorkbenchLifecycleResponse:
+      title: ProjectWorkbenchLifecycleResponse
+      type: object
+      required:
+        - projectId
+      properties:
+        projectId:
+          title: ProjectId
+          type: string
+        alwaysOn:
+          title: AlwaysOn
+          type: boolean
+          description: Bypass idle, nightly and weekend stops (the project accepts the cost).
+        idleStopMinutes:
+          title: IdleStopMinutes
+          type: integer
+          nullable: true
+          minimum: 10
+          maximum: 1440
+          description: Stop after this many idle minutes; null = the deployment's default.
+        nightlyStop:
+          title: NightlyStop
+          type: boolean
+          nullable: true
+          description: Stop running workbenches at the nightly stop time; null = the deployment's default.
+        weekendStop:
+          title: WeekendStop
+          type: boolean
+          nullable: true
+        allowUserDisableNightlyStop:
+          title: AllowUserDisableNightlyStop
+          type: boolean
+          description: Users may switch off the nightly stop for their own workbench.
+        allowUserIdleTimeout:
+          title: AllowUserIdleTimeout
+          type: boolean
+          description: Users may set their own inactivity timeout, within the bounds below.
+        userIdleTimeoutMinMinutes:
+          title: UserIdleTimeoutMinMinutes
+          type: integer
+          minimum: 10
+          maximum: 1440
+        userIdleTimeoutMaxMinutes:
+          title: UserIdleTimeoutMaxMinutes
+          type: integer
+          minimum: 10
+          maximum: 1440
     ProjectMutationRequest:
       type: object
       required: [name, isActive]

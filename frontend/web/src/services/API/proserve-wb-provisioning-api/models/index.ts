@@ -39,3 +39,7 @@ export * from './RemoveProvisionedProductsRequest';
 export * from './StopProvisionedProductsRequest';
 export * from './UpdateProvisionedProductRequest';
 export * from './UpdateUserProfileRequest';
+export * from './WorkbenchLifecycleEffective';
+export * from './WorkbenchLifecyclePermissions';
+export * from './WorkbenchLifecycleResponse';
+export * from './WorkbenchLifecycleUserSettings';

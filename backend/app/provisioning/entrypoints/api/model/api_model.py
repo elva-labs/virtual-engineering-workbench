@@ -7,7 +7,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Empty(BaseModel):
@@ -536,3 +536,40 @@ class GetPaginatedProvisionedProductsResponse(BaseModel):
 
 class GetProvisionedProductsResponse(BaseModel):
     provisionedProducts: List[ProvisionedProduct] = Field(..., title="provisionedProducts")
+
+
+class WorkbenchLifecycleUserSettings(BaseModel):
+    """The owner's choices for their workbench."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    nightlyStopDisabled: bool = Field(False, title="NightlyStopDisabled")
+    idleTimeoutMinutes: Optional[int] = Field(None, title="IdleTimeoutMinutes")
+
+
+class WorkbenchLifecyclePermissions(BaseModel):
+    mayDisableNightlyStop: bool = Field(..., title="MayDisableNightlyStop")
+    maySetIdleTimeout: bool = Field(..., title="MaySetIdleTimeout")
+    idleTimeoutMinMinutes: int = Field(..., title="IdleTimeoutMinMinutes")
+    idleTimeoutMaxMinutes: int = Field(..., title="IdleTimeoutMaxMinutes")
+
+
+class WorkbenchLifecycleEffective(BaseModel):
+    alwaysOn: bool = Field(..., title="AlwaysOn")
+    idleStopEnabled: bool = Field(..., title="IdleStopEnabled")
+    idleStopMinutes: int = Field(..., title="IdleStopMinutes")
+    nightlyStop: bool = Field(..., title="NightlyStop")
+    weekendStop: bool = Field(..., title="WeekendStop")
+    sources: Dict[str, str] = Field(..., title="Sources")
+    ignoredUserSettings: List[str] = Field(..., title="IgnoredUserSettings")
+
+
+class WorkbenchLifecycleResponse(BaseModel):
+    provisionedProductId: str = Field(..., title="ProvisionedProductId")
+    projectId: str = Field(..., title="ProjectId")
+    canEdit: bool = Field(..., title="CanEdit")
+    nightlyStopTime: str = Field(..., title="NightlyStopTime")
+    nightlyStopTimezone: str = Field(..., title="NightlyStopTimezone")
+    userSettings: WorkbenchLifecycleUserSettings = Field(..., title="UserSettings")
+    permissions: WorkbenchLifecyclePermissions = Field(..., title="Permissions")
+    effective: WorkbenchLifecycleEffective = Field(..., title="Effective")

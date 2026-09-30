@@ -1332,6 +1332,139 @@ paths:
         requestTemplates:
           application/json: '{"statusCode": 200}'
         passthroughBehavior: "when_no_match"
+  /projects/{projectId}/products/provisioned/{provisionedProductId}/lifecycle:
+    get:
+      description: "The workbench's stop rules: the owner's choices, what the program allows and the effective values"
+      operationId: "GetProvisionedProductLifecycle"
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: provisionedProductId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "200 response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkbenchLifecycleResponse"
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        cacheKeyParameters:
+          - "method.request.header.Authorization"
+          - "method.request.path.projectId"
+          - "method.request.path.provisionedProductId"
+        contentHandling: "CONVERT_TO_TEXT"
+        credentials: "{{apigw_invocation_role_arn}}"
+    put:
+      description: "Change the owner's stop-rule choices, within what the program allows"
+      operationId: "UpdateProvisionedProductLifecycle"
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: provisionedProductId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkbenchLifecycleUserSettings"
+      responses:
+        "200":
+          description: "200 response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkbenchLifecycleResponse"
+      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        cacheKeyParameters:
+          - "method.request.header.Authorization"
+          - "method.request.path.projectId"
+          - "method.request.path.provisionedProductId"
+        contentHandling: "CONVERT_TO_TEXT"
+        credentials: "{{apigw_invocation_role_arn}}"
+    options:
+      description: "CORS"
+      operationId: "ProvisionedProductLifecycleCORS"
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: provisionedProductId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "200 response"
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
+            Access-Control-Allow-Methods:
+              schema:
+                type: string
+            Access-Control-Allow-Headers:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Empty"
+      security: []
+      x-amazon-apigateway-integration:
+        type: "mock"
+        responses:
+          default:
+            statusCode: "200"
+            responseParameters:
+              method.response.header.Access-Control-Allow-Methods: "'GET,PUT,OPTIONS'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-amz-security-token,Cache-Control'"
+              method.response.header.Access-Control-Allow-Origin: "{{cors_origin}}"
+        requestTemplates:
+          application/json: '{"statusCode": 200}'
+        passthroughBehavior: "when_no_match"
   /projects/{projectId}/products/provisioned/{provisionedProductId}/stop:
     patch:
       description: "Stop provisioned product"
@@ -2499,6 +2632,77 @@ components:
     StartProvisionedProductResponse:
       title: StartProvisionedProductResponse
       type: object
+    WorkbenchLifecycleUserSettings:
+      title: WorkbenchLifecycleUserSettings
+      type: object
+      additionalProperties: false
+      properties:
+        nightlyStopDisabled:
+          title: NightlyStopDisabled
+          type: boolean
+        idleTimeoutMinutes:
+          title: IdleTimeoutMinutes
+          type: integer
+          nullable: true
+          minimum: 10
+          maximum: 1440
+    WorkbenchLifecyclePermissions:
+      title: WorkbenchLifecyclePermissions
+      type: object
+      required: [mayDisableNightlyStop, maySetIdleTimeout, idleTimeoutMinMinutes, idleTimeoutMaxMinutes]
+      properties:
+        mayDisableNightlyStop:
+          type: boolean
+        maySetIdleTimeout:
+          type: boolean
+        idleTimeoutMinMinutes:
+          type: integer
+        idleTimeoutMaxMinutes:
+          type: integer
+    WorkbenchLifecycleEffective:
+      title: WorkbenchLifecycleEffective
+      type: object
+      required: [alwaysOn, idleStopEnabled, idleStopMinutes, nightlyStop, weekendStop, sources, ignoredUserSettings]
+      properties:
+        alwaysOn:
+          type: boolean
+        idleStopEnabled:
+          type: boolean
+        idleStopMinutes:
+          type: integer
+        nightlyStop:
+          type: boolean
+        weekendStop:
+          type: boolean
+        sources:
+          type: object
+          additionalProperties:
+            type: string
+        ignoredUserSettings:
+          type: array
+          items:
+            type: string
+    WorkbenchLifecycleResponse:
+      title: WorkbenchLifecycleResponse
+      type: object
+      required: [provisionedProductId, projectId, canEdit, nightlyStopTime, nightlyStopTimezone, userSettings, permissions, effective]
+      properties:
+        provisionedProductId:
+          type: string
+        projectId:
+          type: string
+        canEdit:
+          type: boolean
+        nightlyStopTime:
+          type: string
+        nightlyStopTimezone:
+          type: string
+        userSettings:
+          $ref: "#/components/schemas/WorkbenchLifecycleUserSettings"
+        permissions:
+          $ref: "#/components/schemas/WorkbenchLifecyclePermissions"
+        effective:
+          $ref: "#/components/schemas/WorkbenchLifecycleEffective"
     StopProvisionedProductResponse:
       title: StopProvisionedProductResponse
       type: object

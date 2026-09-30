@@ -314,6 +314,9 @@ packaging_app_config = {
 
 
 _dev_provisioning_config = {
+    # Minute field of the workbench status sync (EventBridge cron); "2/5" = every 5 minutes, off the
+    # minutes of the 5-minute metrics job. The sync makes a few calls per spoke account, not per workbench.
+    "sync-job-cron-minute": "2/5",
     "api-lambda-reserved-concurrency": 10,
     "api-lambda-provisioned-concurrency": 1,
     "authorizer-reserved-concurrency": 10,

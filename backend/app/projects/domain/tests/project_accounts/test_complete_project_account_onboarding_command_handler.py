@@ -111,3 +111,34 @@ def test_handle_should_publish_event(
             region=sample_project_account.region,
         )
     )
+
+
+def test_handle_sets_onboarded_at_once(
+    mock_complete_project_account_onboarding_command,
+    mock_uow_2,
+    mock_account_repo,
+    mock_projects_qs,
+    mock_parameters_qs,
+    message_bus_mock,
+    sample_project_account_factory,
+):
+    # ADR 0022: onboardedAt marks the first successful onboarding and a re-onboarding keeps it.
+    account = sample_project_account_factory()
+    mock_projects_qs.get_project_account_by_id.return_value = account
+
+    def complete():
+        complete_project_account_onboarding_command_handler.handle(
+            command=mock_complete_project_account_onboarding_command,
+            uow=mock_uow_2,
+            projects_qs=mock_projects_qs,
+            parameters_qs=mock_parameters_qs,
+            account_parameters_path="/param/path",
+            message_bus=message_bus_mock,
+        )
+
+    complete()
+    first = account.onboardedAt
+    assertpy.assert_that(first).is_not_none()
+    account.lastUpdateDate = "2000-01-01T00:00:00+00:00"
+    complete()
+    assertpy.assert_that(account.onboardedAt).is_equal_to(first)

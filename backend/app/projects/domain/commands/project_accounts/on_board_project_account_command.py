@@ -23,4 +23,5 @@ class OnBoardProjectAccountCommand(command_bus.Command):
     technology: account_technology_id_value_object.AccountTechnologyIdValueObject
     region: region_value_object.RegionValueObject
     reserved_account_id: str | None = None
+    onboarding_revision: str | None = None
     model_config = ConfigDict(arbitrary_types_allowed=True)

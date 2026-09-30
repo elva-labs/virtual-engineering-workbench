@@ -168,6 +168,7 @@ def handle_on_board_project_account_command(  # noqa: C901
         projectId=command.project_id.value,
         onboardingOperationId=str(uuid4()),
         onboardingPublicationStatus=project_account.ProjectAccountOnboardingPublicationStatus.Pending,
+        onboardingRevision=command.onboarding_revision,
     )
 
     if projects_query_service.list_project_accounts_by_aws_account(project_acct.awsAccountId):

@@ -22,4 +22,6 @@ class UpdateProjectAccountCommand(command_bus.Command):
     technology: account_technology_id_value_object.AccountTechnologyIdValueObject
     stage: project_account.ProjectAccountStageEnum
     region: region_value_object.RegionValueObject
+    # None leaves the stored revision alone (portal updates); a different value re-onboards.
+    onboarding_revision: str | None = None
     model_config = ConfigDict(arbitrary_types_allowed=True)

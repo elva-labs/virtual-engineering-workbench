@@ -15,7 +15,7 @@ from app.provisioning.domain.model import (
     provisioning_parameter,
 )
 from app.provisioning.domain.ports import products_query_service, versions_query_service
-from app.provisioning.domain.read_models import product, version
+from app.provisioning.domain.read_models import product, project_assignment, version
 from app.provisioning.domain.value_objects import (
     additional_configurations_value_object,
     deployment_option_value_object,
@@ -1128,3 +1128,109 @@ def test_launch_product_sanitizes_provisioned_product_name(
         # ASSERT
         saved_entity = mock_provisioned_product_repo.add.call_args[0][0]
         assertpy.assert_that(saved_entity.provisionedProductName).is_equal_to(expected_name)
+
+
+def _launch_command(stage: str) -> launch_product_command.LaunchProductCommand:
+    return launch_product_command.LaunchProductCommand(
+        provisioned_product_id=provisioned_product_id_value_object.from_str("pp-123"),
+        project_id=project_id_value_object.from_str("proj-123"),
+        user_id=user_id_value_object.from_str("T0011AA"),
+        user_domains=user_domains_value_object.from_list(["domain"]),
+        product_id=product_id_value_object.from_str("prod-123"),
+        version_id=product_version_id_value_object.from_str("vers-123"),
+        provisioning_parameters=provisioning_parameters_value_object.from_list([]),
+        additional_configurations=additional_configurations_value_object.from_list([]),
+        stage=provisioned_product_stage_value_object.from_str(stage),
+        region=region_value_object.from_str("us-east-1"),
+        user_ip_address=ip_address_value_object.from_str("127.0.0.1"),
+        deployment_option=deployment_option_value_object.from_str("MULTI_AZ"),
+    )
+
+
+@pytest.mark.parametrize(
+    "roles,stage",
+    [
+        (["PLATFORM_USER"], "dev"),
+        (["PLATFORM_USER"], "qa"),
+        (["BETA_USER"], "dev"),
+        (["SUPPORT"], "dev"),
+    ],
+)
+def test_launch_product_from_a_stage_the_role_may_not_consume_should_raise(
+    roles,
+    stage,
+    mock_logger,
+    mock_publisher,
+    mock_products_query_service,
+    mock_message_bus,
+    mock_unit_of_work,
+    mock_versions_query_service,
+    mock_provisioned_products_qs,
+    mock_be_feature_toggles_srv,
+    mock_experimental_provisioned_product_per_project_limit,
+    mocked_projects_qs,
+):
+    # ARRANGE: the stage comes straight from the request, so the API can be called for any stage
+    mocked_projects_qs.get_project_assignment.return_value = project_assignment.ProjectAssignment(
+        userId="T0011AA", roles=roles
+    )
+
+    # ACT
+    with pytest.raises(domain_exception.DomainException) as e:
+        launch.handle(
+            command=_launch_command(stage),
+            publisher=mock_publisher,
+            products_qs=mock_products_query_service,
+            versions_qs=mock_versions_query_service,
+            logger=mock_logger,
+            provisioned_products_qs=mock_provisioned_products_qs,
+            uow=mock_unit_of_work,
+            feature_toggles_srv=mock_be_feature_toggles_srv,
+            experimental_provisioned_product_per_project_limit=mock_experimental_provisioned_product_per_project_limit,
+            projects_qs=mocked_projects_qs,
+        )
+
+    # ASSERT
+    assertpy.assert_that(str(e.value)).is_equal_to(
+        f"User role does not allow launching products from the {stage.upper()} stage"
+    )
+    mock_versions_query_service.get_product_version_distributions.assert_not_called()
+    mock_message_bus.publish.assert_not_called()
+    mock_unit_of_work.commit.assert_not_called()
+
+
+def test_launch_product_into_an_inactive_account_should_raise(
+    mock_logger,
+    mock_publisher,
+    mock_products_query_service,
+    mock_message_bus,
+    mock_unit_of_work,
+    mock_versions_query_service,
+    mock_provisioned_products_qs,
+    mock_be_feature_toggles_srv,
+    mock_experimental_provisioned_product_per_project_limit,
+    mocked_projects_qs,
+):
+    # ARRANGE: the project account was deactivated, its version records remain
+    mocked_projects_qs.get_aws_accounts_by_status.return_value = []
+
+    # ACT
+    with pytest.raises(domain_exception.DomainException) as e:
+        launch.handle(
+            command=_launch_command("dev"),
+            publisher=mock_publisher,
+            products_qs=mock_products_query_service,
+            versions_qs=mock_versions_query_service,
+            logger=mock_logger,
+            provisioned_products_qs=mock_provisioned_products_qs,
+            uow=mock_unit_of_work,
+            feature_toggles_srv=mock_be_feature_toggles_srv,
+            experimental_provisioned_product_per_project_limit=mock_experimental_provisioned_product_per_project_limit,
+            projects_qs=mocked_projects_qs,
+        )
+
+    # ASSERT
+    assertpy.assert_that(str(e.value)).contains("account of this project is not active")
+    mocked_projects_qs.get_aws_accounts_by_status.assert_called_once_with(project_id="proj-123", statuses=["Active"])
+    mock_message_bus.publish.assert_not_called()
+    mock_unit_of_work.commit.assert_not_called()

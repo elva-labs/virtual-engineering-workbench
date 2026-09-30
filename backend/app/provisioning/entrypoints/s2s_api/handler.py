@@ -160,6 +160,7 @@ def get_available_product_versions(
         stage=stage,
         region=region,
         return_technical_params=False,
+        project_id=project_id,
     )
 
     versions_parsed = [

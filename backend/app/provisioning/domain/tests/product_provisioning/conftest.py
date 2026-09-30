@@ -30,6 +30,7 @@ from app.provisioning.domain.ports import (
 from app.provisioning.domain.read_models import (
     component_version_detail,
     product,
+    project_account,
     project_assignment,
     version,
 )
@@ -428,7 +429,12 @@ def mock_experimental_provisioned_product_per_project_limit():
 @pytest.fixture
 def mocked_projects_qs():
     m = mock.create_autospec(spec=projects_query_service.ProjectsQueryService)
+    # Contributors may launch from every stage (stage access).
     m.get_project_assignment.return_value = project_assignment.ProjectAssignment(
-        userId="test-user", roles=["PLATFORM_USER"]
+        userId="test-user", roles=["PRODUCT_CONTRIBUTOR"]
     )
-    return mock.create_autospec(spec=projects_query_service.ProjectsQueryService)
+    m.get_aws_accounts_by_status.return_value = [
+        project_account.ProjectAccount(id=account_id, awsAccountId="001234567890", stage="dev")
+        for account_id in ("account-id-12345", "acc-123")
+    ]
+    return m

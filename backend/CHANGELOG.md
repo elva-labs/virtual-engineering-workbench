@@ -28,6 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Product templates are validated rendered, not as raw Jinja; CloudFormation rejected every version of the default templates ("YAML not well-formed"). Validation renders with a placeholder image and the image's architecture.
+- A product's first automated version (a pipeline build for a product without versions) is created as `1.0.0-rc.1` instead of failing with "No released version found".
+- The default templates list every region the image is available in, instead of `us-east-1` only.
+- Workbenches join the spoke's workbench security group (`/proserve/wb/provisioning-enablement/pp-sg`), so a connection gateway admitted to it can reach them.
+- Removing a workbench no longer fails when a policy was attached to its instance role from outside the template (for example by an SSM Quick Setup patch policy): an `InstanceRoleCleanup` custom resource, backed by a function in the spoke's provisioning enablement stack, removes such policies before the role is deleted.
 - Project account create, update, re-onboard and S2S deactivate took their repository before entering the unit of work, which has repositories only inside its context, so every live call failed; the test doubles now enforce the same.
 - A product template gets only the image in its own distribution's account (another account's copy in the same region could win), and each distribution's rendered template is stored under its own account and stage, since distributions of one version publish concurrently.
 - The status sync closes a removal whose Service Catalog product is already gone after 5 minutes (a launch that failed before its stack existed never sends a stack event), and a settled workbench whose product was removed outside VEW after 10 minutes instead of 30.

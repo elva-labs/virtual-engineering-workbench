@@ -60,6 +60,15 @@ def handle(
     )
     metadata_changed = current_metadata != desired_metadata
     operational_changed = current_operational != desired_operational
+    # A new onboarding revision asks for the same configuration to be onboarded again;
+    # None (the portal) keeps the stored one. The first revision on an account that has none only
+    # records it: adopting the attribute (e.g. importing into Terraform) is not a re-onboarding request.
+    revision_sent = (
+        command.onboarding_revision is not None and command.onboarding_revision != account.onboardingRevision
+    )
+    revision_adopted = revision_sent and account.onboardingRevision is None
+    metadata_changed = metadata_changed or revision_adopted
+    operational_changed = operational_changed or (revision_sent and not revision_adopted)
     if _resume_inflight_onboarding(
         account=account,
         project=project,
@@ -95,6 +104,8 @@ def handle(
     account.technologyId = desired_technology_id
     account.stage = command.stage
     account.region = command.region.value
+    if command.onboarding_revision is not None:
+        account.onboardingRevision = command.onboarding_revision
     account.lastUpdateDate = datetime.now(timezone.utc).isoformat()
 
     if not operational_changed:

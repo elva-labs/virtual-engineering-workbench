@@ -224,6 +224,9 @@ class ProjectsBCContextEnricher(authorizer.AuthorizerStep):
                 if selected_assignment and selected_assignment.activeDirectoryGroups
                 else []
             )
+            settings = self.__assignments_query_service.get_project_settings(project_id=project_id)
+            context.project_managed_by = settings.managedBy
+            context.project_managed_source = settings.managedSource
 
         return True
 

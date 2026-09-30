@@ -126,3 +126,38 @@ def test_stale_group_update_cannot_reuse_version(
         )
     current = query.get_project_group_assignment("proj-race", group_id)
     assert current.version == 2 and current.roles == ["ADMIN"]
+
+
+def test_set_management_marks_unmarks_and_keeps_it_on_update(
+    mock_ddb_repo, mock_dynamodb, test_table_name
+):
+    query = query_service(mock_dynamodb, test_table_name)
+    events = Mock()
+    service = ProjectLifecycleService(mock_ddb_repo, query, events)
+    with patch(
+        "app.projects.domain.model.project.generate_project_id",
+        return_value="proj-managed",
+    ):
+        service.create("client-1", str(uuid4()), "Managed", None, True)
+    events.reset_mock()
+
+    service.set_management("proj-managed", "terraform", "org/config programs/managed")
+    stored = query.get_project_by_id("proj-managed")
+    assert (stored.managedBy, stored.managedSource) == ("terraform", "org/config programs/managed")
+    published = events.publish.call_args.args[0]
+    assert (published.managed_by, published.managed_source) == ("terraform", "org/config programs/managed")
+
+    # Unchanged: nothing is published.
+    service.set_management("proj-managed", "terraform", "org/config programs/managed")
+    assert events.publish.call_count == 1
+
+    # An update keeps the mark and carries it in its event.
+    service.update("proj-managed", "Renamed", None, True)
+    assert query.get_project_by_id("proj-managed").managedBy == "terraform"
+    assert events.publish.call_args.args[0].managed_by == "terraform"
+
+    service.set_management("proj-managed", None, "ignored")
+    stored = query.get_project_by_id("proj-managed")
+    assert (stored.managedBy, stored.managedSource) == (None, None)
+    with pytest.raises(KeyError):
+        service.set_management("proj-missing", "terraform", "x")

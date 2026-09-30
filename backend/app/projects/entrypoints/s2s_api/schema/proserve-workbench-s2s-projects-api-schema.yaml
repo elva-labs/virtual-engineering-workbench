@@ -666,6 +666,96 @@ paths:
         passthroughBehavior: when_no_match
         contentHandling: CONVERT_TO_TEXT
         credentials: "{{apigw_invocation_role_arn}}"
+  /projects/{projectId}/management:
+    get:
+      operationId: GetProjectManagement
+      description: "The external tool that manages the project; 404 while the portal owns it"
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectManagementResponse"
+      security:
+        - ClientCredentials: ["clients/projects/program.read"]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: when_no_match
+        contentHandling: CONVERT_TO_TEXT
+        credentials: "{{apigw_invocation_role_arn}}"
+    put:
+      operationId: PutProjectManagement
+      description: "Marks the project as managed by an external tool; the user APIs then refuse its configuration changes"
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectManagement"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectManagementResponse"
+      security:
+        - ClientCredentials: ["clients/projects/program.write"]
+      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: when_no_match
+        contentHandling: CONVERT_TO_TEXT
+        credentials: "{{apigw_invocation_role_arn}}"
+    delete:
+      operationId: DeleteProjectManagement
+      description: "Hands the project back to the portal (idempotent)"
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: No content
+      security:
+        - ClientCredentials: ["clients/projects/program.write"]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: when_no_match
+        contentHandling: CONVERT_TO_TEXT
+        credentials: "{{apigw_invocation_role_arn}}"
   /projects/{projectId}/enrolments:
     post:
       description: "Request to be enrolled to a program"
@@ -1523,6 +1613,38 @@ components:
           title: LastUpdateDate
           type: string
           description: Point in time where project is last updated.
+        managedBy:
+          title: ManagedBy
+          type: string
+          nullable: true
+          description: The external tool that manages the project, if any.
+        managedSource:
+          title: ManagedSource
+          type: string
+          nullable: true
+          description: Where the project's configuration lives, if externally managed.
+    ProjectManagement:
+      type: object
+      additionalProperties: false
+      required: [managedBy, source]
+      properties:
+        managedBy:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{0,63}$"
+        source:
+          type: string
+          minLength: 1
+          maxLength: 256
+    ProjectManagementResponse:
+      type: object
+      required: [projectId, managedBy, source]
+      properties:
+        projectId:
+          type: string
+        managedBy:
+          type: string
+        source:
+          type: string
     GetProjectsResponse:
       title: GetProjectsResponse
       required:

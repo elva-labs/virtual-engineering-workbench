@@ -8,6 +8,7 @@ from app.authorization.adapters.repository import dynamo_entity_config
 from app.authorization.domain.integration_event_handlers.projects import (
     enrolment_approved_handler,
     project_group_assignment_changed_handler,
+    project_updated_handler,
     user_assigned_handler,
     user_reassigned_handler,
     user_unassigned_handler,
@@ -15,6 +16,7 @@ from app.authorization.domain.integration_event_handlers.projects import (
 from app.authorization.domain.integration_events.projects import (
     enrolment_approved,
     project_group_assignment_changed,
+    project_updated,
     user_assigned,
     user_reassigned,
     user_unassigned,
@@ -32,6 +34,7 @@ class Dependencies(BaseModel):
     project_group_assignment_changed_handler: typing.Callable[
         [project_group_assignment_changed.ProjectGroupAssignmentChanged], None
     ]
+    project_updated_handler: typing.Callable[[project_updated.ProjectUpdated], None]
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -70,4 +73,5 @@ def bootstrap(  # noqa: C901
         project_group_assignment_changed_handler=lambda event: project_group_assignment_changed_handler.handle(
             event, uow
         ),
+        project_updated_handler=lambda event: project_updated_handler.handle(event=event, uow=uow),
     )

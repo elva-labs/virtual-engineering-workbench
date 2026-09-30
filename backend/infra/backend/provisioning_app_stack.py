@@ -328,6 +328,7 @@ class ProvisioningAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                         "EXPERIMENTAL_PROVISIONED_PRODUCT_PER_PROJECT_LIMIT_PARAMETER_NAME": experimental_provisioned_product_per_project_limit_param.parameter_name,
                         "LAMBDA_IAM_ROLE": f"{scheduler_role.role_arn}",
                         "LAYER_VERSION": self._shared_app_layer.layer.layer_version_arn,
+                        "WORKBENCH_LIFECYCLE_DEFAULTS": json.dumps(app_config.component_specific["workbench-lifecycle"]),
                     },
                     permissions=[
                         lambda lambda_f: lambda_f.add_to_role_policy(
@@ -403,6 +404,8 @@ class ProvisioningAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                     cross_bc_api_access={
                         bounded_contexts.BoundedContext.PROJECTS: [
                             ("GET", "/internal/projects/*/users/*"),
+                            # The project's workbench stop policy for the workbench settings.
+                            ("GET", "/internal/projects"),
                         ],
                     },
                 ),
@@ -615,6 +618,7 @@ class ProvisioningAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                         "PROVISIONED_PRODUCT_CLEANUP_CONFIG": json.dumps(
                             app_config.component_specific["pp-cleanup-config"]
                         ),
+                        "WORKBENCH_LIFECYCLE_DEFAULTS": json.dumps(app_config.component_specific["workbench-lifecycle"]),
                     },
                     permissions=[
                         lambda lambda_f: self._storage.table.grant_read_write_data(lambda_f),
@@ -875,6 +879,8 @@ class ProvisioningAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
             ],
             rule_name=app_config.format_resource_name("pp-batch-stop"),
         )
+
+        self._workbench_lifecycle_schedules(app_config)
 
         # --- Legacy export: kept for backward compatibility during migration. ---
         # --- Was consumed by integration_permissions_stack.py (now replaced by ServiceDiscoveryStack). ---
@@ -1316,3 +1322,60 @@ class ProvisioningAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
     @property
     def provisioning_entry(self) -> backend_app_entrypoints.BackendAppEntrypoints:
         return self._backend_app
+
+    def _workbench_lifecycle_schedules(self, app_config) -> None:
+        """The nightly workbench stop in local time, and delivering the idle timeout to workbenches."""
+        lifecycle = app_config.component_specific["workbench-lifecycle"]
+        jobs_fn = self._backend_app.app_entries_functions[self._scheduled_jobs_handler_name]
+
+        # EventBridge Scheduler (not an EventBridge rule): rules only know UTC, and the nightly stop
+        # must stay at the same local time across daylight saving changes.
+        scheduler_role = aws_iam.Role(
+            self,
+            "workbench-lifecycle-scheduler-role",
+            assumed_by=aws_iam.ServicePrincipal("scheduler.amazonaws.com"),
+            description="EventBridge Scheduler invokes the provisioning scheduled jobs (workbench nightly stop)",
+        )
+        # A managed policy (cdk-nag IAMNoInlinePolicy), for this one function only.
+        aws_iam.ManagedPolicy(
+            self,
+            "workbench-lifecycle-scheduler-policy",
+            roles=[scheduler_role],
+            statements=[
+                aws_iam.PolicyStatement(actions=["lambda:InvokeFunction"], resources=[jobs_fn.function_arn])
+            ],
+        )
+        hour, minute = lifecycle["nightlyStopTime"].split(":")
+        aws_scheduler.CfnSchedule(
+            self,
+            "workbench-nightly-stop-schedule",
+            name=app_config.format_resource_name("workbench-nightly-stop"),
+            description="Stops running workbenches that keep the nightly stop; never starts any",
+            schedule_expression=f"cron({int(minute)} {int(hour)} * * ? *)",
+            schedule_expression_timezone=lifecycle["timezone"],
+            flexible_time_window=aws_scheduler.CfnSchedule.FlexibleTimeWindowProperty(mode="OFF"),
+            state="ENABLED" if lifecycle["nightlyStop"] else "DISABLED",
+            target=aws_scheduler.CfnSchedule.TargetProperty(
+                arn=jobs_fn.function_arn,
+                role_arn=scheduler_role.role_arn,
+                input=json.dumps(
+                    {"jobName": "WorkbenchLifecycleJob", "parameters": {"action": "nightly-stop", "dryRun": False}}
+                ),
+                retry_policy=aws_scheduler.CfnSchedule.RetryPolicyProperty(maximum_retry_attempts=2),
+            ),
+        )
+
+        aws_events.Rule(
+            self,
+            "workbench-lifecycle-reconcile-rule",
+            schedule=aws_events.Schedule.rate(aws_cdk.Duration.minutes(lifecycle["reconcileEveryMinutes"])),
+            targets=[
+                aws_events_targets.LambdaFunction(
+                    jobs_fn,
+                    event=aws_events.RuleTargetInput.from_object(
+                        {"jobName": "WorkbenchLifecycleJob", "parameters": {"action": "reconcile", "dryRun": False}}
+                    ),
+                )
+            ],
+            rule_name=app_config.format_resource_name("workbench-lifecycle-reconcile"),
+        )

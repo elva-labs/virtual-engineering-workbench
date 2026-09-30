@@ -66,6 +66,9 @@ class EC2InstanceManagementServiceCachedInMemory(instance_management_service.Ins
     def stop_instance(self, **kwargs) -> str:
         return self._inner.stop_instance(**kwargs)
 
+    def set_instance_tags(self, **kwargs) -> None:
+        return self._inner.set_instance_tags(**kwargs)
+
     def get_user_security_group_id(self, **kwargs) -> str | None:
         return self._inner.get_user_security_group_id(**kwargs)
 

@@ -1,3 +1,4 @@
+import json
 import os
 
 from pydantic import Field
@@ -90,6 +91,10 @@ class AppConfig(config.VEWBaseConfig):
 
     def get_lambda_iam_role(self) -> str:
         return os.environ.get("LAMBDA_IAM_ROLE", "")
+
+    def get_workbench_lifecycle_defaults(self) -> dict:
+        """The deployment's workbench stop policy defaults (infra/config.py workbench-lifecycle); {} = built-in."""
+        return json.loads(os.environ.get("WORKBENCH_LIFECYCLE_DEFAULTS") or "{}")
 
 
 config = {

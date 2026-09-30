@@ -6,6 +6,8 @@ from mypy_boto3_servicecatalog import client
 from mypy_boto3_ssm import client as ssm_client
 from pydantic import BaseModel, ConfigDict
 
+from app.provisioning.domain.command_handlers.provisioned_product_state import workbench_lifecycle
+from app.provisioning.domain.model import workbench_lifecycle as workbench_lifecycle_model
 from app.provisioning.adapters.query_services import (
     aws_networking_query_service,
     dynamodb_provisioned_products_query_service,
@@ -66,6 +68,7 @@ class Dependencies(BaseModel):
     provisioned_products_domain_qry_srv: provisioned_products_domain_query_service.ProvisionedProductsDomainQueryService
     projects_domain_query_service: projects_domain_query_service.ProjectsDomainQueryService
     provisioned_product_cleanup_config: str
+    workbench_lifecycle_srv: workbench_lifecycle.WorkbenchLifecycleService | None = None
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -269,6 +272,18 @@ def bootstrap(  # noqa: C901
 
         return _handle
 
+    workbench_lifecycle_srv = workbench_lifecycle.WorkbenchLifecycleService(
+        platform=workbench_lifecycle_model.PlatformLifecycleDefaults.model_validate(
+            app_config.get_workbench_lifecycle_defaults()
+        ),
+        pp_qry_srv=provisioned_products_qs,
+        projects_qry_srv=projects_api_qs,
+        instance_mgmt_srv=instance_mgmt_srv,
+        uow=uow,
+        publisher=publisher,
+        logger=logger,
+    )
+
     def _initiate_batch_stop_handler_factory():
         def _handle(command):
             initiate_batch_stop.handle(
@@ -276,6 +291,7 @@ def bootstrap(  # noqa: C901
                 publisher=publisher,
                 logger=logger,
                 pp_qry_srv=provisioned_products_qs,
+                lifecycle_srv=workbench_lifecycle_srv,
             )
 
         return _handle
@@ -303,4 +319,5 @@ def bootstrap(  # noqa: C901
         provisioned_products_domain_qry_srv=provisioned_products_domain_qs,
         projects_domain_query_service=projects_domain_qs,
         provisioned_product_cleanup_config=provisioned_product_cleanup_config,
+        workbench_lifecycle_srv=workbench_lifecycle_srv,
     )

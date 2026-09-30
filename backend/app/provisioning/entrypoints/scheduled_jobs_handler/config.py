@@ -1,3 +1,4 @@
+import json
 import os
 
 from app.shared import config
@@ -42,3 +43,7 @@ class AppConfig(config.VEWBaseConfig):
 
     def get_provisioned_product_cleanup_config(self) -> dict:
         return os.environ.get("PROVISIONED_PRODUCT_CLEANUP_CONFIG")
+
+    def get_workbench_lifecycle_defaults(self) -> dict:
+        """The deployment's workbench stop policy defaults (infra/config.py workbench-lifecycle); {} = built-in."""
+        return json.loads(os.environ.get("WORKBENCH_LIFECYCLE_DEFAULTS") or "{}")

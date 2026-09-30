@@ -6,6 +6,7 @@ from aws_lambda_powertools.event_handler import api_gateway, content_types
 from aws_lambda_powertools.event_handler.api_gateway import Router
 from aws_lambda_powertools.event_handler.exceptions import BadRequestError, NotFoundError, ServiceError
 
+from app.projects.domain.model import workbench_lifecycle
 from app.projects.entrypoints.s2s_api import bootstrapper
 from app.projects.entrypoints.s2s_api.model import api_model
 from app.projects.entrypoints.s2s_api.routers import access
@@ -141,6 +142,44 @@ def init(dependencies: bootstrapper.Dependencies) -> Router:  # noqa: C901
             router, dependencies.projects_query_service, project_id, "clients/projects/program.write"
         )
         dependencies.project_lifecycle_service.set_management(project_id, None, None)
+        return api_gateway.Response(status_code=HTTPStatus.NO_CONTENT)
+
+    def lifecycle_response(project_id: str, settings: workbench_lifecycle.WorkbenchLifecycle):
+        return api_model.ProjectWorkbenchLifecycleResponse(projectId=project_id, **settings.model_dump())
+
+    @router.get("/projects/<project_id>/workbench-lifecycle")
+    def get_project_workbench_lifecycle(project_id: str):
+        # 404 while the project uses the deployment's defaults, so import finds nothing.
+        access.require_project_access(
+            router, dependencies.projects_query_service, project_id, "clients/projects/program.read"
+        )
+        current = existing_project(project_id)
+        if current.workbenchLifecycle is None:
+            raise NotFoundError("Project uses the default workbench lifecycle")
+        return lifecycle_response(project_id, current.workbenchLifecycle)
+
+    @router.put("/projects/<project_id>/workbench-lifecycle")
+    def put_project_workbench_lifecycle(project_id: str, request: workbench_lifecycle.WorkbenchLifecycle):
+        # Upsert of the whole policy; omitted fields take their defaults.
+        access.require_project_access(
+            router, dependencies.projects_query_service, project_id, "clients/projects/program.write"
+        )
+        try:
+            dependencies.project_lifecycle_service.set_workbench_lifecycle(project_id, request)
+        except KeyError as exc:
+            raise NotFoundError("Project not found") from exc
+        return lifecycle_response(project_id, request)
+
+    @router.delete("/projects/<project_id>/workbench-lifecycle")
+    def delete_project_workbench_lifecycle(project_id: str):
+        # Back to the deployment's defaults. Idempotent: a missing project or policy is the desired state.
+        access.require_scope(router, "clients/projects/program.write")
+        if dependencies.projects_query_service.get_project_by_id(project_id) is None:
+            return api_gateway.Response(status_code=HTTPStatus.NO_CONTENT)
+        access.require_project_access(
+            router, dependencies.projects_query_service, project_id, "clients/projects/program.write"
+        )
+        dependencies.project_lifecycle_service.set_workbench_lifecycle(project_id, None)
         return api_gateway.Response(status_code=HTTPStatus.NO_CONTENT)
 
     return router

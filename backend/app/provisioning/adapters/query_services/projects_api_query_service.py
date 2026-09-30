@@ -73,6 +73,7 @@ class ProjectsApiQueryService(projects_query_service.ProjectsQueryService):
                 projectId=proj["projectId"],
                 projectName=proj["projectName"],
                 projectDescription=proj["projectDescription"],
+                workbenchLifecycle=proj.get("workbenchLifecycle"),
             )
             for proj in resp["projects"]
         ]
@@ -93,6 +94,7 @@ class ProjectsApiQueryService(projects_query_service.ProjectsQueryService):
             projectId=proj["projectId"],
             projectName=proj["projectName"],
             projectDescription=proj["projectDescription"],
+            workbenchLifecycle=proj.get("workbenchLifecycle"),
         )
 
     def get_project_assignment(self, project_id: str, user_id: str) -> project_assignment.ProjectAssignment | None:
@@ -137,7 +139,8 @@ class ProjectsApiQueryService(projects_query_service.ProjectsQueryService):
         )
 
     def _get_projects(self) -> dict:
-        params = {"pageSize": "20"}
+        # Every program in one page: the lifecycle jobs need all of them (fewer than 100 for now).
+        params = {"pageSize": "100"}
 
         return self._aws_api.call_api(
             path="internal/projects",

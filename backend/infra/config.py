@@ -302,6 +302,16 @@ _dev_provisioning_config = {
         "pp-experimental-cleanup-alert": 5,
         "pp-experimental-cleanup": 7,
     },
+    # Workbench stop policy defaults; projects override them (vew_project_workbench_lifecycle). The idle
+    # timeout reaches workbenches as the instance tag vew:autostop, for an idle agent in the image.
+    "workbench-lifecycle": {
+        "idleStopMinutes": 60,
+        "nightlyStop": False,
+        "nightlyStopTime": "21:00",
+        "timezone": "UTC",
+        "weekendStop": True,
+        "reconcileEveryMinutes": 5,
+    },
 }
 
 provisioning_app_config = {

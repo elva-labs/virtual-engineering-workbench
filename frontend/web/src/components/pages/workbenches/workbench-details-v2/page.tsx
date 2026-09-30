@@ -21,6 +21,7 @@ import { Feature } from '../../../feature-toggles/feature-toggle.state';
 import { useNavigationPaths } from '../../../layout/navigation/navigation-paths.logic';
 import { UserPrompt } from '../../shared/user-prompt';
 import { ProvisionedProductsToDeleteList } from '../../provisioned-products/components';
+import { WorkbenchSettings } from '../workbench-settings/workbench-settings';
 
 
 export function WorkbenchDetails() {
@@ -175,6 +176,12 @@ export function WorkbenchDetails() {
         {...props}
         dataTestPrefix="workbench"
         headerActions={renderActionHeader()}
+        extraSections={
+          <WorkbenchSettings
+            projectId={provisionedProduct?.projectId}
+            provisionedProductId={provisionedProduct?.provisionedProductId}
+          />
+        }
       ></ProvisionedProductDetails>
       {provisionedProduct ?
         <ProvisionedProductLogin

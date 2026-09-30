@@ -64,10 +64,11 @@ def handle_on_board_project_account_command(  # noqa: C901
     if not project:
         raise domain_exception.DomainException("Provided project does not exist.")
 
-    account_repo = unit_of_work.get_repository(project_account.ProjectAccountPrimaryKey, project_account.ProjectAccount)
     if command.reserved_account_id:
         with unit_of_work:
-            existing = account_repo.get(
+            existing = unit_of_work.get_repository(
+                project_account.ProjectAccountPrimaryKey, project_account.ProjectAccount
+            ).get(
                 project_account.ProjectAccountPrimaryKey(
                     projectId=command.project_id.value,
                     id=command.reserved_account_id,
@@ -106,7 +107,9 @@ def handle_on_board_project_account_command(  # noqa: C901
                 existing.onboardingOperationId = str(uuid4())
                 existing.onboardingPublicationStatus = project_account.ProjectAccountOnboardingPublicationStatus.Pending
                 with unit_of_work:
-                    account_repo.update_entity(
+                    unit_of_work.get_repository(
+                        project_account.ProjectAccountPrimaryKey, project_account.ProjectAccount
+                    ).update_entity(
                         project_account.ProjectAccountPrimaryKey(
                             projectId=command.project_id.value,
                             id=existing.id,
@@ -132,7 +135,9 @@ def handle_on_board_project_account_command(  # noqa: C901
                     project_account.ProjectAccountOnboardingPublicationStatus.Published
                 )
                 with unit_of_work:
-                    account_repo.update_entity(
+                    unit_of_work.get_repository(
+                        project_account.ProjectAccountPrimaryKey, project_account.ProjectAccount
+                    ).update_entity(
                         project_account.ProjectAccountPrimaryKey(
                             projectId=command.project_id.value,
                             id=existing.id,
@@ -175,7 +180,9 @@ def handle_on_board_project_account_command(  # noqa: C901
         raise domain_exception.DomainException(f"Account with id: {project_acct.awsAccountId} already onboarded")
 
     with unit_of_work:
-        account_repo.add(project_acct)
+        unit_of_work.get_repository(project_account.ProjectAccountPrimaryKey, project_account.ProjectAccount).add(
+            project_acct
+        )
         unit_of_work.commit()
 
     _publish_onboarding(
@@ -190,7 +197,9 @@ def handle_on_board_project_account_command(  # noqa: C901
     )
     project_acct.onboardingPublicationStatus = project_account.ProjectAccountOnboardingPublicationStatus.Published
     with unit_of_work:
-        account_repo.update_entity(
+        unit_of_work.get_repository(
+            project_account.ProjectAccountPrimaryKey, project_account.ProjectAccount
+        ).update_entity(
             project_account.ProjectAccountPrimaryKey(projectId=project_acct.projectId, id=project_acct.id),
             project_acct,
         )

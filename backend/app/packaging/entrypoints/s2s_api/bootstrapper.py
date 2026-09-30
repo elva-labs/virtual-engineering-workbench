@@ -19,9 +19,12 @@ from app.packaging.adapters.query_services import (
 )
 from app.packaging.adapters.repository import dynamo_entity_config
 from app.packaging.adapters.services import (
+    ami_factory_clients,
     aws_component_definition_service,
     ec2_image_builder_pipeline_service,
+    ec2_image_tag_service,
     parameter_service,
+    ssm_base_image_parameter_service,
 )
 from app.packaging.adapters.services.projects_api_service_client_project_access_service import (
     ProjectsApiServiceClientProjectAccessService,
@@ -35,7 +38,7 @@ from app.packaging.domain.command_handlers.component import (
     update_component_command_handler,
     update_component_version_command_handler,
 )
-from app.packaging.domain.command_handlers.image import create_image_command_handler
+from app.packaging.domain.command_handlers.image import create_image_command_handler, release_base_image_command_handler
 from app.packaging.domain.command_handlers.pipeline import (
     create_pipeline_command_handler,
     retire_pipeline_command_handler,
@@ -58,7 +61,9 @@ from app.packaging.domain.commands.component import (
     update_component_command,
     update_component_version_command,
 )
-from app.packaging.domain.commands.image import create_image_command
+from app.packaging.domain.commands.image import create_image_command, release_base_image_command
+from app.packaging.domain.model.recipe import base_image_channels as base_image_channels_model
+from app.packaging.domain.ports.base_image_release_service import BaseImageParameterService
 from app.packaging.domain.commands.pipeline import (
     create_pipeline_command,
     retire_pipeline_command,
@@ -138,6 +143,9 @@ class Dependencies(BaseModel):
     resume_component_version_creation: Callable[[str, str, str], None]
     resume_recipe_version_creation: Callable[[str, str, str], None]
     resume_pipeline_creation: Callable[[str, str], None]
+    # Base image release channels; disabled (no parameters) unless the deployment configures them.
+    base_image_channels: base_image_channels_model.BaseImageChannels = base_image_channels_model.BaseImageChannels()
+    base_image_parameter_service: BaseImageParameterService | None = None
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -429,6 +437,27 @@ def bootstrap(app_config: config.AppConfig, logger: logging.Logger) -> Dependenc
         create_image_command.CreateImageCommand, create_image
     )
 
+    channels = base_image_channels_model.from_environment()
+    ami_factory_client = ami_factory_clients.factory(
+        admin_role=app_config.get_admin_role(),
+        ami_factory_aws_account_id=app_config.get_ami_factory_account_id(),
+        region=app_config.get_default_region(),
+        boto_session=session,
+    )
+    base_image_parameters = ssm_base_image_parameter_service.SSMBaseImageParameterService(ami_factory_client)
+    command_bus.register_handler(
+        release_base_image_command.ReleaseBaseImageCommand,
+        partial(
+            release_base_image_command_handler.handle,
+            channels=channels,
+            image_qry_srv=image_query_service,
+            recipe_qry_srv=recipe_query_service,
+            parameter_srv=base_image_parameters,
+            image_tag_srv=ec2_image_tag_service.EC2ImageTagService(ami_factory_client),
+            logger=safe_logger,
+        ),
+    )
+
     registry = service_registry.ServiceRegistry.from_config(
         app_config=app_config,
         ssm_client=session.client("ssm", region_name=app_config.get_default_region()),
@@ -438,6 +467,8 @@ def bootstrap(app_config: config.AppConfig, logger: logging.Logger) -> Dependenc
         api=registry.api_for(bounded_contexts.BoundedContext.PROJECTS)
     )
     return Dependencies(
+        base_image_channels=channels,
+        base_image_parameter_service=base_image_parameters,
         project_access_service=project_access_service,
         command_bus=command_bus,
         recipe_domain_qry_srv=recipe_domain_query_service.RecipeDomainQueryService(recipe_qry_srv=recipe_query_service),

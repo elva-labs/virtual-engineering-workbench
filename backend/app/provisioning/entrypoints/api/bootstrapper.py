@@ -23,6 +23,7 @@ from app.provisioning.adapters.services import (
     ec2_instance_management_service,
 )
 from app.provisioning.domain.aggregates.internal import networking_helpers
+from app.provisioning.domain.model import workbench_lifecycle as workbench_lifecycle_model
 from app.provisioning.domain.command_handlers.product_provisioning import (
     authorize_user_ip_address,
     launch,
@@ -34,6 +35,7 @@ from app.provisioning.domain.command_handlers.provisioned_product_state import (
     initiate_start,
     initiate_stop,
     initiate_stop_by_admin,
+    workbench_lifecycle,
 )
 from app.provisioning.domain.command_handlers.user_profile import update as update_user_profile_command_handler
 from app.provisioning.domain.commands.product_provisioning import (
@@ -94,6 +96,7 @@ class Dependencies(BaseModel):
     virtual_targets_domain_qry_srv: provisioned_products_domain_query_service.ProvisionedProductsDomainQueryService
     user_profile_domain_qry_srv: user_profile_domain_query_service.UserProfileDomainQueryService
     prov_infra_qry_srv: provisioning_infrastructure_domain_query_service.ProvisioningInfrastructureDomainQueryService
+    workbench_lifecycle_srv: workbench_lifecycle.WorkbenchLifecycleService | None = None
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -470,4 +473,15 @@ def bootstrap(  # noqa: C901
         virtual_targets_domain_qry_srv=provisioned_products_domain_qry_srv,
         user_profile_domain_qry_srv=user_profile_domain_qry_srv,
         prov_infra_qry_srv=prov_infra_qry_srv,
+        workbench_lifecycle_srv=workbench_lifecycle.WorkbenchLifecycleService(
+            platform=workbench_lifecycle_model.PlatformLifecycleDefaults.model_validate(
+                app_config.get_workbench_lifecycle_defaults()
+            ),
+            pp_qry_srv=provisioned_products_qry_srv,
+            projects_qry_srv=projects_api_qs,
+            instance_mgmt_srv=instance_mgmt_srv,
+            uow=uow,
+            publisher=publisher,
+            logger=logger,
+        ),
     )

@@ -9,6 +9,7 @@ from app.projects.domain.model import (
     project,
     project_create_request,
     service_client_assignment,
+    workbench_lifecycle,
 )
 from app.shared.adapters.unit_of_work_v2 import unit_of_work
 from app.shared.adapters.message_bus import message_bus
@@ -160,6 +161,23 @@ class ProjectLifecycleService:
             self._uow.commit()
         # The full current state, so an update never drops the management mode.
         self._events.publish(project_updated.from_project(current))
+        return current
+
+    def set_workbench_lifecycle(self, project_id: str, settings: workbench_lifecycle.WorkbenchLifecycle | None):
+        """Replaces the project's workbench stop policy, or returns it to the deployment's defaults (None).
+        The Provisioning BC reads it through the internal projects API, so no event is needed."""
+        with self._uow:
+            repo = self._uow.get_repository(project.ProjectPrimaryKey, project.Project)
+            pk = project.ProjectPrimaryKey(projectId=project_id)
+            current = repo.get(pk)
+            if current is None:
+                raise KeyError(project_id)
+            if current.workbenchLifecycle == settings:
+                return current
+            current.workbenchLifecycle = settings
+            current.lastUpdateDate = datetime.now(timezone.utc).isoformat()
+            repo.update_entity(pk, current)
+            self._uow.commit()
         return current
 
     def set_management(self, project_id: str, managed_by: str | None, source: str | None):

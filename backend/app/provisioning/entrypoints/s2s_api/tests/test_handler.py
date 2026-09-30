@@ -321,6 +321,7 @@ def test_get_available_product_version(versions_domain_qs, lambda_context, authe
         stage=version_stage_value_object.from_str("dev"),
         region=region_value_object.from_str("us-east-1"),
         return_technical_params=False,
+        project_id="proj-12345",
     )
     response = api_model.GetAvailableProductVersionsResponse.model_validate(json.loads(result["body"]))
     assertpy.assert_that(response).is_not_none()

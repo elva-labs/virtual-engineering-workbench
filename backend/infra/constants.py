@@ -59,6 +59,14 @@ PROJECTS_SPOKE_ACCOUNT_SECRETS_SCOPE = "spoke-cfg"
 PROJECTS_SPOKE_ACCOUNT_SSM_PARAMETER_SCOPE = "spoke-cfg"
 
 PROVISIONED_PRODUCT_INSTANCE_PROFILE_POLICY = "ProvisionedProductInstanceProfilePermissionsPolicyV2"
+# Removes policies attached to a workbench's instance role from outside its template (for example an
+# SSM Quick Setup patch policy attaches one to every instance role) before CloudFormation deletes the
+# role; invoked by the product templates' InstanceRoleCleanup custom resource.
+WORKBENCH_ROLE_CLEANUP_FUNCTION = "WorkbenchInstanceRoleCleanup"
+# The product templates read the function's ARN from this spoke parameter (RoleCleanupFunctionArnSSM).
+WORKBENCH_ROLE_CLEANUP_FUNCTION_ARN_PARAMETER = (
+    "/proserve/wb/provisioning-enablement/workbench-role-cleanup-function-arn"
+)
 PROVISIONED_PRODUCT_TASK_ROLE_POLICY = "ProvisionedProductTaskRolePermissionsPolicyV2"
 
 CATALOG_SERVICE_EVENTS_DETAIL_TYPE = "Catalog SNS notifications"

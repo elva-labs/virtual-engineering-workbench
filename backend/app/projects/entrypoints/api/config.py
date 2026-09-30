@@ -62,6 +62,9 @@ class AppConfig(BaseModel):
     def get_cognito_user_pool_id(self) -> str:
         return os.environ.get("COGNITO_USER_POOL_ID", "")
 
+    def get_user_pool_url(self) -> str:
+        return os.environ.get("USER_POOL_URL", "")
+
 
 config = {
     "cors_config": {

@@ -897,6 +897,71 @@ paths:
         requestTemplates:
           application/json: '{"statusCode": 200}'
         passthroughBehavior: "when_no_match"
+  /projects/{projectId}/groups:
+    get:
+      description: "Get active Entra group grants for a project"
+      operationId: "GetProjectGroups"
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "200 response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetProjectGroupsResponse"
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        passthroughBehavior: "when_no_match"
+        contentHandling: "CONVERT_TO_TEXT"
+        credentials: "{{apigw_invocation_role_arn}}"
+    options:
+      description: "CORS"
+      operationId: "QueryProjectGroupsCors"
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "200 response"
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
+            Access-Control-Allow-Methods:
+              schema:
+                type: string
+            Access-Control-Allow-Headers:
+              schema:
+                type: string
+      security: []
+      x-amazon-apigateway-integration:
+        type: "mock"
+        responses:
+          default:
+            statusCode: "200"
+            responseParameters:
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Origin: "{{cors_origin}}"
+        requestTemplates:
+          application/json: '{"statusCode": 200}'
+        passthroughBehavior: "when_no_match"
   /projects/{projectId}/users:
     delete:
       description: "Remove multiple users from a specific project"
@@ -1559,6 +1624,38 @@ paths:
           - "method.request.querystring.pageSize"
         contentHandling: "CONVERT_TO_TEXT"
         credentials: "{{apigw_invocation_role_arn}}"
+  /internal/projects/{projectId}/groups:
+    get:
+      description: "Get project group grants, including tombstones for reconciliation"
+      operationId: "GetInternalProjectGroups"
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: includeDeleted
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: "200 response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetProjectGroupsResponse"
+      security:
+        - sigv4: []
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        passthroughBehavior: "when_no_match"
+        contentHandling: "CONVERT_TO_TEXT"
+        credentials: "{{apigw_invocation_role_arn}}"
   /internal/projects/{projectId}/users:
     get:
       description: "Get all project assignments via internal API"
@@ -2043,6 +2140,11 @@ components:
           type: array
           items:
             "$ref": "#/components/schemas/ProjectAssignment"
+        effectiveAccess:
+          title: Effective project roles
+          type: array
+          items:
+            "$ref": "#/components/schemas/EffectiveProjectAccess"
         enrolments:
           title: Enrolments
           type: array
@@ -2156,6 +2258,10 @@ components:
           title: UserEmail
           type: string
           description: Email address of the user
+        userDisplayName:
+          title: UserDisplayName
+          type: string
+          description: Display name supplied with the direct assignment
         activeDirectoryGroups:
           title: ActiveDirectoryGroups
           type: array
@@ -2179,6 +2285,51 @@ components:
           type: array
           items:
             "$ref": "#/components/schemas/GetProjectAssignmentsResponseItem"
+    EffectiveProjectAccess:
+      title: EffectiveProjectAccess
+      type: object
+      required:
+        - projectId
+        - roles
+      properties:
+        projectId:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+    ProjectGroupAssignment:
+      title: ProjectGroupAssignment
+      type: object
+      required:
+        - projectId
+        - groupId
+        - roles
+      properties:
+        projectId:
+          type: string
+        groupId:
+          type: string
+        groupName:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        version:
+          type: integer
+        isDeleted:
+          type: boolean
+    GetProjectGroupsResponse:
+      title: GetProjectGroupsResponse
+      type: object
+      required:
+        - assignments
+      properties:
+        assignments:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ProjectGroupAssignment"
     GetProjectAssignmentResponseItem:
       title: GetProjectAssignmentResponseItem
       required:
@@ -2415,7 +2566,7 @@ components:
         type: "request"
         authorizerUri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{authorization_bc_handler_arn}}/invocations"
         authorizerCredentials: "{{apigw_invocation_role_arn}}"
-        authorizerResultTtlInSeconds: 1800
+        authorizerResultTtlInSeconds: 0
         identitySource: "method.request.header.Authorization, context.path, context.httpMethod"
     sigv4:
       type: "apiKey"

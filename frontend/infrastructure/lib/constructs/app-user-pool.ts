@@ -64,7 +64,8 @@ export class WebUserPool extends Construct {
       customAttributes: {
         user_tid: new cognito.StringAttribute({
           mutable: true
-        })
+        }),
+        entra_groups: new cognito.StringAttribute({ mutable: true })
       },
       signInAliases: {
         username: false,
@@ -124,7 +125,7 @@ export class WebUserPool extends Construct {
     return this;
   }
 
-  withIdentityProvider(identityProviderSecretName: string, userIdClaim = 'sub'): WebUserPool {
+  withIdentityProvider(identityProviderSecretName: string, userIdClaim = 'sub', groupIdClaim = 'groups'): WebUserPool {
     this._userPool.registerIdentityProvider(new UserPoolIdentityProviderOidc(this, 'oidc-provider', {
       userPool: this._userPool,
       name: 'CorporateLogin',
@@ -148,6 +149,7 @@ export class WebUserPool extends Construct {
         familyName: ProviderAttribute.other('family_name'),
         custom: {
           'custom:user_tid': ProviderAttribute.other(userIdClaim), // eslint-disable-line
+          'custom:entra_groups': ProviderAttribute.other(groupIdClaim), // eslint-disable-line
         }
       },
     }));
@@ -199,6 +201,7 @@ export class WebUserPool extends Construct {
     }
 
     return this._userPool.addClient(name, {
+      // Keep Cognito's default read access to all attributes, including custom:entra_groups.
       userPoolClientName: `${this._appName.replace(/[^a-zA-Z0-9]/gu, '-')}-${name}`,
       supportedIdentityProviders,
       authFlows: {

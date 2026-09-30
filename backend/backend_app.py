@@ -355,6 +355,7 @@ if custom_domain and cert_arn:
             (publishing_stack.api.api, constants.CUSTOM_DNS_API_PATH_PUBLISHING),
             (packaging_stack.s2s_api.api, constants.CUSTOM_DNS_S2S_API_PATH_PACKAGING),
             (projects_stack.s2s_api.api, constants.CUSTOM_DNS_S2S_API_PATH_PROJECTS),
+            (publishing_stack.s2s_api.api, constants.CUSTOM_DNS_S2S_API_PATH_PUBLISHING),
             (
                 provisioning_stack.s2s_api.api,
                 constants.CUSTOM_DNS_S2S_API_PATH_PROVISIONING,

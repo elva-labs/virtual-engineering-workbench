@@ -2,7 +2,7 @@ import typing
 from dataclasses import dataclass
 
 from app.packaging.domain.exceptions import domain_exception
-from app.packaging.domain.model.recipe import recipe
+from app.packaging.domain.model.recipe import base_image_channels, recipe
 
 
 @dataclass(frozen=True)
@@ -34,8 +34,10 @@ def _handle_not_in_a_list_errors(
         raise domain_exception.DomainException(f"Recipe platform should be in {recipe.RecipePlatform.list()}.")
     if architecture not in recipe.RecipeArchitecture.list():
         raise domain_exception.DomainException(f"Recipe architecture should be in {recipe.RecipeArchitecture.list()}.")
-    if os_version not in recipe.RecipeOsVersion.list():
-        raise domain_exception.DomainException(f"Recipe OS version should be in {recipe.RecipeOsVersion.list()}.")
+    # The deployment's base image entries (base_image_channels) are OS versions too.
+    os_versions = recipe.RecipeOsVersion.list() + sorted(base_image_channels.from_environment().os_versions)
+    if os_version not in os_versions:
+        raise domain_exception.DomainException(f"Recipe OS version should be in {os_versions}.")
 
 
 def _handle_platform_is_Linux(
@@ -63,9 +65,9 @@ def _handle_platform_is_Windows(
                 f"Recipe platform {recipe.RecipePlatform.Windows.value} does not "
                 f"support {recipe.RecipeArchitecture.Arm64.value} architecture."
             )
-        if os_version in {
-            recipe.RecipeOsVersion.Ubuntu_24.value,
-        }:
+        channels = base_image_channels.from_environment()
+        linux_bases = channels.os_versions if channels.platform == recipe.RecipePlatform.Linux.value else set()
+        if os_version in {recipe.RecipeOsVersion.Ubuntu_24.value, *linux_bases}:
             raise domain_exception.DomainException(
                 f"Recipe platform {recipe.RecipePlatform.Windows.value} does "
                 f"not support {recipe.RecipePlatform.Linux.value} OS versions."

@@ -90,6 +90,8 @@ class IntegrationOauthStack(aws_cdk.Stack):
                     "pipeline.read": "Allows service clients to read pipelines and image build status",
                     "pipeline.write": "Allows service clients to manage pipelines",
                     "pipeline.execute": "Allows service clients to start image builds",
+                    "base_image.read": "Allows service clients to read the released base images",
+                    "base_image.write": "Allows service clients to release base images (releasing project only)",
                 },
             ),
         )
@@ -150,6 +152,8 @@ class IntegrationOauthStack(aws_cdk.Stack):
                         "pipeline.read",
                         "pipeline.write",
                         "pipeline.execute",
+                        "base_image.read",
+                        "base_image.write",
                     ],
                 ),
                 backend_app_api_oauth_client.AppClientResourceServer(

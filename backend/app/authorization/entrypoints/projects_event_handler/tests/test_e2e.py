@@ -118,3 +118,15 @@ def test_user_unassigned_removes_assignment(
     saved_entity = backend_app_dynamodb_table.get_item(Key={"PK": "USER#test-user-id", "SK": "PROJECT#proj-123"})
 
     assertpy.assert_that(saved_entity.get("Item", None)).is_none()
+
+
+def test_group_events_project_and_revoke_without_user_records(generate_event, backend_app_dynamodb_table, lambda_context):
+    from app.authorization.entrypoints.projects_event_handler import handler
+    group = "12345678-1234-1234-1234-123456789abc"
+    for version, deleted in [(1, False), (2, True), (1, False)]:
+        event = generate_event(detail_type="ProjectGroupAssignmentChanged", detail={
+            "projectId": "proj-123", "groupId": group, "roles": ["ADMIN"], "version": version, "isDeleted": deleted})
+        handler.handler(event=event, context=lambda_context)
+    record = backend_app_dynamodb_table.get_item(Key={"PK": f"GROUP#{group}", "SK": "PROJECT#proj-123"})["Item"]
+    assert record["isDeleted"] and record["version"] == 2
+    assert not any(item["PK"].startswith("USER#") for item in backend_app_dynamodb_table.scan()["Items"])

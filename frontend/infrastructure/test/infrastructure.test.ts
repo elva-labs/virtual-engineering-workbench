@@ -17,6 +17,7 @@ class FEStack {
     logoutUrl: string | null = 'http://localhost',
     oidcUserIdClaim?: string,
     domainName?: string,
+    oidcGroupIdClaim?: string,
   ) {
     const cdkCfg: { [key: string]: string } = {};
     if (logoutUrl !== null) {
@@ -28,6 +29,7 @@ class FEStack {
     if (oidcUserIdClaim !== undefined) {
       cdkCfg.OIDCUserIdClaim = oidcUserIdClaim;
     }
+    Object.assign(cdkCfg, { OIDCGroupIdClaim: oidcGroupIdClaim });
 
     const app = new App({
       context: {
@@ -255,6 +257,31 @@ test('OIDC user ID should default to the subject claim', () => {
     AttributeMapping: Match.objectLike({
       'custom:user_tid': 'sub',
     }),
+  }));
+});
+
+test('OIDC group IDs default to the groups claim and are readable to the web client', () => {
+  const template = Template.fromStack(FEStack.get('fake-secret-name'));
+  template.hasResourceProperties('AWS::Cognito::UserPool', Match.objectLike({
+    Schema: Match.arrayWith([Match.objectLike({ Name: 'entra_groups', Mutable: true })])
+  }));
+  template.hasResourceProperties('AWS::Cognito::UserPoolIdentityProvider', Match.objectLike({
+    AttributeMapping: Match.objectLike({ 'custom:entra_groups': 'groups' })
+  }));
+  template.hasResourceProperties('AWS::Cognito::UserPoolClient', Match.objectLike({
+    ReadAttributes: Match.absent()
+  }));
+});
+
+test('configured OIDC group ID claim is mapped to Cognito', () => {
+  const template = Template.fromStack(FEStack.get(
+    'fake-secret-name', 'http://localhost', undefined, undefined,
+    'https://example.com/claims/entra_groups'
+  ));
+  template.hasResourceProperties('AWS::Cognito::UserPoolIdentityProvider', Match.objectLike({
+    AttributeMapping: Match.objectLike({
+      'custom:entra_groups': 'https://example.com/claims/entra_groups'
+    })
   }));
 });
 

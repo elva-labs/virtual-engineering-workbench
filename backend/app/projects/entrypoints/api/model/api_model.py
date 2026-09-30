@@ -210,6 +210,9 @@ class GetProjectAssignmentsResponseItem(BaseModel):
     userId: Optional[str] = Field(None, description="User TID", title="UserId")
     roles: Optional[List[str]] = Field(None, description="User roles in the project", title="Roles")
     userEmail: Optional[str] = Field(None, description="Email address of the user", title="UserEmail")
+    userDisplayName: Optional[str] = Field(
+        None, description="Display name supplied with the direct assignment", title="UserDisplayName"
+    )
     activeDirectoryGroups: Optional[List[GetProjectAssignmentsResponseItemADGroup]] = Field(
         None,
         description="Active directory groups that the user is member of",
@@ -225,6 +228,19 @@ class GetProjectAssignmentsResponseItem(BaseModel):
 class GetProjectAssignmentsResponse(BaseModel):
     nextToken: Optional[str] = Field(None, title="LastEvaluatedKey token")
     assignments: Optional[List[GetProjectAssignmentsResponseItem]] = Field(None, title="Assignments")
+
+
+class ProjectGroupAssignment(BaseModel):
+    projectId: str
+    groupId: str
+    roles: List[str]
+    groupName: Optional[str] = None
+    version: Optional[int] = None
+    isDeleted: Optional[bool] = None
+
+
+class GetProjectGroupsResponse(BaseModel):
+    assignments: List[ProjectGroupAssignment]
 
 
 class GetProjectAssignmentResponseItem(BaseModel):
@@ -351,10 +367,16 @@ class ProjectAssignment(BaseModel):
     userEmail: Optional[str] = Field(None, description="User email.", title="UserEmail")
 
 
+class EffectiveProjectAccess(BaseModel):
+    projectId: str
+    roles: List[str]
+
+
 class GetProjectsResponse(BaseModel):
     nextToken: Optional[Dict[str, Any]] = Field(None, title="LastEvaluatedKey token")
     projects: List[Project] = Field(..., title="Projects")
     assignments: Optional[List[ProjectAssignment]] = Field(None, title="Assignments")
+    effectiveAccess: Optional[List[EffectiveProjectAccess]] = Field(None, title="Effective project roles")
     enrolments: Optional[List[ProjectEnrolment]] = Field(None, title="Enrolments")
 
 

@@ -206,7 +206,7 @@ def test_assign_already_existing_user_should_raise(
     _, projects_query_service_mock, message_bus_mock = handler_dependencies
 
     projects_query_service_mock.get_project_by_id.return_value = sample_project
-    projects_query_service_mock.get_user_assignment.return_value = user_sample_assignment
+    projects_query_service_mock.get_user_assignment.return_value = user_sample_assignment()
 
     # Act and Assert
     with pytest.raises(domain_exception.DomainException):
@@ -217,3 +217,50 @@ def test_assign_already_existing_user_should_raise(
             message_bus=message_bus_mock,
             user_directory_service=user_directory_service_mock,
         )
+
+
+def test_supplied_metadata_persists_without_directory_user(
+    handler_dependencies, sample_project, mock_uow_2, mock_assignments_repo, user_directory_service_mock
+):
+    command_to_assign = command.AssignUserCommand(
+        project_id=project_id_value_object.from_str("123"),
+        user_id=user_id_value_object.from_str("unknown-user"),
+        roles=[user_role_value_object.from_str(Role.PLATFORM_USER)],
+        user_email="new@example.com",
+        user_display_name="New User",
+    )
+    _, query, events = handler_dependencies
+    query.get_project_by_id.return_value = sample_project
+    query.get_user_assignment.return_value = None
+    command_handler.handle_assign_user_command(
+        cmd=command_to_assign, unit_of_work=mock_uow_2, projects_query_service=query,
+        message_bus=events, user_directory_service=user_directory_service_mock,
+    )
+    saved = mock_assignments_repo.add.call_args.args[0]
+    assert saved.userEmail == "new@example.com"
+    assert saved.userDisplayName == "New User"
+    user_directory_service_mock.get_user_email.assert_not_called()
+
+
+def test_repeating_same_direct_assignment_is_idempotent(
+    handler_dependencies, sample_project, mock_uow_2, user_directory_service_mock
+):
+    command_to_assign = command.AssignUserCommand(
+        project_id=project_id_value_object.from_str("123"),
+        user_id=user_id_value_object.from_str("unknown-user"),
+        roles=[user_role_value_object.from_str(Role.PLATFORM_USER)],
+        user_email="new@example.com",
+        user_display_name="New User",
+    )
+    _, query, events = handler_dependencies
+    query.get_project_by_id.return_value = sample_project
+    query.get_user_assignment.return_value = project_assignment.Assignment(
+        userId="UNKNOWN-USER", projectId="123", roles=[Role.PLATFORM_USER],
+        userEmail="new@example.com", userDisplayName="New User",
+    )
+    command_handler.handle_assign_user_command(
+        cmd=command_to_assign, unit_of_work=mock_uow_2, projects_query_service=query,
+        message_bus=events, user_directory_service=user_directory_service_mock,
+    )
+    mock_uow_2.commit.assert_not_called()
+    events.publish.assert_not_called()

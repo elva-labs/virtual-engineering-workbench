@@ -225,6 +225,7 @@ def mock_template_domain_qry_srv():
 
     mock_srv = mock.Mock(spec=template_domain_query_service.TemplateDomainQueryService)
     mock_srv.get_default_template_file_name.return_value = "draft_workbench.yml"
+    mock_srv.get_latest_draft_template.return_value = "Resources: {}"
     return mock_srv
 
 

@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from app.publishing.domain.events import product_version_creation_started
 from app.publishing.domain.exceptions import domain_exception
-from app.publishing.domain.model import portfolio, product, version
+from app.publishing.domain.model import portfolio, product, product_template, version
 from app.publishing.domain.model.version import VersionReleaseType
 from app.publishing.domain.ports import (
     iac_service,
@@ -24,18 +24,18 @@ from app.shared.adapters.unit_of_work_v2 import unit_of_work
 from app.shared.api import parameter_service
 
 
-def _get_latest_released_version_info(
+# The first version of a product, as for a version created in the portal (create_version_command_handler).
+INITIAL_VERSION = version.format_version_name("1", "0", "0", version.VersionType.ReleaseCandidate, "1")
+
+
+def _get_latest_version_name(
     versions_qry_srv: versions_query_service.VersionsQueryService,
     product_id: str,
-) -> typing.Tuple[str, str]:
-    latest_version_name, latest_version_id = versions_qry_srv.get_latest_version_name_and_id(
+) -> str | None:
+    latest_version_name, _ = versions_qry_srv.get_latest_version_name_and_id(
         product_id=product_id, version_name_begins_with=None
     )
-
-    if not latest_version_name:
-        raise domain_exception.DomainException(f"No released version found for product {product_id}")
-
-    return latest_version_name, latest_version_id
+    return latest_version_name
 
 
 def _calculate_new_version_name(latest_version_name: str, release_type: str) -> str:
@@ -139,13 +139,17 @@ def _prepare_template(
     product_id: str,
     version_id: str,
     project_id: str,
+    architecture: str | None,
 ) -> typing.Tuple[str, typing.List]:
     template_content = template_domain_qry_srv.get_latest_draft_template(
         project_id=project_id_value_object.from_str(project_id),
         product_id=product_id_value_object.from_str(product_id),
     )
 
-    is_valid, parameters, error_message = stack_srv.validate_template(template_body=template_content)
+    # The draft stays a Jinja template (rendered at publish); CloudFormation validates it rendered.
+    is_valid, parameters, error_message = stack_srv.validate_template(
+        template_body=product_template.render_for_validation(template_content, architecture=architecture)
+    )
     if not is_valid:
         raise domain_exception.DomainException(f"The template is invalid: {error_message}")
 
@@ -266,8 +270,10 @@ def handle(
 
         product_entity = _get_and_validate_product(uow, project_id, product_id)
 
-        latest_released_version_name, _ = _get_latest_released_version_info(version_qry_srv, product_id)
-        logger.info(f"Found latest released version: {latest_released_version_name}")
+        # A product linked to a pipeline gets its first version from the first build (this used to require
+        # an existing version, so a new product never got one).
+        latest_version_name = _get_latest_version_name(version_qry_srv, product_id)
+        logger.info(f"Found latest version: {latest_version_name}")
 
         fetched_dev_portfolios = _get_dev_portfolios(portf_qry_srv, product_entity.technologyId)
 
@@ -280,7 +286,9 @@ def handle(
         )
 
         version_id = version.generate_version_id()
-        new_version_name = _calculate_new_version_name(latest_released_version_name, release_type)
+        new_version_name = (
+            _calculate_new_version_name(latest_version_name, release_type) if latest_version_name else INITIAL_VERSION
+        )
         logger.info(f"New version name: {new_version_name}")
 
         template_path, parameters = _prepare_template(
@@ -291,6 +299,7 @@ def handle(
             product_id,
             version_id,
             project_id,
+            architecture if product_entity.productType != product.ProductType.Container else None,
         )
 
         additional_attributes = _get_additional_attributes(

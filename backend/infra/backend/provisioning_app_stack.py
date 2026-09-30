@@ -856,7 +856,10 @@ class ProvisioningAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
         aws_events.Rule(
             self,
             "sync-scheduler-rule",
-            schedule=aws_events.Schedule.cron(minute="30"),  # once every hour at half hour to prevent overlap
+            # Every few minutes, off the minutes of the 5-minute metrics job (config "sync-job-cron-minute").
+            schedule=aws_events.Schedule.cron(
+                minute=app_config.component_specific.get("sync-job-cron-minute", "2/5")
+            ),
             targets=[
                 aws_events_targets.LambdaFunction(
                     self._backend_app.app_entries_functions[self._scheduled_jobs_handler_name],

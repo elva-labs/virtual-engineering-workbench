@@ -38,7 +38,6 @@ def handle(
     if not account:
         raise domain_exception.DomainException("Account does not exist.")
 
-    account_repo = unit_of_work.get_repository(project_account.ProjectAccountPrimaryKey, project_account.ProjectAccount)
     if account.accountStatus in (
         project_account.ProjectAccountStatusEnum.OnBoarding,
         project_account.ProjectAccountStatusEnum.ReOnboarding,
@@ -49,7 +48,9 @@ def handle(
             account.onboardingOperationId = str(uuid4())
             account.onboardingPublicationStatus = project_account.ProjectAccountOnboardingPublicationStatus.Pending
             with unit_of_work:
-                account_repo.update_entity(
+                unit_of_work.get_repository(
+                    project_account.ProjectAccountPrimaryKey, project_account.ProjectAccount
+                ).update_entity(
                     project_account.ProjectAccountPrimaryKey(projectId=command.project_id.value, id=account.id),
                     account,
                 )
@@ -66,7 +67,9 @@ def handle(
         )
         account.onboardingPublicationStatus = project_account.ProjectAccountOnboardingPublicationStatus.Published
         with unit_of_work:
-            account_repo.update_entity(
+            unit_of_work.get_repository(
+                project_account.ProjectAccountPrimaryKey, project_account.ProjectAccount
+            ).update_entity(
                 project_account.ProjectAccountPrimaryKey(projectId=command.project_id.value, id=account.id),
                 account,
             )
@@ -85,7 +88,9 @@ def handle(
     )
 
     with unit_of_work:
-        account_repo.update_entity(
+        unit_of_work.get_repository(
+            project_account.ProjectAccountPrimaryKey, project_account.ProjectAccount
+        ).update_entity(
             project_account.ProjectAccountPrimaryKey(
                 projectId=command.project_id.value,
                 id=command.account_id.value,
@@ -106,7 +111,9 @@ def handle(
     )
     account.onboardingPublicationStatus = project_account.ProjectAccountOnboardingPublicationStatus.Published
     with unit_of_work:
-        account_repo.update_entity(
+        unit_of_work.get_repository(
+            project_account.ProjectAccountPrimaryKey, project_account.ProjectAccount
+        ).update_entity(
             project_account.ProjectAccountPrimaryKey(projectId=command.project_id.value, id=account.id),
             account,
         )

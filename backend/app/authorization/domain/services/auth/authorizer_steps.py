@@ -14,12 +14,10 @@ from app.authorization.domain.ports import (
     authorization_service,
 )
 from app.authorization.domain.read_models import project_assignment
+from app.authorization.domain.read_models import project_assignment as project_assignment_model
 from app.authorization.domain.services.auth import authorizer
 
 from app.shared.identity.entra_groups import group_ids, effective_roles
-
-# An alias for methods whose arguments shadow the module name.
-project_assignment_model = project_assignment
 
 USER_ID_CLAIM_NAME = "custom:user_tid"
 

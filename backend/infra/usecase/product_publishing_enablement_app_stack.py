@@ -257,6 +257,14 @@ class ProductPublishingEnablementAppStack(Stack):
                 resources=[f"arn:{Aws.PARTITION}:lambda:{Aws.REGION}:{Aws.ACCOUNT_ID}:function:SC-*"],
                 effect=iam.Effect.ALLOW,
             ),
+            # The product templates' InstanceRoleCleanup custom resource (provisioning enablement stack).
+            iam.PolicyStatement(
+                actions=["lambda:InvokeFunction"],
+                resources=[
+                    f"arn:{Aws.PARTITION}:lambda:{Aws.REGION}:{Aws.ACCOUNT_ID}:function:{constants.WORKBENCH_ROLE_CLEANUP_FUNCTION}"
+                ],
+                effect=iam.Effect.ALLOW,
+            ),
             iam.PolicyStatement(
                 actions=["kms:Decrypt", "kms:GenerateDataKey"],
                 resources=[f"arn:{Aws.PARTITION}:kms:{Aws.REGION}:{catalog_service_account_id}:key/*"],

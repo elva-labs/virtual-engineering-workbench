@@ -59,7 +59,7 @@ from app.projects.entrypoints.api.model import api_model
 from app.shared.adapters.boto import paging_utils
 from app.shared.logging.helpers import clear_auth_headers
 from app.shared.identity.entra_groups import effective_roles, group_ids
-from app.shared.middleware import authorization, exception_handler
+from app.shared.middleware import authorization, exception_handler, externally_managed
 from app.shared.middleware.metric import metric_handlers
 from app.shared.middleware.metric.types import MetricDimensionNames
 
@@ -75,7 +75,13 @@ app = api_gateway.APIGatewayRestResolver(
     strip_prefixes=(app_config.get_strip_prefixes() if app_config.get_custom_dns_name() else []),
     enable_validation=True,
 )
-app.use(middlewares=[authorization.require_auth_context])
+app.use(
+    middlewares=[
+        authorization.require_auth_context,
+        # Externally managed projects are changed in their source, not in the portal.
+        externally_managed.refuse_changes_to_managed_projects(),
+    ]
+)
 app.enable_swagger(
     path="/_swagger",
     title="Projects BC API",

@@ -159,6 +159,9 @@ def test_schema_exposes_component_and_recipe_slices(api_schema):
         "/projects/{projectId}/pipelines/{pipelineId}",
         "/projects/{projectId}/images",
         "/projects/{projectId}/images/{imageId}",
+        "/base-images",
+        "/base-images/{architecture}",
+        "/base-images/{architecture}/{channel}",
     }
     assert set(api_schema["paths"]["/projects/{projectId}/components/{componentId}"]) >= {
         "put",

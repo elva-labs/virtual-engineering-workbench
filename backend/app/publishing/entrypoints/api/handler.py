@@ -46,7 +46,7 @@ from app.publishing.domain.value_objects import (
 from app.publishing.entrypoints.api import bootstrapper, config
 from app.publishing.entrypoints.api.model import api_model
 from app.shared.logging.helpers import clear_auth_headers
-from app.shared.middleware import authorization, exception_handler
+from app.shared.middleware import authorization, exception_handler, externally_managed
 from app.shared.middleware.metric import metric_handlers
 from app.shared.middleware.metric.types import MetricDimensionNames
 
@@ -62,7 +62,15 @@ app = api_gateway.APIGatewayRestResolver(
     strip_prefixes=app_config.get_strip_prefixes(),
     enable_validation=True,
 )
-app.use(middlewares=[authorization.require_auth_context])
+app.use(
+    middlewares=[
+        authorization.require_auth_context,
+        # Externally managed projects are changed in their source, not in the portal.
+        externally_managed.refuse_changes_to_managed_projects(
+            allowed=[("POST", r"/projects/\{projectId\}/products/\{productId\}/versions/validate")]
+        ),
+    ]
+)
 app.enable_swagger(
     path="/_swagger",
     title="Publishing BC API",

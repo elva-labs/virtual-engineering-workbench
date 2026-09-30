@@ -1,14 +1,10 @@
 from http import HTTPStatus
-from uuid import UUID, RFC_4122
+from uuid import RFC_4122, UUID
 
 from aws_lambda_powertools import Tracer
-from aws_lambda_powertools.event_handler.api_gateway import Router
 from aws_lambda_powertools.event_handler import api_gateway, content_types
-from aws_lambda_powertools.event_handler.exceptions import (
-    BadRequestError,
-    NotFoundError,
-    ServiceError,
-)
+from aws_lambda_powertools.event_handler.api_gateway import Router
+from aws_lambda_powertools.event_handler.exceptions import BadRequestError, NotFoundError, ServiceError
 
 from app.projects.entrypoints.s2s_api import bootstrapper
 from app.projects.entrypoints.s2s_api.model import api_model
@@ -17,7 +13,7 @@ from app.projects.entrypoints.s2s_api.routers import access
 tracer = Tracer()
 
 
-def init(dependencies: bootstrapper.Dependencies) -> Router:
+def init(dependencies: bootstrapper.Dependencies) -> Router:  # noqa: C901
     router = Router()
 
     @router.get("/projects")
@@ -25,15 +21,9 @@ def init(dependencies: bootstrapper.Dependencies) -> Router:
         access.require_scope(router, "clients/projects/program.read")
         page_size = int(router.current_event.get_query_string_value("pageSize") or 10)
         next_token = router.current_event.get_query_string_value("nextToken")
-        projects, last_evaluated_key, _ = (
-            dependencies.projects_query_service.list_projects(
-                page_size, next_token, None
-            )
-        )
+        projects, last_evaluated_key, _ = dependencies.projects_query_service.list_projects(page_size, next_token, None)
         return api_model.GetProjectsResponse(
-            projects=[
-                api_model.Project.model_validate(p.model_dump()) for p in projects
-            ],
+            projects=[api_model.Project.model_validate(p.model_dump()) for p in projects],
             nextToken=last_evaluated_key,
         )
 
@@ -106,5 +96,51 @@ def init(dependencies: bootstrapper.Dependencies) -> Router:
         except KeyError as exc:
             raise NotFoundError("Project not found") from exc
         return api_model.Project.model_validate(updated.model_dump())
+
+    def existing_project(project_id: str):
+        current = dependencies.projects_query_service.get_project_by_id(project_id)
+        if current is None:
+            raise NotFoundError("Project not found")
+        return current
+
+    @router.get("/projects/<project_id>/management")
+    def get_project_management(project_id: str):
+        # 404 while the portal owns the project: the resource does not exist, so import finds nothing.
+        access.require_project_access(
+            router, dependencies.projects_query_service, project_id, "clients/projects/program.read"
+        )
+        current = existing_project(project_id)
+        if not current.managedBy:
+            raise NotFoundError("Project is not externally managed")
+        return api_model.ProjectManagementResponse(
+            projectId=project_id, managedBy=current.managedBy, source=current.managedSource or ""
+        )
+
+    @router.put("/projects/<project_id>/management")
+    def put_project_management(project_id: str, request: api_model.ProjectManagement):
+        # Upsert; repeating it with the same body changes nothing.
+        access.require_project_access(
+            router, dependencies.projects_query_service, project_id, "clients/projects/program.write"
+        )
+        try:
+            dependencies.project_lifecycle_service.set_management(project_id, request.managedBy, request.source)
+        except KeyError as exc:
+            raise NotFoundError("Project not found") from exc
+        return api_model.ProjectManagementResponse(
+            projectId=project_id, managedBy=request.managedBy, source=request.source
+        )
+
+    @router.delete("/projects/<project_id>/management")
+    def delete_project_management(project_id: str):
+        # Hands the project back to the portal. Idempotent: a missing project or mark is already the
+        # desired state.
+        access.require_scope(router, "clients/projects/program.write")
+        if dependencies.projects_query_service.get_project_by_id(project_id) is None:
+            return api_gateway.Response(status_code=HTTPStatus.NO_CONTENT)
+        access.require_project_access(
+            router, dependencies.projects_query_service, project_id, "clients/projects/program.write"
+        )
+        dependencies.project_lifecycle_service.set_management(project_id, None, None)
+        return api_gateway.Response(status_code=HTTPStatus.NO_CONTENT)
 
     return router

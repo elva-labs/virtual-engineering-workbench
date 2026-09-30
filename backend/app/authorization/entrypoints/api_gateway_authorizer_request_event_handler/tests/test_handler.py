@@ -40,6 +40,8 @@ def test_authorizer_lambda_handler_successful_authorization(
                 "stages": '["prod"]',
                 "userRoles": '["PLATFORM_USER"]',
                 "userDomains": '["TEST_DOMAIN"]',
+                "projectManagedBy": "",
+                "projectManagedSource": "",
                 "stages": '["prod"]',
             },
             "policyDocument": {
@@ -212,6 +214,8 @@ def test_authorizer_lambda_handler_multiple_roles_and_domains(
                 "stages": '["dev", "prod", "qa"]',
                 "userRoles": '["ADMIN", "PLATFORM_USER"]',
                 "userDomains": '["domain1", "domain2"]',
+                "projectManagedBy": "",
+                "projectManagedSource": "",
             },
             "policyDocument": {
                 "Version": "2012-10-17",
@@ -260,6 +264,8 @@ def test_authorizer_lambda_handler_when_no_assignments(
                 "stages": "[]",
                 "userRoles": "[]",
                 "userDomains": "[]",
+                "projectManagedBy": "",
+                "projectManagedSource": "",
             },
             "policyDocument": {
                 "Version": "2012-10-17",
@@ -311,6 +317,8 @@ def test_authorizer_lambda_handler_when_not_in_a_project_scope(
                 "stages": "[]",
                 "userRoles": "[]",
                 "userDomains": "[]",
+                "projectManagedBy": "",
+                "projectManagedSource": "",
             },
             "policyDocument": {
                 "Version": "2012-10-17",

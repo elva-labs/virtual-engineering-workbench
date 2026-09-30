@@ -21,6 +21,7 @@ from app.projects.domain.value_objects import (
 )
 from app.shared.adapters.message_bus import message_bus
 from app.shared.adapters.unit_of_work_v2 import unit_of_work
+from app.shared.adapters.unit_of_work_v2.repository_exception import RepositoryException
 
 
 def _command(**overrides):
@@ -62,7 +63,17 @@ def _dependencies(account, sample_project):
     uow = mock.create_autospec(unit_of_work.UnitOfWork, instance=True)
     account_repo = mock.create_autospec(unit_of_work.GenericRepository, instance=True)
     account_repo.get.return_value = account
-    uow.get_repository.return_value = account_repo
+    # Like DynamoDBUnitOfWork: repositories exist only inside "with uow:".
+    entered = []
+    uow.__enter__.side_effect = lambda *_: entered.append(True) or uow
+    uow.__exit__.side_effect = lambda *_: entered.pop() and None
+
+    def _get_repository(*_):
+        if not entered:
+            raise RepositoryException("Repository is not registered with the unit of work.")
+        return account_repo
+
+    uow.get_repository.side_effect = _get_repository
     projects_qs = mock.create_autospec(projects_query_service.ProjectsQueryService, instance=True)
     projects_qs.get_project_by_id.return_value = sample_project
     technologies_qs = mock.create_autospec(technologies_query_service.TechnologiesQueryService, instance=True)

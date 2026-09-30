@@ -223,6 +223,12 @@ class ProjectsAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                     lambda_root="app/projects",
                     entry="app/projects/entrypoints/api",
                     environment={
+                        "PLATFORM_ADMIN_GROUPS": json.dumps(
+                            app_config.component_specific.get("platform-admin-groups", [])
+                        ),
+                        "SELF_ENROLMENT_ENABLED": str(
+                            app_config.component_specific.get("self-enrolment-enabled", True)
+                        ).lower(),
                         "AUDIT_LOGGING_KEY_NAME": audit_logging_key_name,
                         "API_BASE_PATH": constants.CUSTOM_DNS_API_PATH_PROJECTS,
                         "STRIP_PREFIXES": f"{constants.CUSTOM_DNS_API_PATH_PROJECTS},{constants.CUSTOM_DNS_IAM_API_PATH_PROJECTS}",

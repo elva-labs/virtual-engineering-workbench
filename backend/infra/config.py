@@ -205,7 +205,14 @@ vpc_config = {
 }
 
 
+# Entra group object ids whose members are ADMIN on every project, without a grant per project
+# (read by the authorizer and the Projects API). Empty: no platform-admin groups.
+_platform_admin_groups: list[str] = []
+
 _dev_projects_config = {
+    "platform-admin-groups": _platform_admin_groups,
+    # False: users see only the projects they hold a role on (directly or through an Entra group).
+    "self-enrolment-enabled": True,
     "api-lambda-reserved-concurrency": 10,
     "api-lambda-provisioned-concurrency": 1,
     "authorizer-reserved-concurrency": 10,
@@ -364,6 +371,7 @@ prerequisites_app_config = {"dev": {}, "qa": {}, "prod": {}}
 usecase_app_config = {"dev": {}, "qa": {}, "prod": {}}
 
 _dev_authorization_config = {
+    "platform-admin-groups": _platform_admin_groups,
     "api-gateway-event-lambda-reserved-concurrency": 10,
     "api-gateway-event-lambda-provisioned-concurrency": 1,
     "timeout": 5,

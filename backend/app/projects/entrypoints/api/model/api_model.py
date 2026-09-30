@@ -304,6 +304,8 @@ class ProjectGroupAssignment(BaseModel):
 
 class GetProjectGroupsResponse(BaseModel):
     assignments: List[ProjectGroupAssignment]
+    # Groups whose members are ADMIN on every project (config "platform-admin-groups", read-only).
+    platformAdminGroups: Optional[List[str]] = None
 
 
 class GetProjectAssignmentResponseItem(BaseModel):
@@ -311,6 +313,9 @@ class GetProjectAssignmentResponseItem(BaseModel):
     roles: List[str] = Field(
         ..., description="User roles in the project", title="Roles"
     )
+    # For server-side callers (e.g. launch); group-only users get them from the identity provider.
+    userEmail: Optional[str] = Field(None, description="Email address of the user", title="UserEmail")
+    userDisplayName: Optional[str] = Field(None, description="Display name of the user", title="UserDisplayName")
 
 
 class GetProjectAssignmentResponse(BaseModel):

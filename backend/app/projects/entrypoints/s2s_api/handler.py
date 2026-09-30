@@ -13,6 +13,7 @@ from app.projects.entrypoints.s2s_api.routers import (
     accounts,
     assignments,
     enrolments,
+    groups,
     projects,
     service_clients,
     technologies,
@@ -45,6 +46,7 @@ app.include_router(accounts.init(dependencies=dependencies))
 app.include_router(projects.init(dependencies=dependencies))
 app.include_router(enrolments.init(dependencies=dependencies))
 app.include_router(service_clients.init(dependencies=dependencies))
+app.include_router(groups.init(dependencies=dependencies))
 app.include_router(technologies.init(dependencies=dependencies))
 
 

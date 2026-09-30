@@ -33,6 +33,7 @@ projects_bc_auth_policies: list[backend_app_api_auth.CedarPolicy] = [
                 action in {projects_auth_schema.get_full_action_names([
                     projects_auth_schema.ProjectsBCActions.GetProjectEnrolments,
                     projects_auth_schema.ProjectsBCActions.GetProjectUsers,
+                    projects_auth_schema.ProjectsBCActions.GetProjectGroups,
                     projects_auth_schema.ProjectsBCActions.GetUserRoles,
                     projects_auth_schema.ProjectsBCActions.ReAssignProjectUsers,
                     projects_auth_schema.ProjectsBCActions.ReAssignUserAssignments,

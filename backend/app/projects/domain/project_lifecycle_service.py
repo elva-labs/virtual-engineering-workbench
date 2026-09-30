@@ -48,11 +48,11 @@ class ProjectLifecycleService:
             clientId=client_id, idempotencyKey=key
         )
         with self._uow:
-            requests = self._uow.get_repository(
+            create_requests = self._uow.get_repository(
                 project_create_request.ProjectCreateRequestPrimaryKey,
                 project_create_request.ProjectCreateRequest,
             )
-            existing = requests.get(request_pk)
+            existing = create_requests.get(request_pk)
             if existing:
                 if existing.requestHash != digest:
                     raise ValueError("Idempotency key used for a different request")
@@ -90,7 +90,7 @@ class ProjectLifecycleService:
                 )
             )
             self._ensure_creator(client_id, project_id, None)
-            requests.add(
+            create_requests.add(
                 project_create_request.ProjectCreateRequest(
                     clientId=client_id,
                     idempotencyKey=key,

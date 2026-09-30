@@ -1,18 +1,18 @@
 import hashlib
 import json
 from datetime import datetime, timezone
-from uuid import UUID, RFC_4122
+from uuid import RFC_4122, UUID
 
-from app.projects.domain.events.projects.project_created import ProjectCreated
 from app.projects.domain.events.projects import project_updated
+from app.projects.domain.events.projects.project_created import ProjectCreated
 from app.projects.domain.model import (
     project,
     project_create_request,
     service_client_assignment,
     workbench_lifecycle,
 )
-from app.shared.adapters.unit_of_work_v2 import unit_of_work
 from app.shared.adapters.message_bus import message_bus
+from app.shared.adapters.unit_of_work_v2 import unit_of_work
 
 
 class ProjectLifecycleService:
@@ -44,9 +44,7 @@ class ProjectLifecycleService:
             separators=(",", ":"),
         )
         digest = hashlib.sha256(body.encode()).hexdigest()
-        request_pk = project_create_request.ProjectCreateRequestPrimaryKey(
-            clientId=client_id, idempotencyKey=key
-        )
+        request_pk = project_create_request.ProjectCreateRequestPrimaryKey(clientId=client_id, idempotencyKey=key)
         with self._uow:
             create_requests = self._uow.get_repository(
                 project_create_request.ProjectCreateRequestPrimaryKey,
@@ -57,26 +55,19 @@ class ProjectLifecycleService:
                 if existing.requestHash != digest:
                     raise ValueError("Idempotency key used for a different request")
                 project_id = existing.projectId
-                existing_project = self._uow.get_repository(
-                    project.ProjectPrimaryKey, project.Project
-                ).get(project.ProjectPrimaryKey(projectId=project_id))
+                existing_project = self._uow.get_repository(project.ProjectPrimaryKey, project.Project).get(
+                    project.ProjectPrimaryKey(projectId=project_id)
+                )
                 if existing_project is None:
                     raise RuntimeError("Reserved project is missing")
-                assignment = self._query.get_service_client_assignment(
-                    project_id, client_id
-                )
+                assignment = self._query.get_service_client_assignment(project_id, client_id)
                 if assignment is None:
                     self._ensure_creator(client_id, project_id, None)
                     self._uow.commit()
                 return project_id
             project_id = project.generate_project_id()
-            projects = self._uow.get_repository(
-                project.ProjectPrimaryKey, project.Project
-            )
-            if (
-                projects.get(project.ProjectPrimaryKey(projectId=project_id))
-                is not None
-            ):
+            projects = self._uow.get_repository(project.ProjectPrimaryKey, project.Project)
+            if projects.get(project.ProjectPrimaryKey(projectId=project_id)) is not None:
                 raise ValueError("Project ID collision; retry with the same key")
             now = datetime.now(timezone.utc).isoformat()
             projects.add(
@@ -127,20 +118,14 @@ class ProjectLifecycleService:
                 )
             )
         else:
-            current.status = (
-                service_client_assignment.ServiceClientAssignmentStatus.ACTIVE
-            )
+            current.status = service_client_assignment.ServiceClientAssignmentStatus.ACTIVE
             current.lastUpdateDate = now
             repo.update_entity(
-                service_client_assignment.ServiceClientAssignmentPrimaryKey(
-                    clientId=client_id, projectId=project_id
-                ),
+                service_client_assignment.ServiceClientAssignmentPrimaryKey(clientId=client_id, projectId=project_id),
                 current,
             )
 
-    def update(
-        self, project_id: str, name: str, description: str | None, is_active: bool
-    ):
+    def update(self, project_id: str, name: str, description: str | None, is_active: bool):
         with self._uow:
             repo = self._uow.get_repository(project.ProjectPrimaryKey, project.Project)
             pk = project.ProjectPrimaryKey(projectId=project_id)
@@ -204,6 +189,4 @@ class ProjectLifecycleService:
         current = self._query.get_project_by_id(project_id)
         if current is None:
             raise KeyError(project_id)
-        return self.update(
-            project_id, current.projectName, current.projectDescription, False
-        )
+        return self.update(project_id, current.projectName, current.projectDescription, False)

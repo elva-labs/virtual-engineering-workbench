@@ -24,9 +24,14 @@ def handle(
     publisher: aggregate.AggregatePublisher,
     logger: logging.Logger,
     pp_qry_srv: provisioned_products_query_service.ProvisionedProductsQueryService,
+    lifecycle_srv=None,
 ):
+    # The program's workbench stop rules: weekendStop off or alwaysOn keep them running.
+    programs = lifecycle_srv.programs() if lifecycle_srv else {}
     # Loop through all running provisioned products
     for pp_entity in pp_qry_srv.get_all_provisioned_products(status=product_status.ProductStatus.Running):
+        if lifecycle_srv and not lifecycle_srv.weekend_stop_allowed(pp_entity, programs):
+            continue
         # Check if the provisioned product has auto stop protection
         feature_toggles = product_feature_toggles.ProductFeatureToggles(outputs=pp_entity.outputs)
         if feature_toggles.is_enabled(product_feature_toggles.ProductFeature.AutoStopProtection):

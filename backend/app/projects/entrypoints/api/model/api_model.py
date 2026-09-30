@@ -32,6 +32,11 @@ class Project(BaseModel):
         description="Point in time where project is last updated.",
         title="LastUpdateDate",
     )
+    workbenchLifecycle: Optional[Dict[str, Any]] = Field(
+        None,
+        description="The project's workbench stop policy and what its users may change; null = the deployment's defaults.",
+        title="WorkbenchLifecycle",
+    )
 
 
 class ProjectEnrolment(BaseModel):

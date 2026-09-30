@@ -14,6 +14,7 @@ class ProvisioningBCActions(enum.StrEnum):
     GetProductsIPMappings = "GetProductsIPMappings"
     GetProvisionedProduct = "GetProvisionedProduct"
     GetProvisionedProductActivities = "GetProvisionedProductActivities"
+    GetProvisionedProductLifecycle = "GetProvisionedProductLifecycle"
     GetProvisionedProducts = "GetProvisionedProducts"
     GetProvisionedProductSSHKey = "GetProvisionedProductSSHKey"
     GetProvisionedProductUserCredentials = "GetProvisionedProductUserCredentials"
@@ -30,6 +31,7 @@ class ProvisioningBCActions(enum.StrEnum):
     StopProvisionedProducts = "StopProvisionedProducts"
     UpdateFeatures = "UpdateFeatures"
     UpdateProvisionedProduct = "UpdateProvisionedProduct"
+    UpdateProvisionedProductLifecycle = "UpdateProvisionedProductLifecycle"
     UpdateProductsIPMappings = "UpdateProductsIPMappings"
     UpdateUserProfile = "UpdateUserProfile"
 

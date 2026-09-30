@@ -29,6 +29,8 @@ export type ProvisionedProductDetailsHookPorps =
 export interface ProvisionedProductDetailsProps
   extends ProvisionedProductDetailsHookPorps {
   headerActions?: React.ReactNode | null,
+  // Page-specific sections below the details, e.g. the workbench Settings card.
+  extraSections?: React.ReactNode | null,
   dataTestPrefix?: string,
   translations: ProvisionedProductDetailsTranslations,
   myProvisionedProductRouteName: RouteNames,

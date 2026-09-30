@@ -47,6 +47,7 @@ provisioning_bc_auth_policies: list[backend_app_api_auth.CedarPolicy] = [
                     provisioning_auth_schema.ProvisioningBCActions.GetAvailableProductVersions,
                     provisioning_auth_schema.ProvisioningBCActions.GetProvisionedProduct,
                     provisioning_auth_schema.ProvisioningBCActions.GetProvisionedProductActivities,
+                    provisioning_auth_schema.ProvisioningBCActions.GetProvisionedProductLifecycle,
                     provisioning_auth_schema.ProvisioningBCActions.GetProvisionedProducts,
                     provisioning_auth_schema.ProvisioningBCActions.GetProvisionedProductSSHKey,
                     provisioning_auth_schema.ProvisioningBCActions.GetProvisionedProductUserCredentials,
@@ -55,6 +56,7 @@ provisioning_bc_auth_policies: list[backend_app_api_auth.CedarPolicy] = [
                     provisioning_auth_schema.ProvisioningBCActions.StartProvisionedProduct,
                     provisioning_auth_schema.ProvisioningBCActions.StopProvisionedProduct,
                     provisioning_auth_schema.ProvisioningBCActions.UpdateProvisionedProduct,
+                    provisioning_auth_schema.ProvisioningBCActions.UpdateProvisionedProductLifecycle,
                 ])},
                 resource
             )

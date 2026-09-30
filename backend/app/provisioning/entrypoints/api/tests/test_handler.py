@@ -1866,3 +1866,92 @@ def test_get_paginated_project_provisioned_products(
             pagingKey=json.dumps({"string": "NextPagingKey"}),
         )
     )
+
+
+# Workbench stop rules: the Settings card ----------------------------------------------------
+
+
+def _lifecycle_dependencies(mocked_dependencies, owner: str, program: dict | None):
+    from app.provisioning.domain.command_handlers.provisioned_product_state import workbench_lifecycle as wl_service
+    from app.provisioning.domain.model import workbench_lifecycle as wl_model
+    from app.provisioning.domain.read_models import project as project_read_model
+
+    pp, version_metadata = mocked_dependencies.virtual_targets_domain_qry_srv.get_provisioned_product.return_value
+    pp = pp.model_copy(update={"userId": owner, "projectId": "proj-12345"})
+    mocked_dependencies.virtual_targets_domain_qry_srv.get_provisioned_product.return_value = (pp, version_metadata)
+    projects = unittest.mock.Mock()
+    projects.get_projects.return_value = [project_read_model.Project(projectId="proj-12345", workbenchLifecycle=program)]
+    uow = unittest.mock.MagicMock()
+    uow.get_repository.return_value.get.return_value = pp
+    instances = unittest.mock.Mock()
+    srv = wl_service.WorkbenchLifecycleService(
+        platform=wl_model.PlatformLifecycleDefaults(nightlyStop=True, timezone="Europe/Stockholm"),
+        pp_qry_srv=unittest.mock.Mock(),
+        projects_qry_srv=projects,
+        instance_mgmt_srv=instances,
+        uow=uow,
+        publisher=None,
+        logger=unittest.mock.MagicMock(),
+    )
+    return mocked_dependencies.model_copy(update={"workbench_lifecycle_srv": srv}), uow, instances
+
+
+LIFECYCLE_PATH = "/projects/proj-12345/products/provisioned/vt-1/lifecycle"
+ALLOWING = {"allowUserDisableNightlyStop": True, "allowUserIdleTimeout": True, "userIdleTimeoutMinMinutes": 10}
+
+
+def test_get_workbench_lifecycle_shows_effective_values_and_sources(lambda_context, authenticated_event, mocked_dependencies):
+    from app.provisioning.entrypoints.api import handler
+
+    handler.dependencies, _, _ = _lifecycle_dependencies(mocked_dependencies, owner="T00123122", program=ALLOWING)
+
+    result = handler.handler(authenticated_event(None, LIFECYCLE_PATH, "GET"), lambda_context)
+
+    assert result["statusCode"] == 200
+    body = api_model.WorkbenchLifecycleResponse.model_validate(json.loads(result["body"]))
+    assert body.canEdit is True
+    assert (body.nightlyStopTime, body.nightlyStopTimezone) == ("21:00", "Europe/Stockholm")
+    assert body.permissions.maySetIdleTimeout and body.permissions.idleTimeoutMinMinutes == 10
+    assert (body.effective.idleStopMinutes, body.effective.sources["idleStopMinutes"]) == (60, "platform")
+
+
+def test_put_workbench_lifecycle_stores_the_owners_choice(lambda_context, authenticated_event, mocked_dependencies):
+    from app.provisioning.entrypoints.api import handler
+
+    handler.dependencies, uow, _ = _lifecycle_dependencies(mocked_dependencies, owner="T00123122", program=ALLOWING)
+    body = json.dumps({"nightlyStopDisabled": True, "idleTimeoutMinutes": 15})
+
+    result = handler.handler(authenticated_event(body, LIFECYCLE_PATH, "PUT"), lambda_context)
+
+    assert result["statusCode"] == 200
+    response = api_model.WorkbenchLifecycleResponse.model_validate(json.loads(result["body"]))
+    assert (response.effective.idleStopMinutes, response.effective.nightlyStop) == (15, False)
+    stored = uow.get_repository.return_value.update_entity.call_args.kwargs["entity"]
+    assert stored.lifecycleSettings.idleTimeoutMinutes == 15
+
+
+def test_put_workbench_lifecycle_refuses_what_the_program_does_not_allow(lambda_context, authenticated_event, mocked_dependencies):
+    from app.provisioning.entrypoints.api import handler
+
+    handler.dependencies, uow, _ = _lifecycle_dependencies(mocked_dependencies, owner="T00123122", program=None)
+    body = json.dumps({"nightlyStopDisabled": True})
+
+    result = handler.handler(authenticated_event(body, LIFECYCLE_PATH, "PUT"), lambda_context)
+
+    assert result["statusCode"] == 400
+    uow.get_repository.return_value.update_entity.assert_not_called()
+
+
+def test_put_workbench_lifecycle_is_for_the_owner_only(lambda_context, authenticated_event, mocked_dependencies):
+    from app.provisioning.entrypoints.api import handler
+
+    handler.dependencies, uow, _ = _lifecycle_dependencies(mocked_dependencies, owner="SOMEONE-ELSE", program=ALLOWING)
+    body = json.dumps({"idleTimeoutMinutes": 30})
+
+    get = handler.handler(authenticated_event(None, LIFECYCLE_PATH, "GET"), lambda_context)
+    put = handler.handler(authenticated_event(body, LIFECYCLE_PATH, "PUT"), lambda_context)
+
+    # The ADMIN in the test event may read it (oversight) but not change another user's workbench.
+    assert get["statusCode"] == 200 and json.loads(get["body"])["canEdit"] is False
+    assert put["statusCode"] == 400
+    uow.get_repository.return_value.update_entity.assert_not_called()

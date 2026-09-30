@@ -25,6 +25,7 @@ from app.provisioning.domain.commands.provisioned_product_state import (
 from app.provisioning.domain.commands.user_profile import update_user_profile_command
 from app.provisioning.domain.exceptions import domain_exception
 from app.provisioning.domain.model import product_status
+from app.provisioning.domain.model import workbench_lifecycle as workbench_lifecycle_model
 from app.provisioning.domain.value_objects import (
     account_id_value_object,
     additional_configurations_value_object,
@@ -641,6 +642,82 @@ def stop_provisioned_product(
     return api_gateway.Response(
         status_code=HTTPStatus.OK,
         body=api_model.StopProvisionedProductResponse(),
+        content_type=content_types.APPLICATION_JSON,
+    )
+
+
+def _workbench_lifecycle_response(pp, program, effective, can_edit: bool) -> api_model.WorkbenchLifecycleResponse:
+    srv = dependencies.workbench_lifecycle_srv
+    settings = pp.lifecycleSettings or workbench_lifecycle_model.UserLifecycleSettings()
+    return api_model.WorkbenchLifecycleResponse(
+        provisionedProductId=pp.provisionedProductId,
+        projectId=pp.projectId,
+        canEdit=can_edit,
+        nightlyStopTime=srv.platform_defaults.nightlyStopTime,
+        nightlyStopTimezone=srv.platform_defaults.timezone,
+        userSettings=api_model.WorkbenchLifecycleUserSettings.model_validate(settings.model_dump()),
+        permissions=api_model.WorkbenchLifecyclePermissions.model_validate(
+            workbench_lifecycle_model.permissions(program).model_dump()
+        ),
+        effective=api_model.WorkbenchLifecycleEffective.model_validate(
+            effective.model_dump(include=set(api_model.WorkbenchLifecycleEffective.model_fields))
+        ),
+    )
+
+
+def _workbench_for_lifecycle(project_id: str, provisioned_product_id: str):
+    """The owner may change the settings; program owners and admins may read them."""
+    principal = app.context.get("user_principal")
+    roles = set(principal.user_roles or [])
+    oversight = bool(roles & {authorization.VirtualWorkbenchRoles.Admin, authorization.VirtualWorkbenchRoles.ProgramOwner})
+    pp, _ = dependencies.virtual_targets_domain_qry_srv.get_provisioned_product(
+        project_id=project_id_value_object.from_str(project_id),
+        provisioned_product_id=provisioned_product_id_value_object.from_str(provisioned_product_id),
+        return_technical_params=False,
+        user_id=None if oversight else user_id_value_object.from_str(principal.user_name),
+    )
+    return pp, pp.userId == principal.user_name
+
+
+@tracer.capture_method
+@app.get(
+    "/projects/<project_id>/products/provisioned/<provisioned_product_id>/lifecycle",
+    tags=[TAG_PROVISIONED_PRODUCTS],
+)
+def get_provisioned_product_lifecycle(
+    project_id: str, provisioned_product_id: str
+) -> api_gateway.Response[api_model.WorkbenchLifecycleResponse]:
+    pp, is_owner = _workbench_for_lifecycle(project_id, provisioned_product_id)
+    srv = dependencies.workbench_lifecycle_srv
+    program = srv.program(pp.projectId)
+    return api_gateway.Response(
+        status_code=HTTPStatus.OK,
+        body=_workbench_lifecycle_response(pp, program, srv.effective_for(pp, program), can_edit=is_owner),
+        content_type=content_types.APPLICATION_JSON,
+    )
+
+
+@tracer.capture_method
+@app.put(
+    "/projects/<project_id>/products/provisioned/<provisioned_product_id>/lifecycle",
+    tags=[TAG_PROVISIONED_PRODUCTS],
+)
+def update_provisioned_product_lifecycle(
+    project_id: str, provisioned_product_id: str, request: api_model.WorkbenchLifecycleUserSettings
+) -> api_gateway.Response[api_model.WorkbenchLifecycleResponse]:
+    # Using a workbench, not configuring the project: allowed on externally managed projects too.
+    pp, is_owner = _workbench_for_lifecycle(project_id, provisioned_product_id)
+    if not is_owner:
+        raise domain_exception.DomainException("Only the owner can change the settings of a workbench.")
+    try:
+        program, effective = dependencies.workbench_lifecycle_srv.update_user_settings(
+            pp, workbench_lifecycle_model.UserLifecycleSettings.model_validate(request.model_dump())
+        )
+    except workbench_lifecycle_model.LifecycleSettingsError as error:
+        raise domain_exception.DomainException(str(error)) from error
+    return api_gateway.Response(
+        status_code=HTTPStatus.OK,
+        body=_workbench_lifecycle_response(pp, program, effective, can_edit=True),
         content_type=content_types.APPLICATION_JSON,
     )
 

@@ -163,6 +163,13 @@ class EC2InstanceManagementService(instance_management_service.InstanceManagemen
 
         return current_state
 
+    def set_instance_tags(
+        self, user_id: str, aws_account_id: str, region: str, instance_id: str, tags: dict[str, str]
+    ) -> None:
+        """Creates or overwrites tags on the instance (e.g. vew:autostop, read by the idle agent)."""
+        ec2_client = self._ec2_boto_client_provider(aws_account_id, region, user_id)
+        ec2_client.create_tags(Resources=[instance_id], Tags=[{"Key": k, "Value": v} for k, v in tags.items()])
+
     def get_user_security_group_id(self, user_id: str, aws_account_id: str, region: str, vpc_id: str) -> str | None:
         """Returns the user security group id if created, otherwise returns None.
 

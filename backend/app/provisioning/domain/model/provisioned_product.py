@@ -9,6 +9,7 @@ from app.provisioning.domain.model import (
     product_status,
     provisioned_product_output,
     provisioning_parameter,
+    workbench_lifecycle,
 )
 from app.provisioning.domain.read_models.component_version_detail import (
     ComponentVersionDetail,
@@ -132,6 +133,10 @@ class ProvisionedProduct(unit_of_work.Entity):
     startDate: Optional[str] = Field(None, title="StartDate")
     isRetired: bool = Field(False, title="IsRetired")
     deploymentOption: str | None = Field(None, title="DeploymentOption")
+    # The owner's stop-rule choices, applied only while the project allows them.
+    lifecycleSettings: Optional[workbench_lifecycle.UserLifecycleSettings] = Field(None, title="LifecycleSettings")
+    # Last vew:autostop value written to the instance, so the reconcile job only calls EC2 on changes.
+    appliedAutostopTag: Optional[str] = Field(None, title="AppliedAutostopTag")
 
 
 PRODUCT_CONTAINER_TYPES = [ProvisionedProductType.Container]

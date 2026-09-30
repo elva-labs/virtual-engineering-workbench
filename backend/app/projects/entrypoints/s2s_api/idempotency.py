@@ -40,6 +40,15 @@ def _complete(service, scope, request_hash, resource_id, result, now):
     service.complete(scope, request_hash, resource_id, result.status_code, result.body, now)
 
 
+def _release(service, scope, request_hash, resource_id, now):
+    # An unexpected failure (a 500) must not block the key until the lease ends: a retry recovers at
+    # once, checking first whether the resource was created.
+    try:
+        service.release(scope, request_hash, resource_id, now)
+    except Exception:
+        logger.exception("Could not release the idempotency reservation", operation=scope.operation)
+
+
 def _replay(reservation: Reservation) -> StoredCreateResponse:
     if reservation.response_status is None or reservation.response_body is None:
         raise RuntimeError("Completed idempotency record has no response")
@@ -92,6 +101,7 @@ def execute_create(  # noqa: C901
         try:
             exists = resource_exists(reservation.resource_id)
         except Exception as error:
+            _release(service, scope, request_hash, reservation.resource_id, now)
             raise s2s_exception.ResourceReadNotReady() from error
         if exists:
             if resume_existing is not None:
@@ -104,6 +114,7 @@ def execute_create(  # noqa: C901
         result = create(reservation.resource_id)
     except s2s_exception.S2SException as error:
         if error.retryable:
+            _release(service, scope, request_hash, reservation.resource_id, now)
             raise
         failure = StoredCreateResponse(
             problem_details.status_for(error),
@@ -136,5 +147,8 @@ def execute_create(  # noqa: C901
             failure.body["code"],
             False,
         ) from error
+    except Exception:
+        _release(service, scope, request_hash, reservation.resource_id, now)
+        raise
     _complete(service, scope, request_hash, reservation.resource_id, result, now)
     return result

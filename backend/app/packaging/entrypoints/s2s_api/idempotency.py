@@ -62,6 +62,15 @@ def _record_reservation(scope: IdempotencyScope, reservation: Reservation) -> No
     )
 
 
+def _release(service, scope, request_hash, resource_id, now):
+    # An unexpected failure (a 500) must not block the key until the lease ends: a retry recovers at
+    # once, checking first whether the resource was created.
+    try:
+        service.release(scope, request_hash, resource_id, now)
+    except Exception:
+        logger.exception("Could not release the idempotency reservation", operation=scope.operation)
+
+
 def _replay_response(reservation: Reservation) -> StoredCreateResponse:
     if reservation.response_status is None or reservation.response_body is None:
         raise RuntimeError("Completed idempotency record has no stored response")
@@ -107,6 +116,7 @@ def _recover_response(
     try:
         exists = resource_exists(reservation.resource_id)
     except Exception as error:
+        _release(service, scope, request_hash, reservation.resource_id, now)
         raise ResourceReadNotReady() from error
     if not exists:
         return None
@@ -138,6 +148,9 @@ def _create_response(
             },
         )
         _complete(service, scope, request_hash, resource_id, failure, now)
+        raise
+    except Exception:
+        _release(service, scope, request_hash, resource_id, now)
         raise
     _complete(service, scope, request_hash, resource_id, result, now)
     return result

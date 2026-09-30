@@ -411,6 +411,8 @@ class ProvisioningAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                             ("GET", "/internal/projects/*/users/*"),
                             # The project's workbench stop policy for the workbench settings.
                             ("GET", "/internal/projects"),
+                            # Launch refuses an inactive project account.
+                            ("GET", "/internal/accounts"),
                         ],
                     },
                 ),
@@ -442,6 +444,8 @@ class ProvisioningAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                     cross_bc_api_access={
                         bounded_contexts.BoundedContext.PROJECTS: [
                             ("GET", "/internal/projects/*/users/*"),
+                            # Launch refuses an inactive project account.
+                            ("GET", "/internal/accounts"),
                         ],
                     },
                 ),

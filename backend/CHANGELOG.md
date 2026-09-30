@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Platform-admin groups: members of the Entra groups in the `platform-admin-groups` config are `ADMIN` on every project without a grant per project (authorizer, project list, server-side role checks). The group list is returned with a project's groups.
+- `self-enrolment-enabled` (default `true`): when `false`, users see only the projects they hold a role on; platform admins see all.
 - Added a project-scoped OAuth S2S API for declarative component and component-version publishing.
 - Added external-ID mappings, optimistic revisions, idempotent reconciliation operations, and lifecycle event recovery.
 - Added service-client project assignments and dedicated Packaging read, write, release, and operation scopes.
@@ -16,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Server-side role checks (the internal user-assignment route that launch reads, and `GET /projects/{projectId}/users/{userId}`) include the roles Entra group grants give, read from the user's Cognito record; a user reached only through a group could not launch.
+- The authorizer passes the sign-in's trusted Entra groups on as `userGroups`, so the Projects API needs no second UserInfo call.
+- Project member lists fill a missing email or display name from the identity provider on read.
 - Component versions can be retired through the declarative API while released content remains immutable.
 
 ### Fixed

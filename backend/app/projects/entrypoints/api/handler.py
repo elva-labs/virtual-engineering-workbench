@@ -1,4 +1,5 @@
 import json
+import os
 from http import HTTPStatus
 from typing import Annotated
 from urllib.parse import unquote
@@ -54,7 +55,7 @@ from app.projects.domain.value_objects import (
     user_id_value_object,
     user_role_value_object,
 )
-from app.projects.entrypoints.api import bootstrapper, config
+from app.projects.entrypoints.api import bootstrapper, config, group_access, user_profiles
 from app.projects.entrypoints.api.model import api_model
 from app.shared.adapters.boto import paging_utils
 from app.shared.logging.helpers import clear_auth_headers
@@ -93,8 +94,17 @@ tracer = tracing.Tracer()
 
 dependencies = bootstrapper.bootstrap(app_config, logger)
 
+# Without self-enrolment, users only see the projects they hold a role on; platform admins see all.
+SELF_ENROLMENT_ENABLED = os.environ.get("SELF_ENROLMENT_ENABLED", "true").lower() == "true"
+PLATFORM_ADMIN_GROUPS = group_access.platform_admin_groups()
+
 
 def _trusted_group_ids() -> list[str]:
+    # The authorizer already read the groups from the trusted user profile and passes them on as
+    # userGroups (principal.user_groups): no second UserInfo call when they are there.
+    principal_groups = getattr(app.context.get("user_principal"), "user_groups", None)
+    if principal_groups:
+        return sorted(principal_groups)
     if dependencies.user_info_client is None:
         return []
     authorization = app.current_event.headers.get("Authorization", "")
@@ -120,23 +130,29 @@ def get_projects(
     requested_size = max(1, min(page_size.pop() if page_size else 10, 100))
     requested_token = next_token_str.pop() if next_token_str else None
     offset = max(0, int(json.loads(requested_token).get("offset", 0))) if requested_token else 0
+    trusted_groups = _trusted_group_ids()
+    platform_admin = group_access.is_platform_admin(trusted_groups, PLATFORM_ADMIN_GROUPS)
 
     # Build one ordered page from the inventory and both grant sources. The
     # inventory remains visible for project enrolment, even without a grant.
-    all_projects = {}
+    inventory_projects = {}
     inventory_token = None
     seen_inventory_tokens = set()
     while True:
         inventory, inventory_token, _ = dependencies.projects_query_service.list_projects(
             page_size=100, next_token=inventory_token, user_id=None
         )
-        all_projects.update({project.projectId: project for project in inventory})
+        inventory_projects.update({project.projectId: project for project in inventory})
         if not inventory_token:
             break
         token_key = json.dumps(inventory_token, sort_keys=True)
         if token_key in seen_inventory_tokens:
             raise RuntimeError("Repeated inventory page token")
         seen_inventory_tokens.add(token_key)
+
+    # Without self-enrolment the inventory is not shown to everyone: users see the projects they hold a
+    # role on, platform admins see all of them.
+    all_projects = dict(inventory_projects) if SELF_ENROLMENT_ENABLED or platform_admin else {}
 
     direct_assignments = []
     direct_token = None
@@ -154,14 +170,21 @@ def get_projects(
             raise RuntimeError("Repeated direct project page token")
         seen_direct_tokens.add(token_key)
 
-    groups = dependencies.projects_query_service.get_group_assignments(_trusted_group_ids())
+    groups = dependencies.projects_query_service.get_group_assignments(trusted_groups)
     for assignment in groups:
         if assignment.projectId not in all_projects:
-            project = dependencies.projects_query_service.get_project_by_id(assignment.projectId)
+            project = inventory_projects.get(assignment.projectId)
+            if project is None:
+                project = dependencies.projects_query_service.get_project_by_id(assignment.projectId)
             if project is not None:
                 all_projects[project.projectId] = project
 
     roles_by_project = effective_roles(direct_assignments, groups)
+    if platform_admin:
+        for project_id in all_projects:
+            roles_by_project[project_id] = sorted(
+                {*roles_by_project.get(project_id, []), project_assignment.Role.ADMIN}
+            )
     project_ids = sorted(all_projects)
     page_ids = project_ids[offset:offset + requested_size]
     projects = [all_projects[project_id] for project_id in page_ids]
@@ -409,8 +432,9 @@ def get_project_users(
 ) -> api_gateway.Response[api_model.GetProjectAssignmentsResponse]:
     """Returns a list of project assignments with paging."""
 
-    assignments = dependencies.projects_query_service.list_users_by_project(
-        project_id=project_id,
+    assignments = user_profiles.with_profiles(
+        dependencies.projects_query_service.list_users_by_project(project_id=project_id),
+        dependencies.user_directory_service,
     )
 
     return api_gateway.Response(
@@ -431,7 +455,8 @@ def get_project_groups(project_id: str) -> api_gateway.Response[api_model.GetPro
     return api_gateway.Response(
         status_code=HTTPStatus.OK,
         body=api_model.GetProjectGroupsResponse(
-            assignments=[api_model.ProjectGroupAssignment.model_validate(a.model_dump()) for a in assignments]
+            assignments=[api_model.ProjectGroupAssignment.model_validate(a.model_dump()) for a in assignments],
+            platformAdminGroups=sorted(PLATFORM_ADMIN_GROUPS),
         ),
         content_type=content_types.APPLICATION_JSON,
     )
@@ -513,14 +538,11 @@ def get_user_roles(
 ) -> api_gateway.Response[api_model.GetUserRolesResponse]:
     """Returns a list of roles assigned to a user for a project."""
 
-    project_assignment = dependencies.projects_query_service.get_user_assignment(
-        project_id=project_id,
-        user_id=user_id,
-    )
+    project_assignment = _effective_assignment(project_id, user_id.upper())
 
     return api_gateway.Response(
         status_code=HTTPStatus.OK,
-        body=api_model.GetUserRolesResponse(roles=project_assignment.roles),
+        body=api_model.GetUserRolesResponse(roles=project_assignment.roles if project_assignment else []),
         content_type=content_types.APPLICATION_JSON,
     )
 
@@ -801,14 +823,39 @@ def get_project_groups_internal(project_id: str) -> dict:
     ).model_dump()
 
 
+def _effective_assignment(project_id: str, user_id: str):
+    """Direct roles plus Entra group grants plus platform ADMIN, for callers without a sign-in token
+    (launch and the other server-side checks). The groups come from the user's Cognito record."""
+    direct = dependencies.projects_query_service.get_user_assignment(project_id=project_id, user_id=user_id)
+    if dependencies.user_directory_service is None:
+        return direct
+    groups = group_access.groups_from_claim(dependencies.user_directory_service.get_user_groups_claim(user_id))
+    if not groups:
+        return direct
+    merged = group_access.effective_assignment(
+        user_id=user_id,
+        project_id=project_id,
+        direct=direct,
+        group_assignments=dependencies.projects_query_service.get_group_assignments(groups),
+        platform_admin=group_access.is_platform_admin(groups, PLATFORM_ADMIN_GROUPS),
+    )
+    if merged is not None and direct is None:
+        # A group-only user has no assignment record to carry email and name (e.g. for launch tags).
+        profile = dependencies.user_directory_service.get_user_profile(user_id)
+        if profile:
+            merged = merged.model_copy(update={"userEmail": profile.email, "userDisplayName": profile.display_name})
+    return merged
+
+
 @tracer.capture_method
 @app.get("/internal/projects/<project_id>/users/<user_id>")
 def get_project_user_assignment_internal(
     project_id: str, user_id: str
 ) -> api_gateway.Response[api_model.GetProjectAssignmentResponse]:
-    """Returns a list of project assignments."""
+    """Returns the user's roles on the project, including those their Entra groups grant: launch and
+    the other server-side checks read this route and have no sign-in token."""
 
-    assignment = dependencies.projects_query_service.get_user_assignment(project_id=project_id, user_id=user_id.upper())
+    assignment = _effective_assignment(project_id, user_id.upper())
 
     response = api_model.GetProjectAssignmentResponse(
         assignment=(

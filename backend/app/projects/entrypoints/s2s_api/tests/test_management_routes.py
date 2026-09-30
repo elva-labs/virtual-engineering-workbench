@@ -17,6 +17,7 @@ from app.projects.domain.project_lifecycle_service import ProjectLifecycleServic
 from app.projects.entrypoints.s2s_api.bootstrapper import Dependencies
 from app.projects.entrypoints.s2s_api.tests.fake_classes import (
     FakeEnrolmentsQueryService,
+    FakeIdempotencyService,
     FakeTechnologiesQueryService,
 )
 from app.shared.adapters.message_bus.command_bus import CommandBus
@@ -63,6 +64,7 @@ def make_dependencies():
         enrolment_query_service=FakeEnrolmentsQueryService(),
         project_lifecycle_service=lifecycle,
         group_assignment_service=groups,
+        idempotency_service=FakeIdempotencyService(),
     )
     return deps, query, lifecycle, groups, command_bus
 

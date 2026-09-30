@@ -41,8 +41,12 @@ class FakeProjectsQueryService(projects_query_service.ProjectsQueryService):
     ) -> service_client_assignment.ServiceClientAssignment | None:
         if client_id == "fake_client_id":
             return service_client_assignment.ServiceClientAssignment(
-                clientId=client_id, projectId=project_id, status="ACTIVE",
-                grantedBy=client_id, createDate="2026-09-01", lastUpdateDate="2026-09-01",
+                clientId=client_id,
+                projectId=project_id,
+                status="ACTIVE",
+                grantedBy=client_id,
+                createDate="2026-09-01",
+                lastUpdateDate="2026-09-01",
             )
         return None
 
@@ -357,7 +361,15 @@ class FakeIdempotencyService(IdempotencyService):
                 existing["status_code"],
                 existing["body"],
             )
+        if existing["status"] == "RELEASED":
+            existing["status"] = "IN_PROGRESS"
+            return Reservation(ReservationOutcome.RECOVER, existing["resource_id"])
         return Reservation(ReservationOutcome.IN_PROGRESS, existing["resource_id"])
 
     def complete(self, scope, request_hash, resource_id, response_status, response_body, now):
         self.records[scope].update(status="COMPLETED", status_code=response_status, body=response_body)
+
+    def release(self, scope, request_hash, resource_id, now):
+        # Like the DynamoDB service: the lease ends, the next reservation recovers.
+        if self.records.get(scope, {}).get("status") == "IN_PROGRESS":
+            self.records[scope]["status"] = "RELEASED"

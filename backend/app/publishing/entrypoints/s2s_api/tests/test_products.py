@@ -36,10 +36,17 @@ class FakeIdempotencyService(IdempotencyService):
             return Reservation(
                 ReservationOutcome.REPLAY, existing["resource_id"], existing["status_code"], existing["body"]
             )
+        if existing["status"] == "RELEASED":
+            existing["status"] = "IN_PROGRESS"
+            return Reservation(ReservationOutcome.RECOVER, existing["resource_id"])
         return Reservation(ReservationOutcome.IN_PROGRESS, existing["resource_id"])
 
     def complete(self, scope, request_hash, resource_id, response_status, response_body, now):
         self.records[scope].update(status="COMPLETED", status_code=response_status, body=response_body)
+
+    def release(self, scope, request_hash, resource_id, now):
+        if self.records.get(scope, {}).get("status") == "IN_PROGRESS":
+            self.records[scope]["status"] = "RELEASED"
 
 
 class FakeProducts:

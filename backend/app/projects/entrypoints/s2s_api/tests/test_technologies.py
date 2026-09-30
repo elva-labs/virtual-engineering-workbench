@@ -400,4 +400,41 @@ def test_retryable_s2s_failure_leaves_reservation_recoverable():
             now=now,
         )
 
-    assert service.records[scope]["status"] == "IN_PROGRESS"
+    # The key is released, not blocked until the lease ends: the retry recovers and creates.
+    assert service.records[scope]["status"] == "RELEASED"
+    result = idempotency.execute_create(
+        service=service,
+        scope=scope,
+        request=request,
+        resource_id="tech-other",
+        resource_exists=lambda _: False,
+        response_for_id=lambda resource_id: idempotency.StoredCreateResponse(201, {"technologyId": resource_id}),
+        create=lambda resource_id: idempotency.StoredCreateResponse(201, {"technologyId": resource_id}),
+        now=now,
+    )
+    assert result.body == {"technologyId": "tech-new"}
+    assert service.records[scope]["status"] == "COMPLETED"
+
+
+def test_unexpected_failure_releases_the_reservation():
+    # A 500 (here: the handler raising) must not leave the key IN_PROGRESS for the lease.
+    service = FakeIdempotencyService()
+    scope = IdempotencyScope(
+        "client", "project-1", "CREATE_ACCOUNT", None, UUID("77b7d6e4-98ba-4f9f-977c-f759f58a7e74")
+    )
+    request = api_model.CreateTechnologyRequest(name="Terraform")
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+    with pytest.raises(RuntimeError):
+        idempotency.execute_create(
+            service=service,
+            scope=scope,
+            request=request,
+            resource_id="acct-new",
+            resource_exists=lambda _: False,
+            response_for_id=lambda resource_id: idempotency.StoredCreateResponse(202, {"accountId": resource_id}),
+            create=mock.Mock(side_effect=RuntimeError("Repository is not registered with the unit of work.")),
+            now=now,
+        )
+
+    assert service.records[scope]["status"] == "RELEASED"

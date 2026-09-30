@@ -93,6 +93,40 @@ class ProductPackagingAppStack(aws_cdk.Stack):
                 lambda lambda_f: lambda_f.add_to_policy(
                     statement=aws_iam.PolicyStatement(
                         actions=[
+                            "ssm:GetParameter",
+                            "ssm:GetParameterHistory",
+                            "ssm:PutParameter",
+                        ],
+                        effect=aws_iam.Effect.ALLOW,
+                        resources=[
+                            self.format_arn(
+                                partition=self.partition,
+                                region=self.region,
+                                resource="parameter",
+                                resource_name=app_config.component_specific.get("base-images", {})
+                                .get("parameterPrefix", "/vew/base-images")
+                                .lstrip("/")
+                                + "/*",
+                                service="ssm",
+                            ),
+                        ],
+                    ),
+                ),
+                # vew:base-channel on released AMIs (CreateTags is allowed below); only that key may be removed.
+                lambda lambda_f: lambda_f.add_to_policy(
+                    statement=aws_iam.PolicyStatement(
+                        actions=["ec2:DeleteTags"],
+                        effect=aws_iam.Effect.ALLOW,
+                        resources=[self.format_arn(account="", service="ec2", resource="image", resource_name="*")],
+                        conditions={
+                            "ForAllValues:StringEquals": {"aws:TagKeys": ["vew:base-channel"]},
+                            "Null": {"aws:TagKeys": "false"},
+                        },
+                    ),
+                ),
+                lambda lambda_f: lambda_f.add_to_policy(
+                    statement=aws_iam.PolicyStatement(
+                        actions=[
                             "ssm:DescribeParameters",
                             "ssm:GetParameter",
                             "ssm:GetParameterHistory",

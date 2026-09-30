@@ -4,6 +4,7 @@ from http import HTTPStatus
 from aws_lambda_powertools.event_handler import api_gateway
 
 from app.packaging.domain.exceptions.s2s_exception import (
+    BaseImageNotReleasedToRequiredChannel,
     IdempotencyKeyReused,
     IdempotencyRequestInProgress,
     InsufficientScope,
@@ -11,6 +12,7 @@ from app.packaging.domain.exceptions.s2s_exception import (
     InvalidIdempotencyKey,
     ProjectAccessDenied,
     ProjectAccessUnavailable,
+    ReleasingProjectOnly,
     ReplayedCreateFailure,
     ResourceReadNotReady,
     S2SException,
@@ -23,13 +25,13 @@ PROBLEM_CONTENT_TYPE = "application/problem+json"
 def status_for(error: S2SException) -> HTTPStatus:
     if isinstance(error, InvalidIdempotencyKey):
         return HTTPStatus.BAD_REQUEST
-    if isinstance(error, (IdempotencyKeyReused, IdempotencyRequestInProgress)):
+    if isinstance(error, (IdempotencyKeyReused, IdempotencyRequestInProgress, BaseImageNotReleasedToRequiredChannel)):
         return HTTPStatus.CONFLICT
     if isinstance(error, ReplayedCreateFailure):
         return HTTPStatus(error.status_code)
     if isinstance(error, InvalidComponentDefinition):
         return HTTPStatus.UNPROCESSABLE_ENTITY
-    if isinstance(error, (ProjectAccessDenied, InsufficientScope)):
+    if isinstance(error, (ProjectAccessDenied, InsufficientScope, ReleasingProjectOnly)):
         return HTTPStatus.FORBIDDEN
     if isinstance(error, (ProjectAccessUnavailable, ResourceReadNotReady)):
         return HTTPStatus.SERVICE_UNAVAILABLE

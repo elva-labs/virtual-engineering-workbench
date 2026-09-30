@@ -4,6 +4,7 @@ from typing import Optional
 
 from pydantic import Field
 
+from app.projects.domain.model import workbench_lifecycle
 from app.shared.adapters.unit_of_work_v2 import unit_of_work
 
 # The managing tool's name, e.g. "terraform".
@@ -30,3 +31,6 @@ class Project(unit_of_work.Entity):
     managedBy: Optional[str] = Field(None, title="ManagedBy", pattern=MANAGED_BY_PATTERN)
     # Where the configuration lives, shown to users whose change is refused.
     managedSource: Optional[str] = Field(None, title="ManagedSource", max_length=256)
+    # The project's workbench stop policy and what its users may change; None = the deployment's
+    # defaults, users may change nothing.
+    workbenchLifecycle: Optional[workbench_lifecycle.WorkbenchLifecycle] = Field(None, title="WorkbenchLifecycle")

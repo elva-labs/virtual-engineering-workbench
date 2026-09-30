@@ -9,6 +9,8 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.projects.domain.model import workbench_lifecycle
+
 
 class Empty(BaseModel):
     pass
@@ -45,6 +47,12 @@ class ProjectManagement(BaseModel):
 
 
 class ProjectManagementResponse(ProjectManagement):
+    projectId: str = Field(..., title="ProjectId")
+
+
+class ProjectWorkbenchLifecycleResponse(workbench_lifecycle.WorkbenchLifecycle):
+    model_config = ConfigDict(extra="ignore")
+
     projectId: str = Field(..., title="ProjectId")
 
 

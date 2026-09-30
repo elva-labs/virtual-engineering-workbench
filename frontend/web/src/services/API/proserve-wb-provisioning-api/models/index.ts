@@ -41,3 +41,7 @@ export * from './StopProvisionedProductsRequest';
 export * from './UpdateProvisionedProductRequest';
 export * from './UpdateUserProfileRequest';
 export * from './WorkbenchFailure';
+export * from './WorkbenchLifecycleEffective';
+export * from './WorkbenchLifecyclePermissions';
+export * from './WorkbenchLifecycleResponse';
+export * from './WorkbenchLifecycleUserSettings';

@@ -205,6 +205,11 @@ Resources:
       IamInstanceProfile: !Ref InstanceProfile
       InstanceType: !Ref InstanceType
       KeyName: !Ref KeyPair
+      # The idle agent reads its effective inactivity timeout from the instance tag vew:autostop through
+      # IMDS; every tag key VEW, Service Catalog and CloudFormation set is IMDS-safe.
+      MetadataOptions:
+        HttpEndpoint: enabled
+        InstanceMetadataTags: enabled
       ImageId: !FindInMap
         - RegionMap
         - !Ref AWS::Region

@@ -113,6 +113,33 @@ class DynamoDBIdempotencyService(idempotency_service.IdempotencyService):
             },
         )
 
+    def release(
+        self,
+        scope: idempotency_service.IdempotencyScope,
+        request_hash: str,
+        resource_id: str,
+        now: datetime,
+    ) -> None:
+        try:
+            self._client.update_item(
+                TableName=self._table_name,
+                Key=self._key(scope),
+                UpdateExpression="SET leaseExpiresAt = :now, lastUpdateAt = :now",
+                ConditionExpression=(
+                    "#status = :in_progress AND requestHash = :hash AND generatedResourceId = :resource"
+                ),
+                ExpressionAttributeNames={"#status": "status"},
+                ExpressionAttributeValues={
+                    ":now": self._timestamp(now),
+                    ":in_progress": "IN_PROGRESS",
+                    ":hash": request_hash,
+                    ":resource": resource_id,
+                },
+            )
+        except self._client.exceptions.ConditionalCheckFailedException:
+            # Completed or taken over by another attempt meanwhile: nothing to release.
+            pass
+
     def _classify_existing(
         self,
         scope: idempotency_service.IdempotencyScope,

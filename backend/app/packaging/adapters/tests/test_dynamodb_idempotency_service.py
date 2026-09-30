@@ -203,3 +203,23 @@ def test_logically_expired_completed_record_is_atomically_replaced_while_ttl_ite
     assert reservation.outcome == ReservationOutcome.ACQUIRED
     assert reservation.resource_id == "component-789"
     assert reservation.replaced_expired is True
+
+
+def test_released_reservation_recovers_immediately_instead_of_waiting_for_the_lease(service, scope):
+    service.reserve(scope, "request-hash", "component-456", NOW)
+
+    service.release(scope, "request-hash", "component-456", NOW)
+    reservation = service.reserve(scope, "request-hash", "component-789", NOW + timedelta(seconds=1))
+
+    assert reservation.outcome == ReservationOutcome.RECOVER
+    assert reservation.resource_id == "component-456"
+
+
+def test_release_leaves_a_completed_reservation_alone(service, scope):
+    service.reserve(scope, "request-hash", "component-456", NOW)
+    service.complete(scope, "request-hash", "component-456", 201, {"componentId": "component-456"}, NOW)
+
+    service.release(scope, "request-hash", "component-456", NOW)
+    reservation = service.reserve(scope, "request-hash", "component-789", NOW)
+
+    assert reservation.outcome == ReservationOutcome.REPLAY

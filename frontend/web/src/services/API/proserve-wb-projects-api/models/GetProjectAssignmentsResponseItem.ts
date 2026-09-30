@@ -44,6 +44,8 @@ export interface GetProjectAssignmentsResponseItem {
      * @memberof GetProjectAssignmentsResponseItem
      */
     userEmail?: string;
+    /** Display name supplied with the direct assignment. */
+    userDisplayName?: string;
     /**
      * Active directory groups that the user is member of
      * @type {Array<GetProjectAssignmentsResponseItemADGroup>}
@@ -80,6 +82,7 @@ export function GetProjectAssignmentsResponseItemFromJSONTyped(json: any, ignore
         'userId': !exists(json, 'userId') ? undefined : json['userId'],
         'roles': !exists(json, 'roles') ? undefined : json['roles'],
         'userEmail': !exists(json, 'userEmail') ? undefined : json['userEmail'],
+        'userDisplayName': !exists(json, 'userDisplayName') ? undefined : json['userDisplayName'],
         'activeDirectoryGroups': !exists(json, 'activeDirectoryGroups') ? undefined : ((json['activeDirectoryGroups'] as Array<any>).map(GetProjectAssignmentsResponseItemADGroupFromJSON)),
         'activeDirectoryGroupStatus': !exists(json, 'activeDirectoryGroupStatus') ? undefined : json['activeDirectoryGroupStatus'],
     };
@@ -97,6 +100,7 @@ export function GetProjectAssignmentsResponseItemToJSON(value?: GetProjectAssign
         'userId': value.userId,
         'roles': value.roles,
         'userEmail': value.userEmail,
+        'userDisplayName': value.userDisplayName,
         'activeDirectoryGroups': value.activeDirectoryGroups === undefined ? undefined : ((value.activeDirectoryGroups as Array<any>).map(GetProjectAssignmentsResponseItemADGroupToJSON)),
         'activeDirectoryGroupStatus': value.activeDirectoryGroupStatus,
     };

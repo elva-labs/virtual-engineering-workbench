@@ -15,8 +15,13 @@ class Empty(BaseModel):
 
 
 class Project(BaseModel):
-    projectId: str = Field(..., description="Unique ID of the project.", title="ProjectId")
-    projectName: Optional[str] = Field(None, description="Name of the project.", title="ProjectName")
+    projectId: str = Field(
+        ..., description="Unique ID of the project.", title="ProjectId"
+    )
+    projectName: Optional[str] = Field(
+        None, description="Name of the project.", title="ProjectName"
+    )
+    isActive: bool = Field(..., description="Whether the project is active", title="IsActive")
     projectDescription: Optional[str] = Field(
         None, description="Description of the project.", title="ProjectDescription"
     )
@@ -26,6 +31,16 @@ class Project(BaseModel):
         description="Point in time where project is last updated.",
         title="LastUpdateDate",
     )
+
+
+class ProjectMutationRequest(BaseModel):
+    name: str
+    description: Optional[str] = None
+    isActive: bool
+
+
+class CreateProjectResponse(BaseModel):
+    projectId: str
 
 
 class GetProjectsResponse(BaseModel):
@@ -63,8 +78,10 @@ class RemoveUsersResponse(BaseModel):
 
 
 class AssignUserRequest(BaseModel):
-    userId: Optional[str] = Field(None, description="User TID", title="UserId")
-    roles: Optional[List[str]] = Field(None, description="User roles in the project", title="Roles")
+    userId: str = Field(None, description="User TID", title="UserId")
+    roles: List[str] = Field(..., description="User roles in the project", title="Roles")
+    userEmail: Optional[str] = None
+    userDisplayName: Optional[str] = None
 
 
 class AssignUserResponse(BaseModel):
@@ -81,6 +98,8 @@ class ReAssignUsersResponse(BaseModel):
 
 
 class GetProjectAssignmentsResponseItem(BaseModel):
+    projectId: Optional[str] = None
+    userDisplayName: Optional[str] = None
     userId: Optional[str] = Field(None, description="User TID", title="UserId")
     roles: Optional[List[str]] = Field(None, description="User roles in the project", title="Roles")
     userEmail: Optional[str] = Field(None, description="Email address of the user", title="UserEmail")
@@ -95,7 +114,34 @@ class UnAssignUserResponse(BaseModel):
 
 
 class GetUserRolesResponse(BaseModel):
-    roles: List[str] = Field(..., title="roles")
+    projectId: str
+    userId: str
+    roles: List[str]
+    userEmail: Optional[str] = None
+    userDisplayName: Optional[str] = None
+
+
+class PutUserAssignmentRequest(BaseModel):
+    roles: List[str]
+    userEmail: Optional[str] = None
+    userDisplayName: Optional[str] = None
+
+
+class PutProjectGroupAssignmentRequest(BaseModel):
+    roles: List[str]
+
+
+class ProjectGroupAssignment(BaseModel):
+    projectId: str
+    groupId: str
+    roles: List[str]
+    version: int
+    createDate: str
+    lastUpdateDate: str
+
+
+class GetProjectGroupAssignmentsResponse(BaseModel):
+    assignments: List[ProjectGroupAssignment]
 
 
 class Status(Enum):

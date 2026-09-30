@@ -19,6 +19,7 @@ import { projectsInitialisedState } from '../state/projects-init-state';
 import { projectsLoadedState } from '../state/projects-loaded-state';
 import { extractErrorResponseMessage } from '../utils/api-helpers';
 import { useLocalStorage } from './local-storage';
+import { projectRoles } from './project-access';
 
 /* eslint complexity: "off" */
 
@@ -59,8 +60,7 @@ function useProjectsSwitch({ skipFetch } : Props): ProjectsSwitch {
         name: p.projectName ?? '',
         description: p.projectDescription ?? '',
         isActive: p.isActive ?? false,
-        roles: (data.assignments?.find(x =>
-          x.projectId === p.projectId)?.roles || []).map(x => x.toUpperCase())
+        roles: projectRoles(data, p.projectId ?? '')
       })));
       setEnrolments(data?.enrolments ?? []);
       setAssignments(data?.assignments ?? []);

@@ -186,6 +186,8 @@ def test_get_project_users_should_return_all_users(projects_qs_mock, lambda_cont
         {
             "assignments": [
                 {
+                    "projectId": "project-id",
+                    "userDisplayName": None,
                     "userId": "T0000AA",
                     "roles": [project_assignment.Role.PLATFORM_USER.value],
                     "userEmail": None,
@@ -257,16 +259,9 @@ def test_get_user_roles(projects_qs_mock, lambda_context, authenticated_event):
     # Assert
     assertpy.assert_that(result["statusCode"]).is_equal_to(200)
     response = api_model.GetUserRolesResponse.model_validate(json.loads(result["body"]))
-    assertpy.assert_that(response).is_not_none()
-    assertpy.assert_that(len(response.roles)).is_equal_to(2)
-    assertpy.assert_that(json.loads(result["body"])).is_equal_to(
-        {
-            "roles": [
-                project_assignment.Role.ADMIN.value,
-                project_assignment.Role.PLATFORM_USER.value,
-            ],
-        }
-    )
+    assertpy.assert_that(response.roles).is_equal_to([project_assignment.Role.ADMIN.value, project_assignment.Role.PLATFORM_USER.value])
+    assert response.userId == "U0"
+    assert response.projectId == "123"
 
 
 @patch(

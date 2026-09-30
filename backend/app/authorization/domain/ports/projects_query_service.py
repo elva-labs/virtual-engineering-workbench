@@ -1,6 +1,10 @@
 from abc import ABC, abstractmethod
 
-from app.authorization.domain.read_models import project, project_assignment
+from app.authorization.domain.read_models import (
+    project,
+    project_assignment,
+    project_group_assignment,
+)
 from app.shared.adapters.boto import paging_utils
 
 
@@ -15,3 +19,6 @@ class ProjectsQueryService(ABC):
     def get_project_assignments(
         self, project_id: str, page: paging_utils.PageInfo
     ) -> paging_utils.PagedResponse[project_assignment.Assignment]: ...
+
+    @abstractmethod
+    def get_project_group_assignments(self, project_id: str) -> list[project_group_assignment.GroupAssignment]: ...

@@ -3,7 +3,10 @@ from mypy_boto3_dynamodb import client
 
 from app.authorization.adapters.repository import dynamo_entity_config
 from app.authorization.domain.ports import assignments_query_service
-from app.authorization.domain.read_models import project_assignment
+from app.authorization.domain.read_models import (
+    project_assignment,
+    project_group_assignment,
+)
 
 
 class AssignmentsDynamoDBQueryService(assignments_query_service.AssignmentsQueryService):
@@ -48,3 +51,19 @@ class AssignmentsDynamoDBQueryService(assignments_query_service.AssignmentsQuery
             ret_val.extend([project_assignment.Assignment.model_validate(item) for item in page["Items"]])
 
         return ret_val
+
+    def get_group_assignments(self, group_ids: list[str]) -> list[project_group_assignment.GroupAssignment]:
+        paginator = self.__dynamodb_client.get_paginator("query")
+        assignments = []
+        for group_id in sorted(set(group_ids)):
+            for page in paginator.paginate(
+                TableName=self.__table_name,
+                KeyConditionExpression=Key("PK").eq(f"GROUP#{group_id}") & Key("SK").begins_with("PROJECT#"),
+                ConsistentRead=True,
+            ):
+                assignments.extend(
+                    project_group_assignment.GroupAssignment.model_validate(item)
+                    for item in page.get("Items", [])
+                    if not item.get("isDeleted", False)
+                )
+        return assignments

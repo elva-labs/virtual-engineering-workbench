@@ -169,6 +169,10 @@ class ProjectsAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
             app_config.environment_config["cognito-userpool-id-ssm-param"].format(environment=app_config.environment),
         )
         cognito_user_pool_arn = f"arn:aws:cognito-idp:{self.region}:{self.account}:userpool/{cognito_user_pool_id}"
+        user_pool_url = aws_ssm.StringParameter.value_for_string_parameter(
+            self,
+            app_config.environment_config["cognito-url-ssm-param"].format(environment=app_config.environment),
+        )
 
         environment_vars = {
             "TABLE_NAME": self._storage.table.table_name,
@@ -223,6 +227,7 @@ class ProjectsAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                         "CUSTOM_DNS": custom_api_domain,
                         "LAYER_VERSION": self._shared_app_layer.layer.layer_version_arn,
                         "COGNITO_USER_POOL_ID": cognito_user_pool_id,
+                        "USER_POOL_URL": f"https://{user_pool_url}",
                     },
                     permissions=[
                         lambda lambda_f: lambda_f.add_to_role_policy(
@@ -551,6 +556,7 @@ class ProjectsAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
             cache_explicit_disable=[
                 "/projects/{projectId}/accounts/GET",
                 "/projects/{projectId}/users/GET",
+                "/projects/{projectId}/groups/GET",
                 "/projects/{projectId}/users/{userId}/GET",
                 "/projects/{projectId}/enrolments/GET",
                 "/projects/{projectId}/technologies/GET",
@@ -632,6 +638,17 @@ class ProjectsAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                 stage=self._open_api.api.deployment_stage.stage_name,
             ),
             export_name=f"{app_config.component_name}-api-internal-project-assignments",
+        )
+
+        aws_cdk.CfnOutput(
+            self,
+            "ProjectsApiInternalProjectGroups",
+            value=self._open_api.api.arn_for_execute_api(
+                method="GET",
+                path="/internal/projects/*/groups",
+                stage=self._open_api.api.deployment_stage.stage_name,
+            ),
+            export_name=f"{app_config.component_name}-api-internal-project-groups",
         )
 
         aws_cdk.CfnOutput(

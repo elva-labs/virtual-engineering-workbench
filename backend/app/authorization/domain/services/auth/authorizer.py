@@ -29,6 +29,7 @@ class AuthorizationContext(BaseModel):
     stages: list[str] | None = Field(None)
     roles: list[str] | None = Field(None)
     domains: list[str] | None = Field(None)
+    trusted_group_ids: list[str] = Field(default_factory=list)
     project_assignments: list[project_assignment.Assignment] = Field([])
     api_auth_cfg: APIAuthConfig = Field(...)
     project_scoped_bounded_contexts: list[str] = Field([])
@@ -85,7 +86,11 @@ class Authorizer:
         for authorization_step in self.__authorization_steps:
             try:
                 if not authorization_step.invoke(request=auth_req, context=auth_context):
-                    return self.__generate_iam_policy(principalId="me", effect=AuthorizationDecision.DENY, resource="*")
+                    return self.__generate_iam_policy(
+                        principalId="me",
+                        effect=AuthorizationDecision.DENY,
+                        resource="*",
+                    )
             except Exception:
                 self.__logger.exception("Authorization step failed")
                 return self.__generate_iam_policy(principalId="me", effect=AuthorizationDecision.DENY, resource="*")
@@ -116,7 +121,11 @@ class Authorizer:
         )
 
     def __generate_iam_policy(
-        self, principalId: str, effect: AuthorizationDecision, resource: str, context: dict[str, str] | None = None
+        self,
+        principalId: str,
+        effect: AuthorizationDecision,
+        resource: str,
+        context: dict[str, str] | None = None,
     ) -> dict:
         authResponse = {}
         authResponse["principalId"] = principalId
@@ -136,7 +145,7 @@ class Authorizer:
 
         self.__logger.debug(authResponse)
         self.__metrics.add_metric(
-            name="UserAuthorized" if effect == AuthorizationDecision.ALLOW else "UserUnauthorized",
+            name=("UserAuthorized" if effect == AuthorizationDecision.ALLOW else "UserUnauthorized"),
             unit=MetricUnit.Count,
             value=1,
         )

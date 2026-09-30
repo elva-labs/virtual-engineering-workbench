@@ -10,7 +10,12 @@ from app.authorization.domain.commands import sync_assignments_command
 from app.shared.api import bounded_contexts
 from infra import config, constants
 from infra.backend import vew_bounded_context_stack
-from infra.constructs import backend_app_entrypoints, backend_app_openapi, backend_app_storage, shared_layer
+from infra.constructs import (
+    backend_app_entrypoints,
+    backend_app_openapi,
+    backend_app_storage,
+    shared_layer,
+)
 from infra.constructs.eventbridge import l3_event_bus
 from infra.helpers import ops_monitoring
 
@@ -196,6 +201,7 @@ class AuthorizationAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                         bounded_contexts.BoundedContext.PROJECTS: [
                             ("GET", "/internal/projects"),
                             ("GET", "/internal/projects/*/users"),
+                            ("GET", "/internal/projects/*/groups"),
                         ],
                     },
                 ),
@@ -208,7 +214,10 @@ class AuthorizationAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
 
         # Subscribe to integration events
         projects_event_bus = l3_event_bus.from_bounded_context(
-            self, "projects-bus", app_config=app_config, bounded_context_name=bounded_contexts.BoundedContext.PROJECTS
+            self,
+            "projects-bus",
+            app_config=app_config,
+            bounded_context_name=bounded_contexts.BoundedContext.PROJECTS,
         )
         projects_event_bus.subscribe_to_events(
             name="projects-events-rule",
@@ -218,6 +227,7 @@ class AuthorizationAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                 "UserAssigned",
                 "UserReAssigned",
                 "UserUnAssigned",
+                "ProjectGroupAssignmentChanged",
             ],
         )
 
@@ -292,7 +302,11 @@ class AuthorizationAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
     def table(self) -> aws_dynamodb.ITable | None:
         return self._storage.table
 
-    def __configure_ops(self, app_config: config.AppConfig, storage: backend_app_storage.BackendAppStorage):
+    def __configure_ops(
+        self,
+        app_config: config.AppConfig,
+        storage: backend_app_storage.BackendAppStorage,
+    ):
         (
             ops_monitoring.OpsMonitoringBuilder(
                 self,
@@ -304,7 +318,8 @@ class AuthorizationAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
             .with_lambda_functions(self.__backend_app.app_entries.values())
             .with_dynamodb_table(storage.table)
             .with_command_monitoring(
-                domain_module=domain, critical_commands=[sync_assignments_command.SyncAssignmentsCommand.__name__]
+                domain_module=domain,
+                critical_commands=[sync_assignments_command.SyncAssignmentsCommand.__name__],
             )
             .with_domain_event_monitoring(domain_module=domain)
             .build()

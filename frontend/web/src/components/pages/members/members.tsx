@@ -23,6 +23,7 @@ import { selectedProjectState, RoleBasedFeature } from '../../../state';
 import { useProjectUsers } from '../projects/project-details/project-users.logic';
 import { useLocalStorage } from '../../../hooks';
 import { GetProjectEnrolmentsResponseItem } from '../../../services/API/proserve-wb-projects-api';
+import { ProjectGroups } from '../projects/project-details/project-groups';
 
 const TAB_ID_MEMBERS = 'members';
 const TAB_ID_REQUESTS = 'requests';
@@ -36,8 +37,10 @@ export const Members = () => {
 
   const {
     projectUsers,
+    projectGroups,
     usersLoading,
     loadProjectUsers,
+    loadProjectGroups,
     unassignUsers,
     userUnassignInProgress,
   } = useProjectUsers({ projectId: selectedProject.projectId ?? '' });
@@ -128,13 +131,16 @@ export const Members = () => {
                 {
                   label: i18n.tabMembers,
                   id: TAB_ID_MEMBERS,
-                  content: <ProjectUsers
-                    projectUsers={projectUsers}
-                    usersLoading={usersLoading}
-                    loadProjectUsers={loadProjectUsers}
-                    unassignUsers={unassignUsers}
-                    userUnassignInProgress={userUnassignInProgress}
-                  />
+                  content: <SpaceBetween size="l">
+                    <ProjectUsers
+                      projectUsers={projectUsers}
+                      usersLoading={usersLoading}
+                      loadProjectUsers={loadProjectUsers}
+                      unassignUsers={unassignUsers}
+                      userUnassignInProgress={userUnassignInProgress}
+                    />
+                    <ProjectGroups assignments={projectGroups} onRefresh={loadProjectGroups}/>
+                  </SpaceBetween>
                 },
                 {
                   label: i18n.tabRequests,

@@ -261,7 +261,20 @@ publishing_app_config = {
     "prod": _dev_publishing_config,
 }
 
+# Base image release channels (app/packaging/domain/model/recipe/base_image_channels.py): one project
+# builds on the raw OS and releases golden images to "<osVersion> (test)" and "<osVersion>", which every
+# recipe can build on. Off while releasingProjectId is empty.
+_base_images_config = {
+    "releasingProjectId": "",
+    "parameterPrefix": "/vew/base-images",
+    "osVersion": "Ubuntu 24.04 base",
+    "sourceOsVersion": "Ubuntu 24",
+    "platform": "Linux",
+    "architectures": ["amd64", "arm64"],
+}
+
 _dev_packaging_config = {
+    "base-images": _base_images_config,
     "ami-factory-subnet-names": [s.strip() for s in HUB_SUBNET_NAMES.split(",") if s.strip()]
     or [
         f"subnet-1-{ORGANIZATION_PREFIX}-{APPLICATION_PREFIX}-dev",
@@ -330,6 +343,8 @@ image_sharing_app_config = {"dev": {}, "qa": {}, "prod": {}}
 
 _dev_product_packaging_config = {
     "ami-factory-vpc-name": HUB_VPC_NAME or f"vpc-{ORGANIZATION_PREFIX}-{APPLICATION_PREFIX}-dev",
+    # The admin role in the AMI factory account reads and writes the base image parameters.
+    "base-images": _base_images_config,
 }
 
 product_packaging_app_config = {

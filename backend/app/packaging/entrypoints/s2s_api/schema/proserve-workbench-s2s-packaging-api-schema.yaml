@@ -697,8 +697,98 @@ paths:
       security: [{ClientCredentials: [clients/packaging/pipeline.read]}]
       x-amazon-apigateway-request-validator: params-only
       x-amazon-apigateway-integration: *lambdaIntegration
+  /base-images:
+    get:
+      operationId: ListBaseImages
+      tags: [ALL]
+      responses:
+        '200': {$ref: '#/components/responses/BaseImagePage'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
+        '500': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+      security: [{ClientCredentials: [clients/packaging/base_image.read]}]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration: *lambdaIntegration
+  /base-images/{architecture}:
+    get:
+      operationId: ListArchitectureBaseImages
+      tags: [ALL]
+      parameters: [{$ref: '#/components/parameters/Architecture'}]
+      responses:
+        '200': {$ref: '#/components/responses/BaseImagePage'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
+        '500': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+      security: [{ClientCredentials: [clients/packaging/base_image.read]}]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration: *lambdaIntegration
+  /base-images/{architecture}/{channel}:
+    get:
+      operationId: GetBaseImage
+      tags: [ALL]
+      parameters: [{$ref: '#/components/parameters/Architecture'}, {$ref: '#/components/parameters/BaseImageChannel'}]
+      responses:
+        '200': {$ref: '#/components/responses/BaseImage'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
+        '500': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+      security: [{ClientCredentials: [clients/packaging/base_image.read]}]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration: *lambdaIntegration
+    put:
+      operationId: ReleaseBaseImage
+      tags: [ALL]
+      parameters: [{$ref: '#/components/parameters/Architecture'}, {$ref: '#/components/parameters/BaseImageChannel'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReleaseBaseImageRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/BaseImage'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
+        '500': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+        '422': {$ref: '#/components/responses/Problem'}
+      security: [{ClientCredentials: [clients/packaging/base_image.write]}]
+      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-integration: *lambdaIntegration
 components:
   parameters:
+    Architecture:
+      name: architecture
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [amd64, arm64]
+    BaseImageChannel:
+      name: channel
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [test, prod]
     ProjectId:
       name: projectId
       in: path
@@ -877,6 +967,16 @@ components:
       content:
         application/json:
           schema: {$ref: '#/components/schemas/ImagePage'}
+    BaseImage:
+      description: Current and previous base image of one architecture and channel.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/BaseImage'}
+    BaseImagePage:
+      description: Base images, one per architecture and channel.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/BaseImagePage'}
   schemas:
     ComponentStatus:
       type: string
@@ -1417,6 +1517,36 @@ components:
       required: [image]
       properties:
         image: {$ref: '#/components/schemas/Image'}
+    BaseImageStatus:
+      type: string
+      enum: [RELEASED, NOT_RELEASED]
+    BaseImage:
+      type: object
+      required: [architecture, channel, osVersion, parameterName, status, projectId]
+      properties:
+        architecture: {type: string, enum: [amd64, arm64]}
+        channel: {type: string, enum: [test, prod]}
+        osVersion: {type: string, description: OS entry recipes select to build on this channel's base.}
+        parameterName: {type: string}
+        status: {$ref: '#/components/schemas/BaseImageStatus'}
+        projectId: {type: string, description: The deployment's releasing project.}
+        imageId: {type: string, nullable: true, description: VEW image (a build of the releasing project) of amiId.}
+        amiId: {type: string, nullable: true, description: AMI of the last release to this channel.}
+        previousAmiId: {type: string, nullable: true, description: The value amiId replaced (rollback).}
+    BaseImagePage:
+      type: object
+      required: [baseImages]
+      properties:
+        baseImages:
+          type: array
+          items: {$ref: '#/components/schemas/BaseImage'}
+    ReleaseBaseImageRequest:
+      type: object
+      additionalProperties: false
+      required: [projectId, imageId]
+      properties:
+        projectId: {type: string, minLength: 1, description: Must be the deployment's releasing project.}
+        imageId: {type: string, minLength: 1, description: 'A successful build of a releasing-project recipe for the architecture, on the raw OS.'}
     RecipeResponse:
       type: object
       required: [recipe]

@@ -16,27 +16,17 @@ class Empty(BaseModel):
 
 class User(BaseModel):
     userId: str = Field(..., description="Unique ID of the user.", title="UserId")
-    userEmail: Optional[str] = Field(
-        None, description="Email of a user.", title="UserEmail"
-    )
+    userEmail: Optional[str] = Field(None, description="Email of a user.", title="UserEmail")
 
 
 class Project(BaseModel):
-    projectId: str = Field(
-        ..., description="Unique ID of the project.", title="ProjectId"
-    )
-    projectName: Optional[str] = Field(
-        None, description="Name of the project.", title="ProjectName"
-    )
+    projectId: str = Field(..., description="Unique ID of the project.", title="ProjectId")
+    projectName: Optional[str] = Field(None, description="Name of the project.", title="ProjectName")
     projectDescription: Optional[str] = Field(
         None, description="Description of the project.", title="ProjectDescription"
     )
-    isActive: Optional[bool] = Field(
-        None, description="Project active flag", title="IsActive"
-    )
-    createDate: Optional[str] = Field(
-        None, description="Point in time where project is created.", title="CreateDate"
-    )
+    isActive: Optional[bool] = Field(None, description="Project active flag", title="IsActive")
+    createDate: Optional[str] = Field(None, description="Point in time where project is created.", title="CreateDate")
     lastUpdateDate: Optional[str] = Field(
         None,
         description="Point in time where project is last updated.",
@@ -45,39 +35,25 @@ class Project(BaseModel):
 
 
 class ProjectEnrolment(BaseModel):
-    projectId: str = Field(
-        ..., description="Unique ID of the project enrolment.", title="ProjectId"
-    )
-    status: str = Field(
-        ..., description="Status of the project enrolment.", title="Status"
-    )
+    projectId: str = Field(..., description="Unique ID of the project enrolment.", title="ProjectId")
+    status: str = Field(..., description="Status of the project enrolment.", title="Status")
 
 
 class ProjectAccount(BaseModel):
     id: Optional[str] = Field(None, description="Unique ID of the account.", title="Id")
-    awsAccountId: str = Field(
-        ..., description="Unique ID of the AWS account.", title="AwsAccountId"
-    )
-    accountType: str = Field(
-        ..., description="Type of the account.", title="AccountType"
-    )
-    accountName: Optional[str] = Field(
-        None, description="Name of the account.", title="AccountName"
-    )
+    awsAccountId: str = Field(..., description="Unique ID of the AWS account.", title="AwsAccountId")
+    accountType: str = Field(..., description="Type of the account.", title="AccountType")
+    accountName: Optional[str] = Field(None, description="Name of the account.", title="AccountName")
     accountDescription: Optional[str] = Field(
         None, description="Description of the account.", title="AccountDescription"
     )
-    createDate: Optional[str] = Field(
-        None, description="Point in time where account is created.", title="CreateDate"
-    )
+    createDate: Optional[str] = Field(None, description="Point in time where account is created.", title="CreateDate")
     lastUpdateDate: Optional[str] = Field(
         None,
         description="Point in time where account is last updated.",
         title="LastUpdateDate",
     )
-    accountStatus: Optional[str] = Field(
-        None, description="Account status", title="AccountStatus"
-    )
+    accountStatus: Optional[str] = Field(None, description="Account status", title="AccountStatus")
     stage: Optional[str] = Field(
         None,
         description="The stage account represents. Possible values dev, qa, prod",
@@ -108,16 +84,12 @@ class ProjectAccount(BaseModel):
 class Technology(BaseModel):
     id: str = Field(..., description="The ID of the technology", title="Id")
     name: str = Field(..., description="The name of the technology", title="Name")
-    description: Optional[str] = Field(
-        None, description="The description of the technology", title="Description"
-    )
+    description: Optional[str] = Field(None, description="The description of the technology", title="Description")
 
 
 class AddTechnologyRequest(BaseModel):
     name: str = Field(..., description="The name of the technology", title="Name")
-    description: Optional[str] = Field(
-        None, description="The description of the technology", title="Description"
-    )
+    description: Optional[str] = Field(None, description="The description of the technology", title="Description")
 
 
 class AddTechnologyResponse(BaseModel):
@@ -126,9 +98,7 @@ class AddTechnologyResponse(BaseModel):
 
 class UpdateTechnologyRequest(BaseModel):
     name: str = Field(..., description="The name of the technology", title="Name")
-    description: Optional[str] = Field(
-        None, description="The description of the technology", title="Description"
-    )
+    description: Optional[str] = Field(None, description="The description of the technology", title="Description")
 
 
 class UpdateTechnologyResponse(BaseModel):
@@ -141,29 +111,19 @@ class DeleteTechnologyResponse(BaseModel):
 
 class OnBoardProjectAccountRequest(BaseModel):
     id: Optional[str] = Field(None, description="Unique ID of the account.", title="Id")
-    awsAccountId: str = Field(
-        ..., description="Unique ID of the AWS account.", title="AwsAccountId"
-    )
-    accountType: str = Field(
-        ..., description="Type of the account.", title="AccountType"
-    )
-    accountName: Optional[str] = Field(
-        None, description="Name of the account.", title="AccountName"
-    )
+    awsAccountId: str = Field(..., description="Unique ID of the AWS account.", title="AwsAccountId")
+    accountType: str = Field(..., description="Type of the account.", title="AccountType")
+    accountName: Optional[str] = Field(None, description="Name of the account.", title="AccountName")
     accountDescription: Optional[str] = Field(
         None, description="Description of the account.", title="AccountDescription"
     )
-    createDate: Optional[str] = Field(
-        None, description="Point in time where account is created.", title="CreateDate"
-    )
+    createDate: Optional[str] = Field(None, description="Point in time where account is created.", title="CreateDate")
     lastUpdateDate: Optional[str] = Field(
         None,
         description="Point in time where account is last updated.",
         title="LastUpdateDate",
     )
-    accountStatus: Optional[str] = Field(
-        None, description="Account status", title="AccountStatus"
-    )
+    accountStatus: Optional[str] = Field(None, description="Account status", title="AccountStatus")
     stage: Optional[str] = Field(
         None,
         description="The stage account represents. Possible values dev, qa, prod",
@@ -193,6 +153,10 @@ class ReonboardProjectAccountResponse(BaseModel):
     pass
 
 
+class GetTechnologyResponse(BaseModel):
+    technology: Technology = Field(..., title="Technology")
+
+
 class GetTechnologiesResponse(BaseModel):
     nextToken: Optional[Dict[str, Any]] = Field(None, title="LastEvaluatedKey token")
     technologies: List[Technology] = Field(..., title="Technologies")
@@ -209,9 +173,7 @@ class GetProjectAccountsResponse(BaseModel):
 
 class AssignUserRequest(BaseModel):
     userId: Optional[str] = Field(None, description="User TID", title="UserId")
-    roles: Optional[List[str]] = Field(
-        None, description="User roles in the project", title="Roles"
-    )
+    roles: Optional[List[str]] = Field(None, description="User roles in the project", title="Roles")
 
 
 class AssignUserResponse(BaseModel):
@@ -219,12 +181,8 @@ class AssignUserResponse(BaseModel):
 
 
 class ReAssignUsersRequest(BaseModel):
-    roles: Optional[List[str]] = Field(
-        None, description="Users roles in the project", title="Roles"
-    )
-    userIds: Optional[List[str]] = Field(
-        None, description="User IDs in the project", title="UserIds"
-    )
+    roles: Optional[List[str]] = Field(None, description="Users roles in the project", title="Roles")
+    userIds: Optional[List[str]] = Field(None, description="User IDs in the project", title="UserIds")
 
 
 class ReAssignUsersResponse(BaseModel):
@@ -279,9 +237,7 @@ class GetProjectAssignmentsResponseItem(BaseModel):
 
 class GetProjectAssignmentsResponse(BaseModel):
     nextToken: Optional[str] = Field(None, title="LastEvaluatedKey token")
-    assignments: Optional[List[GetProjectAssignmentsResponseItem]] = Field(
-        None, title="Assignments"
-    )
+    assignments: Optional[List[GetProjectAssignmentsResponseItem]] = Field(None, title="Assignments")
 
 
 class ProjectGroupAssignment(BaseModel):
@@ -299,15 +255,11 @@ class GetProjectGroupsResponse(BaseModel):
 
 class GetProjectAssignmentResponseItem(BaseModel):
     userId: str = Field(..., description="User TID", title="UserId")
-    roles: List[str] = Field(
-        ..., description="User roles in the project", title="Roles"
-    )
+    roles: List[str] = Field(..., description="User roles in the project", title="Roles")
 
 
 class GetProjectAssignmentResponse(BaseModel):
-    assignment: Optional[GetProjectAssignmentResponseItem] = Field(
-        None, title="Assignment"
-    )
+    assignment: Optional[GetProjectAssignmentResponseItem] = Field(None, title="Assignment")
 
 
 class GetProjectEnrolmentsResponseItem(BaseModel):
@@ -316,18 +268,10 @@ class GetProjectEnrolmentsResponseItem(BaseModel):
     userEmail: Optional[str] = Field(None, description="User e-mail", title="userEmail")
     projectId: Optional[str] = Field(None, description="Project ID", title="ProjectId")
     status: Optional[str] = Field(None, description="Enrolment status", title="Status")
-    ticketId: Optional[str] = Field(
-        None, description="Enrolment ticket ID", title="TicketId"
-    )
-    approver: Optional[str] = Field(
-        None, description="Enrolment approver", title="Approver"
-    )
-    reason: Optional[str] = Field(
-        None, description="Enrolment decline reason", title="Reason"
-    )
-    createDate: Optional[str] = Field(
-        None, description="Point in time where enrolment is created", title="CreateDate"
-    )
+    ticketId: Optional[str] = Field(None, description="Enrolment ticket ID", title="TicketId")
+    approver: Optional[str] = Field(None, description="Enrolment approver", title="Approver")
+    reason: Optional[str] = Field(None, description="Enrolment decline reason", title="Reason")
+    createDate: Optional[str] = Field(None, description="Point in time where enrolment is created", title="CreateDate")
     resolveDate: Optional[str] = Field(
         None,
         description="Point in time where enrolment is resolved",
@@ -352,13 +296,9 @@ class UpdateEnrolmentsRequest(BaseModel):
     enrolmentIds: Optional[List[str]] = Field(
         None, description="Enrolment IDs to approve or decline", title="EnrolmentIds"
     )
-    reason: Optional[str] = Field(
-        None, description="Reason for enrolment rejection", title="Reason"
-    )
+    reason: Optional[str] = Field(None, description="Reason for enrolment rejection", title="Reason")
     status: Optional[str] = Field(None, description="Enrolment status", title="Status")
-    roles: Optional[List[str]] = Field(
-        None, description="User roles in the project", title="Roles"
-    )
+    roles: Optional[List[str]] = Field(None, description="User roles in the project", title="Roles")
 
 
 class UpdateEnrolmentsResponse(BaseModel):
@@ -379,9 +319,7 @@ class UpdateProjectAccountResponse(BaseModel):
 
 class CreateProjectRequest(BaseModel):
     name: str = Field(..., description="Name of the project", title="Name")
-    description: Optional[str] = Field(
-        None, description="Description of the project", title="Description"
-    )
+    description: Optional[str] = Field(None, description="Description of the project", title="Description")
     isActive: bool = Field(..., description="Project active flag", title="IsActive")
 
 
@@ -395,9 +333,7 @@ class GetProjectResponse(BaseModel):
 
 class UpdateProjectRequest(BaseModel):
     name: str = Field(..., description="Name of the project", title="Name")
-    description: Optional[str] = Field(
-        None, description="Description of the project", title="Description"
-    )
+    description: Optional[str] = Field(None, description="Description of the project", title="Description")
     isActive: bool = Field(..., description="Project active flag", title="IsActive")
 
 
@@ -407,9 +343,7 @@ class UpdateProjectResponse(BaseModel):
 
 class GetUsersResponse(BaseModel):
     users: List[User] = Field(..., title="Users")
-    nextToken: Optional[str] = Field(
-        None, description="paging token", title="LastEvaluatedKey token"
-    )
+    nextToken: Optional[str] = Field(None, description="paging token", title="LastEvaluatedKey token")
 
 
 class Status(Enum):
@@ -428,18 +362,12 @@ class GetServiceClientAssignmentResponse(BaseModel):
 
 
 class ProjectAssignment(BaseModel):
-    projectId: Optional[str] = Field(
-        None, description="Unique ID of the project.", title="ProjectId"
-    )
-    roles: Optional[List[str]] = Field(
-        None, description="User roles in the project.", title="Roles"
-    )
-    activeDirectoryGroups: Optional[List[GetProjectAssignmentsResponseItemADGroup]] = (
-        Field(
-            None,
-            description="Active directory groups that the user is member of",
-            title="ActiveDirectoryGroups",
-        )
+    projectId: Optional[str] = Field(None, description="Unique ID of the project.", title="ProjectId")
+    roles: Optional[List[str]] = Field(None, description="User roles in the project.", title="Roles")
+    activeDirectoryGroups: Optional[List[GetProjectAssignmentsResponseItemADGroup]] = Field(
+        None,
+        description="Active directory groups that the user is member of",
+        title="ActiveDirectoryGroups",
     )
     activeDirectoryGroupStatus: Optional[str] = Field(
         None,
@@ -464,6 +392,4 @@ class GetProjectsResponse(BaseModel):
 
 class GetProjectEnrolmentsResponse(BaseModel):
     nextToken: Optional[Dict[str, Any]] = Field(None, title="LastEvaluatedKey token")
-    enrolments: Optional[List[GetProjectEnrolmentsResponseItem]] = Field(
-        None, title="Enrolments"
-    )
+    enrolments: Optional[List[GetProjectEnrolmentsResponseItem]] = Field(None, title="Enrolments")

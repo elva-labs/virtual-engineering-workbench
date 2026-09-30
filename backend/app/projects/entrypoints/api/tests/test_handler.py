@@ -32,7 +32,7 @@ from app.projects.domain.commands.users import (
     reassign_user_command,
     unassign_user_command,
 )
-from app.projects.domain.model import project_assignment, project_group_assignment, service_client_assignment
+from app.projects.domain.model import project_assignment, project_group_assignment, service_client_assignment, technology
 from app.projects.domain.ports import projects_query_service
 from app.projects.entrypoints.api import bootstrapper
 from app.projects.entrypoints.api.model import api_model
@@ -896,9 +896,7 @@ def test_internal_lookup_returns_404_for_missing_service_client_assignment(
     )
 
 
-def test_internal_lookup_returns_service_client_assignment(
-    lambda_context, authenticated_event, get_mock_dependencies
-):
+def test_internal_lookup_returns_service_client_assignment(lambda_context, authenticated_event, get_mock_dependencies):
     from app.projects.entrypoints.api import handler
 
     handler.dependencies = get_mock_dependencies
@@ -1120,3 +1118,46 @@ def test_internal_get_all_users(token, response_token, lambda_context, authentic
     assertpy.assert_that(response).is_not_none()
     assertpy.assert_that(len(response.users)).is_equal_to(5)
     assertpy.assert_that(response.nextToken).is_equal_to(response_token)
+
+
+def test_internal_technology_lookup_returns_technology(lambda_context, authenticated_event, get_mock_dependencies):
+    from app.projects.entrypoints.api import handler
+
+    handler.dependencies = get_mock_dependencies
+    handler.dependencies.technologies_query_service = mock.Mock()
+    handler.dependencies.technologies_query_service.get_technology_by_id.return_value = technology.Technology(
+        id="tech-1", project_id="proj-1", name="Ubuntu", description="Workbenches"
+    )
+
+    response = handler.handler(
+        authenticated_event(None, "/internal/projects/proj-1/technologies/tech-1", "GET"),
+        lambda_context,
+    )
+
+    assert response["statusCode"] == 200
+    assert json.loads(response["body"])["technology"] == {
+        "id": "tech-1",
+        "name": "Ubuntu",
+        "description": "Workbenches",
+    }
+    handler.dependencies.technologies_query_service.get_technology_by_id.assert_called_once_with("proj-1", "tech-1")
+
+
+@pytest.mark.parametrize("found", [None, "other-project"])
+def test_internal_technology_lookup_returns_404_for_missing_or_foreign_technology(
+    found, lambda_context, authenticated_event, get_mock_dependencies
+):
+    from app.projects.entrypoints.api import handler
+
+    handler.dependencies = get_mock_dependencies
+    handler.dependencies.technologies_query_service = mock.Mock()
+    handler.dependencies.technologies_query_service.get_technology_by_id.return_value = (
+        technology.Technology(id="tech-1", project_id=found, name="Other") if found else None
+    )
+
+    response = handler.handler(
+        authenticated_event(None, "/internal/projects/proj-1/technologies/tech-1", "GET"),
+        lambda_context,
+    )
+
+    assert response["statusCode"] == 404

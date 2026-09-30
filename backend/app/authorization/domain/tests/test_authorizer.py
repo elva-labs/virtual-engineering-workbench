@@ -44,6 +44,7 @@ def test_authorize_when_all_steps_succeed_should_return_allow_policy(
                 "stages": "[]",
                 "userRoles": "[]",
                 "userDomains": "[]",
+                "userGroups": "[]",
                 "projectManagedBy": "",
                 "projectManagedSource": "",
             },

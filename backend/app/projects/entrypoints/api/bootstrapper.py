@@ -63,6 +63,7 @@ from app.projects.domain.ports import (
     enrolment_query_service,
     projects_query_service,
     technologies_query_service,
+    user_directory_service as user_directory_port,
 )
 from app.projects.entrypoints.api import config
 from app.shared.adapters.message_bus import (
@@ -87,6 +88,7 @@ class Dependencies(BaseModel):
     technologies_query_service: technologies_query_service.TechnologiesQueryService
     enrolment_query_service: enrolment_query_service.EnrolmentQueryService
     user_info_client: Optional[Callable[[str], dict]] = None
+    user_directory_service: Optional[user_directory_port.UserDirectoryService] = None
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -321,4 +323,5 @@ def bootstrap(
         technologies_query_service=technologies_qry_srv,
         enrolment_query_service=enrolment_qry_srv,
         user_info_client=get_user_info if user_pool_url else None,
+        user_directory_service=user_directory_svc,
     )

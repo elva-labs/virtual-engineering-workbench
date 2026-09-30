@@ -50,6 +50,8 @@ from app.projects.domain.commands.users import assign_user_command, reassign_use
 from app.projects.domain.ports import enrolment_query_service, projects_query_service, technologies_query_service
 from app.projects.entrypoints.s2s_api import common, config
 from app.shared.adapters.idempotency import dynamodb_idempotency_service
+from app.projects.domain.project_group_assignment_service import ProjectGroupAssignmentService
+from app.projects.domain.project_lifecycle_service import ProjectLifecycleService
 from app.shared.adapters.message_bus import (
     command_bus,
     command_bus_metrics,
@@ -67,6 +69,8 @@ from app.shared.logging import boto_logger
 
 class Dependencies(BaseModel):
     command_bus: command_bus.CommandBus
+    group_assignment_service: Optional[ProjectGroupAssignmentService] = None
+    project_lifecycle_service: Optional[ProjectLifecycleService] = None
     projects_query_service: projects_query_service.ProjectsQueryService
     technologies_query_service: technologies_query_service.TechnologiesQueryService
     enrolment_query_service: enrolment_query_service.EnrolmentQueryService
@@ -283,6 +287,8 @@ def bootstrap(
 
     return Dependencies(
         command_bus=command_bus,
+        group_assignment_service=ProjectGroupAssignmentService(shared_uow_v2, projects_query_service, message_bus),
+        project_lifecycle_service=ProjectLifecycleService(shared_uow_v2, projects_query_service, message_bus),
         projects_query_service=projects_query_service,
         technologies_query_service=technologies_qry_srv,
         enrolment_query_service=enrolment_qry_srv,

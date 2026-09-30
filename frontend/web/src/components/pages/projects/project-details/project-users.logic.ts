@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { projectsAPI } from '../../../../services';
+import type { ProjectGroupAssignment } from '../../../../services/API/projects-api';
 import { GetProjectAssignmentsResponseItem } from '../../../../services/API/proserve-wb-projects-api';
 import { extractErrorResponseMessage } from '../../../../utils/api-helpers';
 import { useNotifications } from '../../../layout';
 
 const i18n = {
   userFetchErrorHeader: 'Unable to fetch project users.',
+  groupFetchErrorHeader: 'Unable to fetch project groups.',
   userUnassignSuccess: 'The user has been successfully offboarded from the program',
   userUnassignError: 'Unable to unassign users',
   // eslint-disable-next-line @stylistic/max-len
@@ -18,6 +20,7 @@ type ProjectUsersProps = {
 
 const useProjectUsers = ({ projectId }: ProjectUsersProps) => {
   const [projectUsers, setProjectUsers] = useState<GetProjectAssignmentsResponseItem[]>([]);
+  const [projectGroups, setProjectGroups] = useState<ProjectGroupAssignment[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [userUnassignInProgress, setUserUnassignInProgress] = useState(false);
 
@@ -25,12 +28,16 @@ const useProjectUsers = ({ projectId }: ProjectUsersProps) => {
 
   useEffect(() => {
     loadProjectUsers();
-  }, []);
+    loadProjectGroups();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
 
   return {
     projectUsers,
+    projectGroups,
     usersLoading: usersLoading,
     loadProjectUsers,
+    loadProjectGroups,
     unassignUsers,
     userUnassignInProgress,
   };
@@ -50,6 +57,18 @@ const useProjectUsers = ({ projectId }: ProjectUsersProps) => {
       }).finally(() => {
         setUsersLoading(false);
       });
+  }
+
+  function loadProjectGroups() {
+    setProjectGroups([]);
+    projectsAPI.getProjectGroups(projectId).then(response => {
+      setProjectGroups(response.assignments ?? []);
+    }).catch(async e => {
+      showErrorNotification({
+        header: i18n.groupFetchErrorHeader,
+        content: await extractErrorResponseMessage(e)
+      });
+    });
   }
 
   function unassignUsers(userIds: string[]) {

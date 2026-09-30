@@ -64,6 +64,7 @@ from app.provisioning.domain.model import (
     network_subnet,
     product_status,
     provisioned_product,
+    stage_access,
     user_profile,
 )
 from app.provisioning.domain.ports import (
@@ -76,7 +77,7 @@ from app.provisioning.domain.ports import (
     provisioned_products_query_service,
     versions_query_service,
 )
-from app.provisioning.domain.read_models import product, version
+from app.provisioning.domain.read_models import product, project_account, version
 from app.provisioning.domain.value_objects import (
     project_id_value_object,
     provisioned_product_id_value_object,
@@ -192,6 +193,12 @@ class ProductProvisioningAggregate(aggregate.Aggregate):
             raise domain_exception.DomainException(
                 "User does not have a role in the project to allow product provisioning"
             )
+        # Enforced here, not only in the listing: every launch path (portal, internal, S2S) passes
+        # through this check with the user's project roles.
+        if not stage_access.is_allowed(assignment.roles, command.stage.value):
+            raise domain_exception.DomainException(
+                f"User role does not allow launching products from the {command.stage.value} stage"
+            )
 
         version_distribution = self.__get_version_distribution(
             versions_qs=versions_qs,
@@ -200,6 +207,7 @@ class ProductProvisioningAggregate(aggregate.Aggregate):
             region=command.region.value,
             stage=command.stage.value,
         )
+        self.__raise_if_account_not_active(projects_qs, command.project_id.value, version_distribution)
 
         mapped_params = self.__validate_and_map_input_parameters(
             provisioning_parameters=command.provisioning_parameters.value,
@@ -2478,6 +2486,29 @@ class ProductProvisioningAggregate(aggregate.Aggregate):
             )
 
         return self._route_tables
+
+    def __raise_if_account_not_active(
+        self,
+        projects_qs: projects_query_service.ProjectsQueryService,
+        project_id: str,
+        version_distribution: version.Version,
+    ):
+        """A deactivated project account keeps its version records; nothing may launch into it."""
+        active_accounts = projects_qs.get_aws_accounts_by_status(
+            project_id=project_id, statuses=[project_account.ProjectAccountStatusEnum.Active.value]
+        )
+        if not any(
+            (
+                account.id == version_distribution.accountId
+                if version_distribution.accountId
+                else account.awsAccountId == version_distribution.awsAccountId
+                and account.stage.upper() == str(version_distribution.stage)
+            )
+            for account in active_accounts
+        ):
+            raise domain_exception.DomainException(
+                f"The {version_distribution.stage} account of this project is not active; the product cannot be launched"
+            )
 
     def __get_version_distribution(
         self,

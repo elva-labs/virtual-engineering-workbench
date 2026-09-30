@@ -254,6 +254,8 @@ def get_available_product_versions(
         stage=stage,
         region=region,
         return_technical_params=False,
+        user_roles=list(app.context.get("user_principal").user_roles or []),
+        project_id=project_id,
     )
 
     versions_parsed = [

@@ -1,3 +1,4 @@
+from app.provisioning.domain.model import stage_access
 from app.provisioning.domain.ports import (
     networking_query_service,
     products_query_service,
@@ -9,7 +10,6 @@ from app.provisioning.domain.value_objects import (
     project_id_value_object,
     user_role_value_object,
 )
-from app.shared.middleware.authorization import VirtualWorkbenchRoles
 
 
 class ProductsDomainQueryService:
@@ -29,28 +29,10 @@ class ProductsDomainQueryService:
         product_id_filter: list[product_id_value_object.ProductIdValueObject] = [],
     ) -> list[product.Product]:
         # Decide which stages does the user role has access to
-        user_roles = [user_role.value for user_role in user_roles]
-        if any(
-            [
-                user_role
-                in [
-                    VirtualWorkbenchRoles.Admin,
-                    VirtualWorkbenchRoles.ProgramOwner,
-                    VirtualWorkbenchRoles.PowerUser,
-                    VirtualWorkbenchRoles.ProductContributor,
-                ]
-                for user_role in user_roles
-            ]
-        ):
-            allowed_stages = [
-                product.ProductStage.DEV,
-                product.ProductStage.QA,
-                product.ProductStage.PROD,
-            ]
-        elif VirtualWorkbenchRoles.BetaUser in user_roles:
-            allowed_stages = [product.ProductStage.QA, product.ProductStage.PROD]
-        else:
-            allowed_stages = [product.ProductStage.PROD]
+        allowed_stages = [
+            product.ProductStage(stage)
+            for stage in stage_access.allowed_stages([user_role.value for user_role in user_roles])
+        ]
 
         # Fetch the products available in these stages
         products = self._products_qry_srv.get_products(

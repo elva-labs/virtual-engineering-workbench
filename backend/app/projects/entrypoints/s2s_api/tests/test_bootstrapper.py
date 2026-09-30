@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 import assertpy
-import boto3
 
 from app.projects.domain.commands.project_accounts import (
     deactivate_project_account_s2s_command,
@@ -22,19 +21,6 @@ from app.shared.domain.ports.idempotency_service import IdempotencyScope, Reserv
 def test_bootstrapper():
     # ARRANGE
     app_config = config.AppConfig(cors_config=config.config.get("cors_config"))
-    boto3.resource("dynamodb", region_name="us-east-1").create_table(
-        TableName=app_config.get_table_name(),
-        KeySchema=[
-            {"AttributeName": "PK", "KeyType": "HASH"},
-            {"AttributeName": "SK", "KeyType": "RANGE"},
-        ],
-        AttributeDefinitions=[
-            {"AttributeName": "PK", "AttributeType": "S"},
-            {"AttributeName": "SK", "AttributeType": "S"},
-        ],
-        BillingMode="PAY_PER_REQUEST",
-    )
-
     # ACT
     dependencies = bootstrapper.bootstrap(app_config=app_config, logger=logging.getLogger())
 

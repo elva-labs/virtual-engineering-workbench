@@ -18,6 +18,9 @@ from app.authorization.domain.services.auth import authorizer
 
 from app.shared.identity.entra_groups import group_ids, effective_roles
 
+# An alias for methods whose arguments shadow the module name.
+project_assignment_model = project_assignment
+
 USER_ID_CLAIM_NAME = "custom:user_tid"
 
 
@@ -169,8 +172,11 @@ class ProjectsBCContextEnricher(authorizer.AuthorizerStep):
     def __init__(
         self,
         assignments_query_service: assignments_query_service.AssignmentsQueryService,
+        platform_admin_groups: typing.Iterable[str] = (),
     ):
         self.__assignments_query_service = assignments_query_service
+        # Members of these Entra groups are ADMIN on every project (config "platform-admin-groups").
+        self.__platform_admin_groups = {g.lower() for g in platform_admin_groups}
 
     def invoke(
         self,
@@ -217,6 +223,8 @@ class ProjectsBCContextEnricher(authorizer.AuthorizerStep):
                 (assignment for assignment in context.project_assignments if assignment.projectId == project_id),
                 None,
             )
+            if self.__is_platform_admin(context):
+                selected_assignment = self.__with_platform_admin(context, project_id, selected_assignment)
 
             context.roles = selected_assignment.roles if selected_assignment and selected_assignment.roles else []
             context.domains = (
@@ -227,8 +235,48 @@ class ProjectsBCContextEnricher(authorizer.AuthorizerStep):
             settings = self.__assignments_query_service.get_project_settings(project_id=project_id)
             context.project_managed_by = settings.managedBy
             context.project_managed_source = settings.managedSource
+        elif self.__is_platform_admin(context):
+            # No project in the path: count as an admin somewhere, which CreateProject requires.
+            context.project_assignments = context.project_assignments + [
+                self.__group_assignment(context, PLATFORM_ADMIN_PROJECT_ID, [project_assignment_model.Role.ADMIN])
+            ]
 
         return True
+
+    def __is_platform_admin(self, context: authorizer.AuthorizationContext) -> bool:
+        return bool({g.lower() for g in context.trusted_group_ids} & self.__platform_admin_groups)
+
+    def __with_platform_admin(
+        self,
+        context: authorizer.AuthorizationContext,
+        project_id: str,
+        assignment: project_assignment_model.Assignment | None,
+    ) -> project_assignment_model.Assignment:
+        """Adds ADMIN for members of a platform-admin group, on top of the effective roles (direct and
+        Entra group grants), without a grant per project. The merged assignment replaces the one in
+        context.project_assignments, so the Cedar entities need no change."""
+        admin = project_assignment_model.Role.ADMIN
+        if assignment and admin in assignment.roles:
+            return assignment
+        merged = (
+            assignment.model_copy(update={"roles": [*assignment.roles, admin]})
+            if assignment
+            else self.__group_assignment(context, project_id, [admin])
+        )
+        context.project_assignments = [a for a in context.project_assignments if a.projectId != project_id] + [merged]
+        return merged
+
+    def __group_assignment(
+        self, context: authorizer.AuthorizationContext, project_id: str, roles: list
+    ) -> project_assignment_model.Assignment:
+        return project_assignment_model.Assignment(
+            userId=context.user_name, projectId=project_id, roles=roles, userEmail=context.user_email
+        )
+
+
+# Synthetic project id of a platform admin's assignment when no project is in the path; it matches
+# no real project (ids are proj-xxxxx), so it only feeds totalAdminAssignments.
+PLATFORM_ADMIN_PROJECT_ID = "platform-admin"
 
 
 class AVPEntityType(enum.StrEnum):

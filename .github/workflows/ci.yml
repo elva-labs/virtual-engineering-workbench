@@ -23,6 +23,9 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          # The pull request's changed files are diffed against its base (pre-commit --from-ref).
+          fetch-depth: 0
 
       - name: Set up uv
         uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
@@ -51,7 +54,6 @@ jobs:
         continue-on-error: ${{ github.event_name != 'pull_request' }}
         run: |
           if [ -n "$BASE_SHA" ]; then
-            git fetch --no-tags --depth=1 origin "$BASE_SHA"
             SKIP=frontend-web-lint,frontend-infra-lint uvx pre-commit run --from-ref "$BASE_SHA" --to-ref "$HEAD_SHA" --show-diff-on-failure
           else
             SKIP=frontend-web-lint,frontend-infra-lint uvx pre-commit run --all-files --show-diff-on-failure

@@ -1,4 +1,5 @@
 import typing
+from datetime import datetime, timezone
 
 from boto3.dynamodb.conditions import Key
 from mypy_boto3_dynamodb import service_resource
@@ -52,6 +53,39 @@ def migrations_config(gsi_entities: str):
                         }
                     )
 
+    def project_account_set_onboarded_at(table: service_resource.Table):
+        """003.ProjectAccount_Set_OnboardedAt
+
+        Accounts onboarded before onboardedAt existed get it from their last successful state, so
+        tooling gating on it sees them as onboarded. Only the one attribute is set, and only where it
+        is missing, so a re-run changes nothing.
+        """
+
+        for project in __get_all_projects(table, gsi_entities):
+            for account in __get_all_project_accounts(table, project.get("projectId")):
+                if account.get("onboardedAt"):
+                    continue
+                onboarded = account.get("lastOnboardingResult") == "Succeeded" or account.get("accountStatus") in (
+                    "Active",
+                    "ReOnboarding",
+                )
+                if not onboarded:
+                    continue
+                when = (
+                    account.get("lastUpdateDate")
+                    or account.get("createDate")
+                    or datetime.now(timezone.utc).isoformat()
+                )
+                try:
+                    table.update_item(
+                        Key={"PK": account["PK"], "SK": account["SK"]},
+                        UpdateExpression="SET onboardedAt = :when",
+                        ConditionExpression="attribute_exists(PK) AND attribute_not_exists(onboardedAt)",
+                        ExpressionAttributeValues={":when": when},
+                    )
+                except table.meta.client.exceptions.ConditionalCheckFailedException:
+                    pass
+
     return [
         (
             "001.ProjectAccount_Set_Project_ID",
@@ -60,6 +94,10 @@ def migrations_config(gsi_entities: str):
         (
             "002.Project_and_Account_Set_Sequence_ID",
             project_and_account_set_sequence_id,
+        ),
+        (
+            "003.ProjectAccount_Set_OnboardedAt",
+            project_account_set_onboarded_at,
         ),
     ]
 

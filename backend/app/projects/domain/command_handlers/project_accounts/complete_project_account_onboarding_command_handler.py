@@ -41,6 +41,8 @@ def handle(
         ),
     )
     account.lastUpdateDate = datetime.now(timezone.utc).isoformat()
+    if account.onboardedAt is None:
+        account.onboardedAt = account.lastUpdateDate
 
     with uow:
         uow.get_repository(project_account.ProjectAccountPrimaryKey, project_account.ProjectAccount).update_entity(

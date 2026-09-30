@@ -64,7 +64,13 @@ def test_packaging_resource_server_exposes_all_supported_scopes():
 
 def test_sample_s2s_client_is_granted_all_packaging_scopes():
     template = packaging_oauth_template()
-    clients = template.find_resources("AWS::Cognito::UserPoolClient")
+    # The orphan-project bootstrap client (project management and Entra group access) is a second,
+    # separately scoped client; this test is about the sample S2S client only.
+    clients = {
+        resource_id: client
+        for resource_id, client in template.find_resources("AWS::Cognito::UserPoolClient").items()
+        if "bootstrap" not in client["Properties"].get("ClientName", "")
+    }
     assert len(clients) == 1
 
     allowed_scopes = json.dumps(next(iter(clients.values()))["Properties"].get("AllowedOAuthScopes", []))

@@ -49,6 +49,7 @@ const i18n = {
   tableHeader: 'Program members',
   filterPlaceholder: 'Find members',
   tableHeaderEmail: 'Member email',
+  tableHeaderDisplayName: 'Member name',
   unassignModalHeader: 'Offboard member',
   reassignModalHeader: 'Update member roles',
   unassignModalOK: 'Continue',
@@ -118,6 +119,12 @@ function joinRoleNames(roles?: string[]) {
 }
 
 const COLUMN_DEFINITIONS: TableProps.ColumnDefinition<GetProjectAssignmentsResponseItem>[] = [
+  {
+    id: 'userDisplayName',
+    header: i18n.tableHeaderDisplayName,
+    cell: u => u.userDisplayName || '—',
+    sortingField: 'userDisplayName',
+  },
   {
     id: 'userId',
     header: i18n.tableHeaderUserId,
@@ -204,6 +211,11 @@ export function projectUsers({
             operators: ['=', ':', '!='],
             propertyLabel: 'User ID',
             groupValuesLabel: 'User ID values'
+          }, {
+            key: 'userDisplayName',
+            operators: ['=', ':', '!='],
+            propertyLabel: 'Member name',
+            groupValuesLabel: 'Member name values'
           }, {
             key: 'userEmail',
             operators: ['=', ':', '!='],

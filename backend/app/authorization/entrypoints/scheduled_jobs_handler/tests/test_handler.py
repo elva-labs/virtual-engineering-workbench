@@ -1,9 +1,17 @@
 from unittest import mock
 
 
-@mock.patch("app.authorization.domain.command_handlers.sync_assignments_command_handler.handle", autospec=True)
+@mock.patch(
+    "app.authorization.domain.command_handlers.sync_group_assignments_command_handler.handle",
+    autospec=True,
+)
+@mock.patch(
+    "app.authorization.domain.command_handlers.sync_assignments_command_handler.handle",
+    autospec=True,
+)
 def test_handler_when_sync_job_is_triggered_invokes_sync_command(
     mocked_command_handler,
+    mocked_group_handler,
     lambda_context,
     assignment_sync_job_event,
 ):
@@ -15,3 +23,4 @@ def test_handler_when_sync_job_is_triggered_invokes_sync_command(
 
     # ASSERT
     mocked_command_handler.assert_called_once()
+    mocked_group_handler.assert_called_once()

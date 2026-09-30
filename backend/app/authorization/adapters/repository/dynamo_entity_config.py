@@ -1,6 +1,9 @@
 import enum
 
-from app.authorization.domain.read_models import project_assignment
+from app.authorization.domain.read_models import (
+    project_assignment,
+    project_group_assignment,
+)
 from app.shared.adapters.unit_of_work_v2 import (
     dynamodb_repo_config,
     dynamodb_repository,
@@ -10,6 +13,7 @@ from app.shared.adapters.unit_of_work_v2 import (
 class DBPrefix(enum.StrEnum):
     PROJECT = "PROJECT"
     USER = "USER"
+    GROUP = "GROUP"
 
 
 class EntityConfigurator(dynamodb_repository.DynamoDBEntityConfiguratorBase):
@@ -27,6 +31,27 @@ class EntityConfigurator(dynamodb_repository.DynamoDBEntityConfiguratorBase):
             project_assignment.Assignment,
             self.project_assignment_entity_config,
         )
+
+        self.register_cfg(
+            project_group_assignment.GroupAssignmentPrimaryKey,
+            project_group_assignment.GroupAssignment,
+            self.group_assignment_entity_config,
+        )
+
+    def group_assignment_entity_config(self, cfg):
+        cfg.partition_key(
+            name="PK",
+            value_template=lambda group_id: f"{DBPrefix.GROUP}#{group_id}",
+            values_from_entity=lambda ent: ent.groupId,
+            values_from_primary_key=lambda pk: pk.groupId,
+        )
+        cfg.sort_key(
+            name="SK",
+            value_template=lambda project_id: f"{DBPrefix.PROJECT}#{project_id}",
+            values_from_entity=lambda ent: ent.projectId,
+            values_from_primary_key=lambda pk: pk.projectId,
+        )
+        cfg.enable_optimistic_concurrency_control()
 
     def project_assignment_entity_config(
         self,

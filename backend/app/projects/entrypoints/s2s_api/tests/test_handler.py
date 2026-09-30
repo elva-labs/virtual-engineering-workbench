@@ -185,6 +185,8 @@ def test_get_project_users_should_return_all_users(projects_qs_mock, lambda_cont
         {
             "assignments": [
                 {
+                    "projectId": "project-id",
+                    "userDisplayName": None,
                     "userId": "T0000AA",
                     "roles": [project_assignment.Role.PLATFORM_USER.value],
                     "userEmail": None,
@@ -256,16 +258,9 @@ def test_get_user_roles(projects_qs_mock, lambda_context, authenticated_event):
     # Assert
     assertpy.assert_that(result["statusCode"]).is_equal_to(200)
     response = api_model.GetUserRolesResponse.model_validate(json.loads(result["body"]))
-    assertpy.assert_that(response).is_not_none()
-    assertpy.assert_that(len(response.roles)).is_equal_to(2)
-    assertpy.assert_that(json.loads(result["body"])).is_equal_to(
-        {
-            "roles": [
-                project_assignment.Role.ADMIN.value,
-                project_assignment.Role.PLATFORM_USER.value,
-            ],
-        }
-    )
+    assertpy.assert_that(response.roles).is_equal_to([project_assignment.Role.ADMIN.value, project_assignment.Role.PLATFORM_USER.value])
+    assert response.userId == "U0"
+    assert response.projectId == "123"
 
 
 @patch(
@@ -295,7 +290,11 @@ def service_client_dependencies(assignment=None):
         projects_query_service.ProjectsQueryService,
         instance=True,
     )
-    projects_query_service_mock.get_service_client_assignment.return_value = assignment
+    caller = service_client_assignment.ServiceClientAssignment(
+        clientId="fake_client_id", projectId="proj-1", status="ACTIVE", grantedBy="fake_client_id",
+        createDate="2026-09-01", lastUpdateDate="2026-09-01",
+    )
+    projects_query_service_mock.get_service_client_assignment.side_effect = lambda project_id, client_id: (caller if client_id == "fake_client_id" else assignment)
     command_bus_mock = mock.create_autospec(command_bus.CommandBus, instance=True)
     dependencies = bootstrapper.Dependencies(
         technologies_query_service=fake_classes.FakeTechnologiesQueryService(),
@@ -377,7 +376,7 @@ def test_get_service_client_assignment_returns_404_when_missing(lambda_context, 
         )
 
     assert response["statusCode"] == 404
-    dependencies.projects_query_service.get_service_client_assignment.assert_called_once_with("proj-1", "missing")
+    dependencies.projects_query_service.get_service_client_assignment.assert_any_call("proj-1", "missing")
 
 
 def test_delete_service_client_assignment_dispatches_command(lambda_context, authenticated_event):

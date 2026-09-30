@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import Field
 
@@ -9,5 +9,5 @@ class ProjectUpdated(message_bus.Message):
     event_name: Literal["ProjectUpdated"] = Field("ProjectUpdated", alias="eventName")
     project_id: str = Field(..., alias="projectId")
     project_name: str = Field(..., alias="projectName")
-    project_description: str = Field(..., alias="projectDescription")
+    project_description: Optional[str] = Field(None, alias="projectDescription")
     is_active: bool = Field(..., alias="isActive")

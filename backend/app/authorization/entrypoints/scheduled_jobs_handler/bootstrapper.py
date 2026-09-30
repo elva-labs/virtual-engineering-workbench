@@ -8,7 +8,10 @@ from app.authorization.adapters.query_services import (
     projects_api_query_service,
 )
 from app.authorization.adapters.repository import dynamo_entity_config
-from app.authorization.domain.command_handlers import sync_assignments_command_handler
+from app.authorization.domain.command_handlers import (
+    sync_assignments_command_handler,
+    sync_group_assignments_command_handler,
+)
 from app.authorization.domain.commands import sync_assignments_command
 from app.authorization.domain.services.auth import authorizer
 from app.authorization.entrypoints.scheduled_jobs_handler import config
@@ -76,16 +79,20 @@ def bootstrap(  # noqa: C901
     )
 
     def __sync_handler(command):
+        projects_qs = __projects_qs_provider()
         sync_assignments_command_handler.handle(
             command=command,
-            projects_qs=__projects_qs_provider(),
+            projects_qs=projects_qs,
             assignments_qs=assignments_qs,
             uow=uow,
             logger=logger,
         )
 
+        sync_group_assignments_command_handler.handle(projects_qs, uow)
+
     command_bus = command_bus_metrics.CommandBusMetrics(
-        inner=in_memory_command_bus.InMemoryCommandBus(logger=logger), metrics_client=metrics_client
+        inner=in_memory_command_bus.InMemoryCommandBus(logger=logger),
+        metrics_client=metrics_client,
     ).register_handler(
         sync_assignments_command.SyncAssignmentsCommand,
         __sync_handler,

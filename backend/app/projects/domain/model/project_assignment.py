@@ -26,6 +26,7 @@ class Assignment(unit_of_work.Entity):
     projectId: str = Field(..., title="ProjectId")
     roles: List[Role] = Field(..., title="Roles")
     userEmail: Optional[str] = Field(None, title="UserEmail")
+    userDisplayName: Optional[str] = Field(None, title="UserDisplayName")
     activeDirectoryGroups: list[user.ActiveDirectoryGroup] = Field([], title="ActiveDirectoryGroups")
     activeDirectoryGroupStatus: user.UserADStatus = Field(user.UserADStatus.UNKNOWN, title="ActiveDirectoryGroupStatus")
 

@@ -16,6 +16,8 @@ from app.authorization.domain.ports import (
 from app.authorization.domain.read_models import project_assignment
 from app.authorization.domain.services.auth import authorizer
 
+from app.shared.identity.entra_groups import group_ids, effective_roles
+
 USER_ID_CLAIM_NAME = "custom:user_tid"
 
 
@@ -35,7 +37,11 @@ class JWTAuthorizer(authorizer.AuthorizerStep):
         self.__issuer = issuer
         self.__audiences = audiences
 
-    def invoke(self, request: authorizer.AuthorizationRequest, context: authorizer.AuthorizationContext) -> bool:
+    def invoke(
+        self,
+        request: authorizer.AuthorizationRequest,
+        context: authorizer.AuthorizationContext,
+    ) -> bool:
 
         auth_token_jwt, signing_key = self.__get_auth_token_with_signing_key(request)
 
@@ -121,7 +127,11 @@ class CognitoAuthorizer(authorizer.AuthorizerStep):
         self.__logger = logger
         self.__metrics = metrics
 
-    def invoke(self, request: authorizer.AuthorizationRequest, context: authorizer.AuthorizationContext) -> bool:
+    def invoke(
+        self,
+        request: authorizer.AuthorizationRequest,
+        context: authorizer.AuthorizationContext,
+    ) -> bool:
 
         if not request.auth_token.startswith("Bearer "):
             return False
@@ -129,8 +139,7 @@ class CognitoAuthorizer(authorizer.AuthorizerStep):
         if user_profile := self.__auth_srv.get_user_info(request.auth_token):
             self.__logger.debug(
                 {
-                    "message": "User profile retrieved",
-                    "response": user_profile,
+                    "message": "Trusted identity profile retrieved",
                 }
             )
             context.user_name = (
@@ -138,6 +147,7 @@ class CognitoAuthorizer(authorizer.AuthorizerStep):
                 if USER_ID_CLAIM_NAME in user_profile
                 else None
             )
+            context.trusted_group_ids = group_ids(user_profile)
             context.user_email = user_profile["email"]
             return True
 
@@ -162,7 +172,11 @@ class ProjectsBCContextEnricher(authorizer.AuthorizerStep):
     ):
         self.__assignments_query_service = assignments_query_service
 
-    def invoke(self, request: authorizer.AuthorizationRequest, context: authorizer.AuthorizationContext) -> bool:
+    def invoke(
+        self,
+        request: authorizer.AuthorizationRequest,
+        context: authorizer.AuthorizationContext,
+    ) -> bool:
 
         if not context.user_name:
             return False
@@ -176,22 +190,38 @@ class ProjectsBCContextEnricher(authorizer.AuthorizerStep):
         context.roles = []
         context.domains = []
 
-        project_assignment = None
+        selected_assignment = None
 
-        context.project_assignments = self.__assignments_query_service.get_user_assignments(user_id=context.user_name)
+        direct = self.__assignments_query_service.get_user_assignments(user_id=context.user_name)
+        groups = (
+            self.__assignments_query_service.get_group_assignments(context.trusted_group_ids)
+            if context.trusted_group_ids
+            else []
+        )
+        union = effective_roles(direct, groups)
+        by_project = {assignment.projectId: assignment for assignment in direct}
+        # These assignments exist only in the authorization request; no user records are written.
+        context.project_assignments = [
+            (
+                by_project[project_id].model_copy(update={"roles": roles})
+                if project_id in by_project
+                else project_assignment.Assignment(userId=context.user_name, projectId=project_id, roles=roles)
+            )
+            for project_id, roles in union.items()
+        ]
 
         if request.resource_path.startswith("/projects/") and (
             project_id := request.resource_ids.get("projectId", None)
         ):
-            project_assignment = next(
+            selected_assignment = next(
                 (assignment for assignment in context.project_assignments if assignment.projectId == project_id),
                 None,
             )
 
-            context.roles = project_assignment.roles if project_assignment and project_assignment.roles else []
+            context.roles = selected_assignment.roles if selected_assignment and selected_assignment.roles else []
             context.domains = (
-                list({g.get("domain") for g in project_assignment.activeDirectoryGroups if "domain" in g})
-                if project_assignment and project_assignment.activeDirectoryGroups
+                list({g.get("domain") for g in selected_assignment.activeDirectoryGroups if "domain" in g})
+                if selected_assignment and selected_assignment.activeDirectoryGroups
                 else []
             )
 
@@ -332,7 +362,8 @@ class VEWProjectAssignmentEntityResolver(AVPEntityResolver):
 
         return [
             AVPEntity(
-                identifier=assignmentId, parents=[assignmentIds[idx + 1][1]] if idx + 1 < len(assignmentIds) else []
+                identifier=assignmentId,
+                parents=([assignmentIds[idx + 1][1]] if idx + 1 < len(assignmentIds) else []),
             )
             for idx, (_, assignmentId) in enumerate(assignmentIds)
         ]
@@ -398,7 +429,11 @@ class AmazonVerifiedPermissionsAuthorizer(authorizer.AuthorizerStep):
         self.__logger = logger
         self.__entity_resolvers = entity_resolvers
 
-    def invoke(self, request: authorizer.AuthorizationRequest, context: authorizer.AuthorizationContext) -> bool:
+    def invoke(
+        self,
+        request: authorizer.AuthorizationRequest,
+        context: authorizer.AuthorizationContext,
+    ) -> bool:
         if not context.user_name:
             return False
 

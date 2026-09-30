@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from uuid import UUID, RFC_4122
 
 from app.projects.domain.events.projects.project_created import ProjectCreated
-from app.projects.domain.events.projects.project_updated import ProjectUpdated
+from app.projects.domain.events.projects import project_updated
 from app.projects.domain.model import (
     project,
     project_create_request,
@@ -158,14 +158,28 @@ class ProjectLifecycleService:
             current.lastUpdateDate = datetime.now(timezone.utc).isoformat()
             repo.update_entity(pk, current)
             self._uow.commit()
-        self._events.publish(
-            ProjectUpdated(
-                projectId=project_id,
-                projectName=name,
-                projectDescription=description,
-                isActive=is_active,
-            )
-        )
+        # The full current state, so an update never drops the management mode.
+        self._events.publish(project_updated.from_project(current))
+        return current
+
+    def set_management(self, project_id: str, managed_by: str | None, source: str | None):
+        """Marks the project as managed by an external tool (the user APIs then refuse its
+        configuration changes), or hands it back to the portal (None). Unchanged, it publishes nothing."""
+        source = source if managed_by else None
+        with self._uow:
+            repo = self._uow.get_repository(project.ProjectPrimaryKey, project.Project)
+            pk = project.ProjectPrimaryKey(projectId=project_id)
+            current = repo.get(pk)
+            if current is None:
+                raise KeyError(project_id)
+            if (current.managedBy, current.managedSource) == (managed_by, source):
+                return current
+            current.managedBy = managed_by
+            current.managedSource = source
+            current.lastUpdateDate = datetime.now(timezone.utc).isoformat()
+            repo.update_entity(pk, current)
+            self._uow.commit()
+        self._events.publish(project_updated.from_project(current))
         return current
 
     def deactivate(self, project_id: str):

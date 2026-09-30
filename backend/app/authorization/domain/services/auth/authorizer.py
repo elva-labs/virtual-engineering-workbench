@@ -33,6 +33,10 @@ class AuthorizationContext(BaseModel):
     project_assignments: list[project_assignment.Assignment] = Field([])
     api_auth_cfg: APIAuthConfig = Field(...)
     project_scoped_bounded_contexts: list[str] = Field([])
+    # Whether an external tool manages the project in the request path, and where its configuration
+    # lives; the user APIs refuse its configuration changes (app/shared/middleware/externally_managed.py).
+    project_managed_by: str | None = Field(None)
+    project_managed_source: str | None = Field(None)
 
 
 class AuthorizationRequest(BaseModel):
@@ -117,6 +121,9 @@ class Authorizer:
                 "stages": json.dumps(sorted(list(stages))),
                 "userRoles": json.dumps(sorted(auth_context.roles or [])),
                 "userDomains": json.dumps(sorted(auth_context.domains or [])),
+                # Context values must be strings; "" = managed in the portal.
+                "projectManagedBy": auth_context.project_managed_by or "",
+                "projectManagedSource": auth_context.project_managed_source or "",
             },
         )
 

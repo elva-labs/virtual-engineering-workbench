@@ -25,6 +25,7 @@ import { useFeatureToggles } from '../../feature-toggles/feature-toggle.hook.ts'
 import { useCommonProvisionedProduct } from './common.logic.ts';
 import { ServiceAPI } from '../../../services';
 import { CompareDates } from '../shared/compare-dates.tsx';
+import { statusRefreshInterval } from './status-refresh.ts';
 import { useWorkbenchFailureNotifications } from './workbench-failure.logic.ts';
 
 const NO_PRODUCTS: ProvisionedProduct[] = [];
@@ -146,6 +147,10 @@ export function useProvisionedProducts(
     fetcherFactory(serviceAPI),
     {
       shouldRetryOnError: false,
+      refreshInterval: (latest?: GetProvisionedProductsResponse) =>
+        statusRefreshInterval(
+          (latest?.provisionedProducts ?? []).map((p) => p.status)
+        ),
     }
   );
   useWorkbenchFailureNotifications(data?.provisionedProducts ?? NO_PRODUCTS);

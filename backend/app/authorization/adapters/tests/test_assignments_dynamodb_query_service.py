@@ -41,7 +41,10 @@ def backend_app_dynamodb_table(mock_dynamodb, test_table_name, gsi_name_inverted
         GlobalSecondaryIndexes=[
             {
                 "IndexName": gsi_name_inverted_pk,
-                "KeySchema": [{"AttributeName": "SK", "KeyType": "HASH"}, {"AttributeName": "PK", "KeyType": "RANGE"}],
+                "KeySchema": [
+                    {"AttributeName": "SK", "KeyType": "HASH"},
+                    {"AttributeName": "PK", "KeyType": "RANGE"},
+                ],
                 "Projection": {"ProjectionType": "ALL"},
             },
         ],
@@ -62,7 +65,10 @@ def ddb_uow(backend_app_dynamodb_table, test_table_name, mock_logger):
 
 
 def test_get_user_assignments_returns_all_users_assignments(
-    ddb_uow: unit_of_work.UnitOfWork, test_table_name: str, backend_app_dynamodb_table, gsi_name_inverted_pk
+    ddb_uow: unit_of_work.UnitOfWork,
+    test_table_name: str,
+    backend_app_dynamodb_table,
+    gsi_name_inverted_pk,
 ):
     # ARRANGE
     with ddb_uow as uow:
@@ -116,7 +122,10 @@ def test_get_user_assignments_returns_all_users_assignments(
 
 
 def test_get_project_assignments_returns_all_project_assignments(
-    ddb_uow: unit_of_work.UnitOfWork, test_table_name: str, backend_app_dynamodb_table, gsi_name_inverted_pk
+    ddb_uow: unit_of_work.UnitOfWork,
+    test_table_name: str,
+    backend_app_dynamodb_table,
+    gsi_name_inverted_pk,
 ):
     # ARRANGE
     with ddb_uow as uow:
@@ -160,3 +169,49 @@ def test_get_project_assignments_returns_all_project_assignments(
             activeDirectoryGroups=[{"a": "b"}],
         ),
     )
+
+
+def test_group_projection_replay_and_tombstone(
+    ddb_uow, test_table_name, backend_app_dynamodb_table, gsi_name_inverted_pk
+):
+    from app.authorization.domain.integration_events.projects.project_group_assignment_changed import (
+        ProjectGroupAssignmentChanged,
+    )
+    from app.authorization.domain.integration_event_handlers.projects.project_group_assignment_changed_handler import (
+        handle,
+    )
+    from app.authorization.domain.read_models.project_group_assignment import (
+        GroupAssignment,
+        GroupAssignmentPrimaryKey,
+    )
+
+    group = "12345678-1234-1234-1234-123456789abc"
+    query = assignments_dynamodb_query_service.AssignmentsDynamoDBQueryService(
+        table_name=test_table_name,
+        dynamodb_client=backend_app_dynamodb_table.meta.client,
+        gsi_inverted_pk=gsi_name_inverted_pk,
+    )
+
+    def event(version, roles, deleted=False):
+        return ProjectGroupAssignmentChanged(
+            projectId="p",
+            groupId=group,
+            roles=roles,
+            version=version,
+            isDeleted=deleted,
+        )
+
+    handle(event(1, ["PLATFORM_USER"]), ddb_uow)
+    assert query.get_group_assignments([group])[0].roles == ["PLATFORM_USER"]
+    handle(event(2, ["ADMIN"]), ddb_uow)
+    handle(event(1, ["PLATFORM_USER"]), ddb_uow)
+    assert query.get_group_assignments([group, group])[0].roles == ["ADMIN"]
+    handle(event(3, [], True), ddb_uow)
+    handle(event(2, ["ADMIN"]), ddb_uow)
+    handle(event(3, [], True), ddb_uow)
+    assert query.get_group_assignments([group]) == []
+    with ddb_uow:
+        record = ddb_uow.get_repository(GroupAssignmentPrimaryKey, GroupAssignment).get(
+            GroupAssignmentPrimaryKey(projectId="p", groupId=group)
+        )
+        assert record.isDeleted and record.version == 3

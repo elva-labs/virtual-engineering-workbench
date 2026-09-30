@@ -77,7 +77,7 @@ def authenticated_event():
                     "claims": {
                         "sub": "fake_client_id",
                         "token_use": "access",
-                        "scope": "projects/read",
+                        "scope": "clients/projects/program.read clients/projects/program.write clients/projects/assignment.read clients/projects/assignment.write clients/projects/group_assignment.read clients/projects/group_assignment.write clients/projects/client_assignment.read clients/projects/client_assignment.write",
                         "auth_time": "1681464958",
                         "iss": "cognito",
                         "exp": "Fri Apr 14 10:35:58 UTC 2023",
@@ -151,4 +151,15 @@ def mock_audit_logging_secret(mock_secrets_manager):
         region=TEST_REGION,
     )
 
+    table = boto3.resource("dynamodb", region_name=TEST_REGION).create_table(
+        TableName=TEST_TABLE_NAME,
+        KeySchema=[{"AttributeName": "PK", "KeyType": "HASH"}, {"AttributeName": "SK", "KeyType": "RANGE"}],
+        AttributeDefinitions=[{"AttributeName": "PK", "AttributeType": "S"}, {"AttributeName": "SK", "AttributeType": "S"}],
+        BillingMode="PAY_PER_REQUEST",
+    )
+    table.put_item(Item={
+        "PK": "CLIENT#fake_client_id", "SK": "PROJECT#project-id",
+        "clientId": "fake_client_id", "projectId": "project-id", "status": "ACTIVE",
+        "grantedBy": "fake_client_id", "createDate": "2026-09-01", "lastUpdateDate": "2026-09-01",
+    })
     return secrets_manager.create_secret(name=TEST_SECRET_NAME, value="test123")

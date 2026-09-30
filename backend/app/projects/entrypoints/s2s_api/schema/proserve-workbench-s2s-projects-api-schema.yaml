@@ -540,6 +540,132 @@ paths:
           - "method.request.querystring.nextToken"
         contentHandling: "CONVERT_TO_TEXT"
         credentials: "{{apigw_invocation_role_arn}}"
+    post:
+      operationId: CreateProject
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectMutationRequest"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateProjectResponse"
+      security:
+        - ClientCredentials: ["clients/projects/program.write"]
+      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: when_no_match
+        contentHandling: CONVERT_TO_TEXT
+        credentials: "{{apigw_invocation_role_arn}}"
+  /projects/{projectId}:
+    get:
+      operationId: GetProject
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+      security:
+        - ClientCredentials: ["clients/projects/program.read"]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: when_no_match
+        contentHandling: CONVERT_TO_TEXT
+        credentials: "{{apigw_invocation_role_arn}}"
+    put:
+      operationId: UpdateProject
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectMutationRequest"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+      security:
+        - ClientCredentials: ["clients/projects/program.write"]
+      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: when_no_match
+        contentHandling: CONVERT_TO_TEXT
+        credentials: "{{apigw_invocation_role_arn}}"
+    delete:
+      operationId: DeactivateProject
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+      security:
+        - ClientCredentials: ["clients/projects/program.write"]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: when_no_match
+        contentHandling: CONVERT_TO_TEXT
+        credentials: "{{apigw_invocation_role_arn}}"
   /projects/{projectId}/enrolments:
     post:
       description: "Request to be enrolled to a program"
@@ -682,7 +808,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AssignUserResponse"
+                $ref: "#/components/schemas/GetUserRolesResponse"
       security:
         - ClientCredentials: [ "clients/projects/assignment.write" ]
       x-amazon-apigateway-request-validator: all
@@ -816,6 +942,78 @@ paths:
           - "method.request.path.projectId"
         contentHandling: "CONVERT_TO_TEXT"
         credentials: "{{apigw_invocation_role_arn}}"
+    put:
+      operationId: PutUserAssignment
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PutUserAssignmentRequest"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetUserRolesResponse"
+      security:
+        - ClientCredentials: ["clients/projects/assignment.write"]
+      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: when_no_match
+        contentHandling: CONVERT_TO_TEXT
+        credentials: "{{apigw_invocation_role_arn}}"
+    delete:
+      operationId: DeleteUserAssignment
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Empty"
+      security:
+        - ClientCredentials: ["clients/projects/assignment.write"]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: when_no_match
+        contentHandling: CONVERT_TO_TEXT
+        credentials: "{{apigw_invocation_role_arn}}"
   /projects/{projectId}/clients/{clientId}:
     get:
       description: "Get a service-client project assignment"
@@ -920,6 +1118,141 @@ paths:
             statusCode: "200"
         passthroughBehavior: "when_no_match"
         contentHandling: "CONVERT_TO_TEXT"
+        credentials: "{{apigw_invocation_role_arn}}"
+  /projects/{projectId}/groups:
+    get:
+      operationId: ListProjectGroupAssignments
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetProjectGroupAssignmentsResponse"
+      security:
+        - ClientCredentials: ["clients/projects/group_assignment.read"]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: when_no_match
+        contentHandling: CONVERT_TO_TEXT
+        credentials: "{{apigw_invocation_role_arn}}"
+  /projects/{projectId}/groups/{groupId}:
+    get:
+      operationId: GetProjectGroupAssignment
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectGroupAssignment"
+      security:
+        - ClientCredentials: ["clients/projects/group_assignment.read"]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: when_no_match
+        contentHandling: CONVERT_TO_TEXT
+        credentials: "{{apigw_invocation_role_arn}}"
+    put:
+      operationId: PutProjectGroupAssignment
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PutProjectGroupAssignmentRequest"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectGroupAssignment"
+      security:
+        - ClientCredentials: ["clients/projects/group_assignment.write"]
+      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: when_no_match
+        contentHandling: CONVERT_TO_TEXT
+        credentials: "{{apigw_invocation_role_arn}}"
+    delete:
+      operationId: DeleteProjectGroupAssignment
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Empty"
+      security:
+        - ClientCredentials: ["clients/projects/group_assignment.write"]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: when_no_match
+        contentHandling: CONVERT_TO_TEXT
         credentials: "{{apigw_invocation_role_arn}}"
 components:
   schemas:
@@ -1166,7 +1499,10 @@ components:
       type: object
       required:
         - projectId
+        - isActive
       properties:
+        isActive:
+          type: boolean
         projectId:
           title: ProjectId
           type: string
@@ -1269,6 +1605,7 @@ components:
     AssignUserRequest:
       title: AssignUserRequest
       type: object
+      required: [userId, roles]
       properties:
         userId:
           title: UserId
@@ -1280,6 +1617,10 @@ components:
           description: User roles in the project
           items:
             type: string
+        userEmail:
+          type: string
+        userDisplayName:
+          type: string
     AssignUserResponse:
       title: AssignUserResponse
       type: object
@@ -1320,6 +1661,10 @@ components:
           title: UserEmail
           type: string
           description: Email address of the user
+        userDisplayName:
+          type: string
+        projectId:
+          type: string
     GetProjectAssignmentsResponse:
       title: GetProjectAssignmentsResponse
       type: object
@@ -1335,14 +1680,88 @@ components:
     GetUserRolesResponse:
       title: GetUserRolesResponse
       required:
+        - projectId
+        - userId
         - roles
       type: object
       properties:
+        projectId:
+          type: string
+        userId:
+          type: string
+        userEmail:
+          type: string
+        userDisplayName:
+          type: string
         roles:
           title: roles
           type: array
           items:
             type: string
+    ProjectMutationRequest:
+      type: object
+      required: [name, isActive]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+    CreateProjectResponse:
+      type: object
+      required: [projectId]
+      properties:
+        projectId:
+          type: string
+    PutUserAssignmentRequest:
+      type: object
+      required: [roles]
+      properties:
+        roles:
+          type: array
+          items:
+            type: string
+        userEmail:
+          type: string
+        userDisplayName:
+          type: string
+    PutProjectGroupAssignmentRequest:
+      type: object
+      required: [roles]
+      properties:
+        roles:
+          type: array
+          items:
+            type: string
+    ProjectGroupAssignment:
+      type: object
+      required: [projectId, groupId, roles, version, createDate, lastUpdateDate]
+      properties:
+        projectId:
+          type: string
+        groupId:
+          type: string
+          format: uuid
+        roles:
+          type: array
+          items:
+            type: string
+        version:
+          type: integer
+        createDate:
+          type: string
+        lastUpdateDate:
+          type: string
+    GetProjectGroupAssignmentsResponse:
+      type: object
+      required: [assignments]
+      properties:
+        assignments:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectGroupAssignment"
     ServiceClientAssignment:
       title: ServiceClientAssignment
       type: object

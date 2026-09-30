@@ -26,6 +26,10 @@ def handle_assign_user_command(
         project_id=cmd.project_id.value, user_id=to_be_assigned_user_id
     )
     if to_be_assigned_user_assignment:
+        if (set(to_be_assigned_user_assignment.roles) == {role.value for role in cmd.roles}
+            and (cmd.user_email is None or to_be_assigned_user_assignment.userEmail == cmd.user_email)
+            and (cmd.user_display_name is None or to_be_assigned_user_assignment.userDisplayName == cmd.user_display_name)):
+            return
         raise domain_exception.DomainException(f"User with User ID {to_be_assigned_user_id} already exists.")
 
     assigned_roles = [role.value for role in cmd.roles]
@@ -34,13 +38,14 @@ def handle_assign_user_command(
     # (and downstream notifications) can display it. Best-effort: a missing
     # email does not block onboarding — the assignment still persists with
     # userEmail=None, matching the pre-existing fallback behavior.
-    user_email = user_directory_service.get_user_email(to_be_assigned_user_id)
+    user_email = cmd.user_email or user_directory_service.get_user_email(to_be_assigned_user_id)
 
     assignment = project_assignment.Assignment(
         userId=to_be_assigned_user_id,
         projectId=cmd.project_id.value,
         roles=assigned_roles,
         userEmail=user_email,
+        userDisplayName=cmd.user_display_name,
         activeDirectoryGroups=[],
         activeDirectoryGroupStatus=user.UserADStatus.PENDING,
     )

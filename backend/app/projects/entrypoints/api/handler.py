@@ -58,6 +58,7 @@ from app.projects.entrypoints.api import bootstrapper, config
 from app.projects.entrypoints.api.model import api_model
 from app.shared.adapters.boto import paging_utils
 from app.shared.logging.helpers import clear_auth_headers
+from app.shared.identity.entra_groups import effective_roles, group_ids
 from app.shared.middleware import authorization, exception_handler
 from app.shared.middleware.metric import metric_handlers
 from app.shared.middleware.metric.types import MetricDimensionNames
@@ -87,6 +88,20 @@ tracer = tracing.Tracer()
 dependencies = bootstrapper.bootstrap(app_config, logger)
 
 
+def _trusted_group_ids() -> list[str]:
+    if dependencies.user_info_client is None:
+        return []
+    authorization = app.current_event.headers.get("Authorization", "")
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        return []
+    try:
+        return group_ids(dependencies.user_info_client(token))
+    except Exception:
+        logger.warning("Trusted user info unavailable; group grants omitted")
+        return []
+
+
 @tracer.capture_method
 @app.get("/projects")
 def get_projects(
@@ -96,15 +111,60 @@ def get_projects(
     """Returns a list of all projects with paging."""
 
     user_principal_name = app.context.get("user_principal").user_name.upper()
-    next_token = next_token_str.pop() if next_token_str else None
+    requested_size = max(1, min(page_size.pop() if page_size else 10, 100))
+    requested_token = next_token_str.pop() if next_token_str else None
+    offset = max(0, int(json.loads(requested_token).get("offset", 0))) if requested_token else 0
 
-    projects, last_evaluated_key, assignments = dependencies.projects_query_service.list_projects(
-        page_size=page_size.pop() if page_size else 10,
-        next_token=json.loads(next_token) if next_token else None,
-        user_id=user_principal_name,
-    )
+    # Build one ordered page from the inventory and both grant sources. The
+    # inventory remains visible for project enrolment, even without a grant.
+    all_projects = {}
+    inventory_token = None
+    seen_inventory_tokens = set()
+    while True:
+        inventory, inventory_token, _ = dependencies.projects_query_service.list_projects(
+            page_size=100, next_token=inventory_token, user_id=None
+        )
+        all_projects.update({project.projectId: project for project in inventory})
+        if not inventory_token:
+            break
+        token_key = json.dumps(inventory_token, sort_keys=True)
+        if token_key in seen_inventory_tokens:
+            raise RuntimeError("Repeated inventory page token")
+        seen_inventory_tokens.add(token_key)
 
-    enrolments, last_evaluated_key = dependencies.enrolment_query_service.list_enrolments_by_user(
+    direct_assignments = []
+    direct_token = None
+    seen_direct_tokens = set()
+    while True:
+        direct_projects, direct_token, batch = dependencies.projects_query_service.list_projects_by_user(
+            user_id=user_principal_name, page_size=100, next_token=direct_token
+        )
+        all_projects.update({project.projectId: project for project in direct_projects})
+        direct_assignments.extend(batch)
+        if not direct_token:
+            break
+        token_key = json.dumps(direct_token, sort_keys=True)
+        if token_key in seen_direct_tokens:
+            raise RuntimeError("Repeated direct project page token")
+        seen_direct_tokens.add(token_key)
+
+    groups = dependencies.projects_query_service.get_group_assignments(_trusted_group_ids())
+    for assignment in groups:
+        if assignment.projectId not in all_projects:
+            project = dependencies.projects_query_service.get_project_by_id(assignment.projectId)
+            if project is not None:
+                all_projects[project.projectId] = project
+
+    roles_by_project = effective_roles(direct_assignments, groups)
+    project_ids = sorted(all_projects)
+    page_ids = project_ids[offset:offset + requested_size]
+    projects = [all_projects[project_id] for project_id in page_ids]
+    assignments = [assignment for assignment in direct_assignments if assignment.projectId in page_ids]
+    access = [api_model.EffectiveProjectAccess(projectId=project_id, roles=roles_by_project[project_id])
+              for project_id in page_ids if project_id in roles_by_project]
+    last_evaluated_key = {"offset": offset + requested_size} if offset + requested_size < len(project_ids) else None
+
+    enrolments, _ = dependencies.enrolment_query_service.list_enrolments_by_user(
         user_id=user_principal_name,
         page_size=50,
         next_token=None,
@@ -121,6 +181,7 @@ def get_projects(
             projects=projects_parsed,
             nextToken=last_evaluated_key,
             assignments=assignments_parsed,
+            effectiveAccess=access,
             enrolments=enrolments_parsed,
         ),
         content_type=content_types.APPLICATION_JSON,
@@ -356,6 +417,18 @@ def get_project_users(
         content_type=content_types.APPLICATION_JSON,
     )
 
+
+@tracer.capture_method
+@app.get("/projects/<project_id>/groups")
+def get_project_groups(project_id: str) -> api_gateway.Response[api_model.GetProjectGroupsResponse]:
+    assignments = dependencies.projects_query_service.list_project_group_assignments(project_id)
+    return api_gateway.Response(
+        status_code=HTTPStatus.OK,
+        body=api_model.GetProjectGroupsResponse(
+            assignments=[api_model.ProjectGroupAssignment.model_validate(a.model_dump()) for a in assignments]
+        ),
+        content_type=content_types.APPLICATION_JSON,
+    )
 
 @tracer.capture_method
 @app.delete("/projects/<project_id>/users/<user_id>")
@@ -708,6 +781,18 @@ def get_project_assignments_internal(
         ),
     )
     return response.model_dump()
+
+
+@tracer.capture_method
+@app.get("/internal/projects/<project_id>/groups")
+def get_project_groups_internal(project_id: str) -> dict:
+    include_deleted = (app.current_event.get_query_string_value("includeDeleted") or "").lower() == "true"
+    assignments = dependencies.projects_query_service.list_project_group_assignments(
+        project_id, include_deleted=include_deleted
+    )
+    return api_model.GetProjectGroupsResponse(
+        assignments=[api_model.ProjectGroupAssignment.model_validate(a.model_dump()) for a in assignments]
+    ).model_dump()
 
 
 @tracer.capture_method

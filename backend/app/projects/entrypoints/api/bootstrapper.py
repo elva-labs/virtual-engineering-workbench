@@ -1,6 +1,7 @@
-from typing import Optional
+from typing import Callable, Optional
 
 import boto3
+import requests
 from aws_lambda_powertools import logging
 from pydantic import BaseModel, ConfigDict
 
@@ -85,6 +86,7 @@ class Dependencies(BaseModel):
     projects_query_service: projects_query_service.ProjectsQueryService
     technologies_query_service: technologies_query_service.TechnologiesQueryService
     enrolment_query_service: enrolment_query_service.EnrolmentQueryService
+    user_info_client: Optional[Callable[[str], dict]] = None
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -302,9 +304,21 @@ def bootstrap(
         )
     )
 
+    user_pool_url = app_config.get_user_pool_url().rstrip("/")
+
+    def get_user_info(access_token: str) -> dict:
+        response = requests.get(
+            f"{user_pool_url}/oauth2/userInfo",
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=3,
+        )
+        response.raise_for_status()
+        return response.json()
+
     return Dependencies(
         command_bus=command_bus,
         projects_query_service=projects_query_service,
         technologies_query_service=technologies_qry_srv,
         enrolment_query_service=enrolment_qry_srv,
+        user_info_client=get_user_info if user_pool_url else None,
     )

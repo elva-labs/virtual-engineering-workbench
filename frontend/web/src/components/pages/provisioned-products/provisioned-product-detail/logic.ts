@@ -18,6 +18,7 @@ import {
 } from './interface';
 import { useCommonProvisionedProduct, useCommonProvisionedProductState } from '../common.logic';
 import useSWR from 'swr';
+import { statusRefreshInterval } from '../status-refresh';
 
 type FetcherProps = {
   projectId: string,
@@ -64,6 +65,8 @@ export const useProvisionedProductDetails = (
     fetcherFactory(props.serviceAPI),
     {
       shouldRetryOnError: false,
+      refreshInterval: (latest?: GetProvisionedProductResponse) =>
+        statusRefreshInterval([latest?.provisionedProduct?.status]),
     }
   );
 

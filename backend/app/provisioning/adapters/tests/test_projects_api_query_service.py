@@ -25,7 +25,7 @@ def test_get_projects_returns_correct_projects(mock_api):
     mock_api.call_api.assert_called_once_with(
         path="internal/projects",
         http_method="GET",
-        query_params={"pageSize": "20"},
+        query_params={"pageSize": "100"},
     )
     assertpy.assert_that(projects).is_not_none()
     assertpy.assert_that(projects).is_length(3)

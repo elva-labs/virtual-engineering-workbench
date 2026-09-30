@@ -1,10 +1,16 @@
+import pathlib
+
 import cdk_nag
 from aws_cdk import (
+    Duration,
+    RemovalPolicy,
     Stack,
     aws_ec2,
     aws_events,
     aws_events_targets,
     aws_iam,
+    aws_lambda,
+    aws_logs,
     aws_ssm,
 )
 from constructs import Construct
@@ -143,6 +149,90 @@ class ProvisioningEnablementStack(Stack):
             description="Security Group ID for all provisioned products",
             parameter_name=app_config.format_ssm_parameter_name(name="pp-sg", include_environment=False),
             string_value=provisioned_product_sg.security_group_id,
+        )
+
+        # Workbench instance role cleanup: an organization's SSM Quick Setup patch policy, for example,
+        # attaches AWSQuickSetupPatchPolicyBaselineAccess to every instance role, and CloudFormation cannot
+        # delete a role with policies it did not attach.
+        # The product templates call this function from an InstanceRoleCleanup custom resource that is
+        # deleted after the instance and before the role; it removes only what the template does not
+        # declare.
+        cleanup_role = aws_iam.Role(
+            self,
+            "WorkbenchRoleCleanupRole",
+            role_name=constants.WORKBENCH_ROLE_CLEANUP_FUNCTION,
+            assumed_by=aws_iam.ServicePrincipal("lambda.amazonaws.com"),
+            inline_policies={
+                "StripForeignPolicies": aws_iam.PolicyDocument(
+                    statements=[
+                        # Only the roles of Service Catalog product stacks (SC-<account>-pp-*).
+                        aws_iam.PolicyStatement(
+                            actions=[
+                                "iam:ListAttachedRolePolicies",
+                                "iam:DetachRolePolicy",
+                                "iam:ListRolePolicies",
+                                "iam:DeleteRolePolicy",
+                            ],
+                            resources=[f"arn:{self.partition}:iam::{self.account}:role/SC-{self.account}-pp-*"],
+                        ),
+                    ]
+                ),
+            },
+        )
+        cleanup_logs = aws_logs.LogGroup(
+            self,
+            "WorkbenchRoleCleanupLogs",
+            log_group_name=f"/aws/lambda/{constants.WORKBENCH_ROLE_CLEANUP_FUNCTION}",
+            retention=aws_logs.RetentionDays.THREE_MONTHS,
+            removal_policy=RemovalPolicy.DESTROY,
+        )
+        cleanup_logs.grant_write(cleanup_role)
+        cleanup_function = aws_lambda.Function(
+            self,
+            "WorkbenchRoleCleanup",
+            function_name=constants.WORKBENCH_ROLE_CLEANUP_FUNCTION,
+            description="Removes policies attached from outside a workbench template before its role is deleted",
+            runtime=aws_lambda.Runtime.PYTHON_3_14,
+            architecture=constants.LAMBDA_ARCHITECTURE,
+            handler="index.handler",
+            # Inline (ZipFile, standard library + boto3 only): no asset upload into the spoke.
+            code=aws_lambda.Code.from_inline(
+                (pathlib.Path(__file__).parent / "resources" / "workbench_role_cleanup.py").read_text()
+            ),
+            timeout=Duration.seconds(60),
+            role=cleanup_role,
+            log_group=cleanup_logs,
+        )
+        aws_ssm.StringParameter(
+            self,
+            "WorkbenchRoleCleanupFunctionArn",
+            description="Custom resource function the workbench templates use before deleting their instance role",
+            parameter_name=constants.WORKBENCH_ROLE_CLEANUP_FUNCTION_ARN_PARAMETER,
+            string_value=cleanup_function.function_arn,
+        )
+        cdk_nag.NagSuppressions.add_resource_suppressions(
+            cleanup_function,
+            [
+                cdk_nag.NagPackSuppression(id=rule, reason=reason)
+                for rule, reason in {
+                    "NIST.800.53.R4-LambdaInsideVPC": "Calls only IAM and the CloudFormation response URL; no VPC resources.",
+                    "NIST.800.53.R5-LambdaInsideVPC": "Calls only IAM and the CloudFormation response URL; no VPC resources.",
+                    "PCI.DSS.321-LambdaInsideVPC": "Calls only IAM and the CloudFormation response URL; no VPC resources.",
+                    "NIST.800.53.R5-LambdaConcurrency": "Invoked once per workbench stack delete; no concurrency limit needed.",
+                    "NIST.800.53.R5-LambdaDLQ": "Synchronous CloudFormation custom resource; failures surface on the stack.",
+                }.items()
+            ],
+        )
+        cdk_nag.NagSuppressions.add_resource_suppressions(
+            cleanup_logs,
+            [
+                cdk_nag.NagPackSuppression(id=rule, reason="Holds only role and policy names; default encryption.")
+                for rule in (
+                    "NIST.800.53.R4-CloudWatchLogGroupEncrypted",
+                    "NIST.800.53.R5-CloudWatchLogGroupEncrypted",
+                    "PCI.DSS.321-CloudWatchLogGroupEncrypted",
+                )
+            ],
         )
 
         # Stack based suppressions

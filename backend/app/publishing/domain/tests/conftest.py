@@ -5,11 +5,7 @@ import pytest
 from freezegun import freeze_time
 
 from app.publishing.domain.model import portfolio, product, shared_ami, version
-from app.publishing.domain.ports import (
-    amis_query_service,
-    products_query_service,
-    projects_query_service,
-)
+from app.publishing.domain.ports import amis_query_service, products_query_service, projects_query_service
 from app.publishing.domain.read_models import ami
 from app.shared.adapters.unit_of_work_v2 import unit_of_work
 
@@ -225,6 +221,7 @@ def mock_template_domain_qry_srv():
 
     mock_srv = mock.Mock(spec=template_domain_query_service.TemplateDomainQueryService)
     mock_srv.get_default_template_file_name.return_value = "draft_workbench.yml"
+    mock_srv.get_latest_draft_template.return_value = "Resources: {}"
     return mock_srv
 
 

@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from app.publishing.domain.commands import create_version_command
 from app.publishing.domain.events import product_version_creation_started
 from app.publishing.domain.exceptions import domain_exception
-from app.publishing.domain.model import portfolio, product, version
+from app.publishing.domain.model import portfolio, product, product_template, version
 from app.publishing.domain.ports import (
     amis_query_service,
     iac_service,
@@ -132,9 +132,18 @@ def handle(
 
     new_version_name = _calculate_new_version_name(version_qry_srv, command)
 
-    # Validate the template and get parameters
+    ami = None
+    if product_entity.productType != product.ProductType.Container:
+        ami = amis_qry_srv.get_ami(command.amiId.value)
+        if not ami:
+            raise domain_exception.DomainException(f"AMI {command.amiId.value} not found")
+
+    # Validate the template and get parameters. The draft stays a Jinja template (rendered at
+    # publish); CloudFormation validates it rendered for the image's architecture.
     is_valid, parameters, error_message = stack_srv.validate_template(
-        template_body=command.versionTemplateDefinition.value
+        template_body=product_template.render_for_validation(
+            command.versionTemplateDefinition.value, architecture=ami.architecture if ami else None
+        )
     )
     if not is_valid:
         raise domain_exception.DomainException(f"The template is invalid: {error_message}")
@@ -152,10 +161,6 @@ def handle(
         additional_attributes["imageTag"] = command.imageTag.value
         additional_attributes["imageDigest"] = command.imageDigest.value
     else:
-        # Get Ami
-        ami = amis_qry_srv.get_ami(command.amiId.value)
-        if not ami:
-            raise domain_exception.DomainException(f"AMI {command.amiId.value} not found")
         additional_attributes["originalAmiId"] = command.amiId.value
         additional_attributes["componentVersionDetails"] = ami.componentVersionDetails
         additional_attributes["osVersion"] = ami.osVersion

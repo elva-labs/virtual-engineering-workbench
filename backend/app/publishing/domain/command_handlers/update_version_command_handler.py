@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from app.publishing.domain.commands import update_version_command
 from app.publishing.domain.events import product_version_update_started
 from app.publishing.domain.exceptions import domain_exception
-from app.publishing.domain.model import product, version
+from app.publishing.domain.model import product, product_template, version
 from app.publishing.domain.ports import amis_query_service, iac_service, template_service, versions_query_service
 from app.publishing.domain.query_services import template_domain_query_service
 from app.publishing.domain.read_models import component_version_detail
@@ -78,8 +78,11 @@ def __validate_version_distributions(fetched_version_distributions):
 
 
 def __validate_and_generate_version(command, stack_srv, fetched_version_distributions):
+    # The draft stays a Jinja template (rendered at publish); CloudFormation validates it rendered.
     is_valid, parameters, error_message = stack_srv.validate_template(
-        template_body=command.versionTemplateDefinition.value
+        template_body=product_template.render_for_validation(
+            command.versionTemplateDefinition.value, architecture=fetched_version_distributions[0].architecture
+        )
     )
     if not is_valid:
         raise domain_exception.DomainException(f"The template is invalid: {error_message}")

@@ -1,6 +1,7 @@
 name: CI
 
-# No-secrets PR validation running on the CodeBuild-hosted runner (project: vew-ci).
+# No-secrets PR validation. Backend and frontend run on GitHub-hosted runners by default; set the
+# repository variable CI_RUNNER=codebuild to use the CodeBuild-hosted runner (project: vew-ci).
 # Backend: install + static checks (black/isort/flake8/mypy/secret scans) + pytest.
 # Frontend: install + lint + unit tests + build (with a placeholder aws-exports).
 # IaC scan: checkov over CFN product templates, Dockerfiles, and workflows
@@ -17,7 +18,7 @@ permissions:
 jobs:
   backend:
     name: Backend (lint, type, test)
-    runs-on: codebuild-vew-ci-${{ github.run_id }}-${{ github.run_attempt }}
+    runs-on: ${{ vars.CI_RUNNER == 'codebuild' && format('codebuild-vew-ci-{0}-{1}', github.run_id, github.run_attempt) || 'ubuntu-24.04' }}
     permissions:
       contents: read
     steps:
@@ -26,8 +27,8 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
 
-      # setup-python has no Amazon Linux 2 (arm64) build — let uv provide Python
-      # via its OS-agnostic standalone builds (same approach as local dev).
+      # Let uv provide Python via its OS-agnostic standalone builds (setup-python has no Amazon
+      # Linux 2 arm64 build for the CodeBuild runner; same approach as local dev).
       - name: Provision Python 3.13 (via uv)
         run: uv python install 3.13
 
@@ -59,7 +60,7 @@ jobs:
 
   frontend:
     name: Frontend (lint, test, build)
-    runs-on: codebuild-vew-ci-${{ github.run_id }}-${{ github.run_attempt }}
+    runs-on: ${{ vars.CI_RUNNER == 'codebuild' && format('codebuild-vew-ci-{0}-{1}', github.run_id, github.run_attempt) || 'ubuntu-24.04' }}
     permissions:
       contents: read
     env:

@@ -23,6 +23,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from infra import config, constants
 from infra.constructs import backend_app_api_auth
+from infra.constructs.openapi_nullable import accept_null_in_nullable_fields
 
 
 def serialize_datetime(obj):
@@ -258,7 +259,9 @@ class BackendAppOpenApi(constructs.Construct):
         return aws_apigateway.SpecRestApi(
             self,
             id,
-            api_definition=aws_apigateway.ApiDefinition.from_inline(rendered_schema_dict),
+            api_definition=aws_apigateway.ApiDefinition.from_inline(
+                accept_null_in_nullable_fields(rendered_schema_dict)
+            ),
             deploy=True,
             deploy_options=self._create_stage_options(
                 access_log_group,
@@ -549,7 +552,7 @@ class BackendAppOpenApi(constructs.Construct):
         iam_api = aws_apigateway.SpecRestApi(
             self,
             "IAMApi",
-            api_definition=aws_apigateway.ApiDefinition.from_inline(iam_schema_dict),
+            api_definition=aws_apigateway.ApiDefinition.from_inline(accept_null_in_nullable_fields(iam_schema_dict)),
             deploy=True,
             deploy_options=self._create_stage_options(
                 iam_access_log_group,

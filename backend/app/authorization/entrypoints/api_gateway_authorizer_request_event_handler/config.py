@@ -1,3 +1,4 @@
+import json
 import os
 
 from app.shared import config
@@ -36,6 +37,10 @@ class AppConfig(config.VEWBaseConfig):
 
     def get_user_role_stage_access_ssm_param(self) -> str:
         return os.environ.get("USER_ROLE_STAGE_ACCESS_SSM_PARAM", "")
+
+    def get_platform_admin_groups(self) -> list[str]:
+        # Entra group ids whose members are ADMIN on every project (config "platform-admin-groups").
+        return json.loads(os.environ.get("PLATFORM_ADMIN_GROUPS", "[]"))
 
     def get_gsi_name_inverted_pk(self) -> str:
         return os.environ.get("GSI_NAME_INVERTED_PK", "")

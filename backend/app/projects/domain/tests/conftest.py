@@ -36,6 +36,7 @@ from app.shared.adapters.boto import (
 )
 from app.shared.adapters.message_bus import message_bus as msg_bus
 from app.shared.adapters.unit_of_work_v2 import unit_of_work as unit_of_work_v2
+from app.shared.adapters.unit_of_work_v2.repository_exception import RepositoryException
 
 
 @pytest.fixture
@@ -123,8 +124,14 @@ def mock_uow_2_factory(
         }
 
         uow = mock.create_autospec(spec=unit_of_work_v2.UnitOfWork, instance=True)
+        # Like DynamoDBUnitOfWork: repositories exist only inside "with uow:".
+        entered = []
+        uow.__enter__.side_effect = lambda *_: entered.append(True) or uow
+        uow.__exit__.side_effect = lambda *_: entered.pop() and None
 
         def __get_repo(_, repo_type):
+            if not entered:
+                raise RepositoryException(f"Repository {repo_type} is not registered with the unit of work.")
             return repos[repo_type]
 
         uow.get_repository.side_effect = __get_repo

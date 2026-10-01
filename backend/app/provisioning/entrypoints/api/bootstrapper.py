@@ -23,7 +23,6 @@ from app.provisioning.adapters.services import (
     ec2_instance_management_service,
 )
 from app.provisioning.domain.aggregates.internal import networking_helpers
-from app.provisioning.domain.model import workbench_lifecycle as workbench_lifecycle_model
 from app.provisioning.domain.command_handlers.product_provisioning import (
     authorize_user_ip_address,
     launch,
@@ -51,6 +50,7 @@ from app.provisioning.domain.commands.provisioned_product_state import (
     initiate_provisioned_products_stop_command,
 )
 from app.provisioning.domain.commands.user_profile import update_user_profile_command
+from app.provisioning.domain.model import workbench_lifecycle as workbench_lifecycle_model
 from app.provisioning.domain.query_services import (
     products_domain_query_service,
     provisioned_products_domain_query_service,

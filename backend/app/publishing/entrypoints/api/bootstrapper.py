@@ -74,14 +74,19 @@ def bootstrap(  # noqa: C901
 
     dynamodb = session.resource("dynamodb", region_name=app_config.get_default_region())
 
-    # The version key migration must run before the API reads versions (portfolios also migrate in the
-    # projects event handler); the migrator records completed scripts, so this is a no-op once done.
+    # The version key migration should run before the API reads versions; the projects event handler runs
+    # the same scripts, and the migrator records completed ones, so this is a no-op once done. The API
+    # still starts if the table cannot be migrated from here (for example where it is bootstrapped without
+    # one): the failure is logged and the projects event handler retries.
     if app_config.get_table_name():
-        dynamodb_migrations.DynamoDBMigrator(
-            ddb_resource=dynamodb,
-            table_name=app_config.get_table_name(),
-            logger=logger,
-        ).register_migrations(migrations_config()).migrate()
+        try:
+            dynamodb_migrations.DynamoDBMigrator(
+                ddb_resource=dynamodb,
+                table_name=app_config.get_table_name(),
+                logger=logger,
+            ).register_migrations(migrations_config()).migrate()
+        except Exception:  # noqa: BLE001 - never block the API on a migration
+            logger.exception("Publishing table migrations did not run from the API.")
 
     shared_uow = dynamodb_unit_of_work.DynamoDBUnitOfWork(
         table_name=app_config.get_table_name(),

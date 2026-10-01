@@ -270,3 +270,15 @@ def test_without_a_releasing_project_any_assigned_project_changes_the_lists(
 
     assert response["statusCode"] == 200
     mocked_dependencies.project_access_service.require_access.assert_called_once_with("sample", "proj-other")
+
+
+def test_delete_takes_the_project_from_a_json_body(monkeypatch, mocked_dependencies, lambda_context, client_event):
+    handler = _handler(monkeypatch, mocked_dependencies)
+
+    response = handler.handler(
+        client_event("DELETE", PATH, body={"projectId": PLATFORM}, client_id="terraform", scopes=[WRITE]),
+        lambda_context,
+    )
+
+    assert response["statusCode"] == 204
+    mocked_dependencies.project_access_service.require_access.assert_called_once_with("terraform", PLATFORM)

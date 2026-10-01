@@ -194,7 +194,13 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:
     @router.delete(PATH)
     def delete_mandatory_components_list(platform: str, os_version: str, architecture: str):
         key = _key(platform, os_version, architecture)
+        # projectId as a query parameter or in a JSON body (the provider's transport sends bodies only).
         project_id = router.current_event.get_query_string_value("projectId", "") or ""
+        if not project_id and router.current_event.body:
+            try:
+                project_id = str((router.current_event.json_body or {}).get("projectId") or "")
+            except (ValueError, AttributeError):
+                project_id = ""
         require_platform_program(project_id)
         common.require_scope(router, WRITE_SCOPE)
         dependencies.command_bus.handle(

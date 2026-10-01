@@ -192,6 +192,20 @@ _dev_env_config = {
     "spoke-account-backend-subnet-ids-param-name": "/workbench/vpc/backend-subnet-ids",
     "spoke-account-backend-subnet-tag": "subnet_type:backend",
     "spoke-account-backend-subnet-cidrs-param-name": "/workbench/vpc/backend-subnet-cidrs",
+    # How publishing gets a version's image into each account:
+    #   "share": grant the account the image key and launch permission on the image service
+    #            account's copy (the account launches that copy);
+    #   "store-restore": move the image into the account (EC2 store image task into the account's
+    #            import bucket, restore image task there), for organisations that deny image sharing
+    #            or the use of another account's KMS key. The account launches its own copy, encrypted
+    #            with its default EBS key (which must be on). Needs the import bucket and role that the
+    #            account's product publishing enablement stack creates in this mode.
+    "image-distribution": {
+        "mode": "share",
+        # Store with the ami-sharing function's own role instead of the image service role; only
+        # where the image service account is the web application account.
+        "storeWithFunctionRole": False,
+    },
 }
 
 env_config = {

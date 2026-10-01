@@ -7,19 +7,23 @@ from app.publishing.adapters.services import ec2_image_service
 from app.publishing.domain.command_handlers import (
     copy_ami_command_handler,
     fail_ami_sharing_command_handler,
+    restore_ami_command_handler,
     share_ami_command_handler,
+    store_ami_command_handler,
     succeed_ami_sharing_command_handler,
 )
 from app.publishing.domain.commands import (
     copy_ami_command,
     fail_ami_sharing_command,
+    restore_ami_command,
     share_ami_command,
+    store_ami_command,
     succeed_ami_sharing_command,
 )
 from app.publishing.domain.query_services import shared_amis_domain_query_service
 from app.publishing.entrypoints.ami_sharing import config
+from app.shared.adapters.message_bus import command_bus as command_bus_port
 from app.shared.adapters.message_bus import (
-    command_bus,
     command_bus_metrics,
     event_bridge_message_bus,
     in_memory_command_bus,
@@ -32,7 +36,7 @@ from app.shared.logging import boto_logger
 
 
 class Dependencies(BaseModel):
-    command_bus: command_bus.CommandBus
+    command_bus: command_bus_port.CommandBus
     shared_amis_domain_qry_svc: shared_amis_domain_query_service.SharedAMIsDomainQueryService
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -71,8 +75,13 @@ def bootstrap(  # noqa: C901
         image_srv_aws_account_id=app_config.get_image_service_aws_account_id(),
         image_srv_key_name=app_config.get_image_service_key_name(),
         image_srv_region=app_config.get_default_region(),
+        image_import_role=app_config.get_image_import_role(),
+        image_import_bucket_prefix=app_config.get_image_import_bucket_prefix(),
+        store_with_own_credentials=app_config.get_store_with_function_role(),
         boto_session=session,
     )
+    # With "store-restore" the image recorded for an account is its own restored copy: nothing to share.
+    share_with_account = app_config.get_image_distribution_mode() != "store-restore"
 
     def _copy_ami_cmd_handler_factory():
         def _handle_command(command: copy_ami_command.CopyAmiCommand):
@@ -82,7 +91,25 @@ def bootstrap(  # noqa: C901
 
     def _share_ami_cmd_handler_factory():
         def _handle_command(command: share_ami_command.ShareAmiCommand):
-            return share_ami_command_handler.handle(cmd=command, uow=shared_uow, img_srv=ec2_img_srv, logger=logger)
+            return share_ami_command_handler.handle(
+                cmd=command,
+                uow=shared_uow,
+                img_srv=ec2_img_srv,
+                logger=logger,
+                share_with_account=share_with_account,
+            )
+
+        return _handle_command
+
+    def _store_ami_cmd_handler_factory():
+        def _handle_command(command: store_ami_command.StoreAmiCommand):
+            return store_ami_command_handler.handle(cmd=command, img_srv=ec2_img_srv, logger=logger)
+
+        return _handle_command
+
+    def _restore_ami_cmd_handler_factory():
+        def _handle_command(command: restore_ami_command.RestoreAmiCommand):
+            return restore_ami_command_handler.handle(cmd=command, img_srv=ec2_img_srv, logger=logger)
 
         return _handle_command
 
@@ -100,12 +127,14 @@ def bootstrap(  # noqa: C901
 
         return _handle_command
 
-    command_bus = (
+    bus = (
         command_bus_metrics.CommandBusMetrics(
             inner=in_memory_command_bus.InMemoryCommandBus(logger=logger), metrics_client=metrics_client
         )
         .register_handler(copy_ami_command.CopyAmiCommand, _copy_ami_cmd_handler_factory())
         .register_handler(share_ami_command.ShareAmiCommand, _share_ami_cmd_handler_factory())
+        .register_handler(store_ami_command.StoreAmiCommand, _store_ami_cmd_handler_factory())
+        .register_handler(restore_ami_command.RestoreAmiCommand, _restore_ami_cmd_handler_factory())
         .register_handler(
             succeed_ami_sharing_command.SucceedAmiSharingCommand, _succeed_ami_sharing_cmd_handler_factory()
         )
@@ -116,6 +145,6 @@ def bootstrap(  # noqa: C901
         unit_of_work=shared_uow, image_svc=ec2_img_srv, default_original_ami_region=app_config.get_default_region()
     )
     return Dependencies(
-        command_bus=command_bus,
+        command_bus=bus,
         shared_amis_domain_qry_svc=shared_amis_domain_qry_svc,
     )

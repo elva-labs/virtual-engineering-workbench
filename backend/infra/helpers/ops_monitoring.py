@@ -62,6 +62,11 @@ class OpsMonitoringBuilder:
         self._alarms.extend(_create_durable_lambda_alarms(self._scope, app_entry_list))
         return self
 
+    def with_alarms(self, alarms: typing.Iterable[cloudwatch.IAlarm]) -> "OpsMonitoringBuilder":
+        """Alarms built by the stack itself; they join the system-health composite alarm."""
+        self._alarms.extend(alarms)
+        return self
+
     def with_dynamodb_table(self, table: aws_dynamodb.ITable) -> "OpsMonitoringBuilder":
         self._widgets.extend(_create_dynamodb_widgets(table))
         return self

@@ -7,6 +7,7 @@ from mypy_boto3_ssm import client as ssm_client
 from pydantic import BaseModel, ConfigDict
 
 from app.provisioning.domain.command_handlers.provisioned_product_state import workbench_lifecycle
+from app.provisioning.domain.model import idle_signals
 from app.provisioning.domain.model import workbench_lifecycle as workbench_lifecycle_model
 from app.provisioning.adapters.query_services import (
     aws_networking_query_service,
@@ -20,6 +21,7 @@ from app.provisioning.adapters.repository.dynamo_entity_migrations import (
 )
 from app.provisioning.adapters.services import aws_parameter_service as ssm_parameter_service_v2
 from app.provisioning.adapters.services import (
+    cloudwatch_workbench_signals_service,
     ec2_instance_management_service,
     ec2_instance_management_service_in_mem_cached,
     sc_products_service,
@@ -283,6 +285,13 @@ def bootstrap(  # noqa: C901
         uow=uow,
         publisher=publisher,
         logger=logger,
+        # The idle decision reads the workbenches' signals from their account's CloudWatch.
+        signals_srv=cloudwatch_workbench_signals_service.CloudWatchWorkbenchSignalsService(
+            cloudwatch_boto_client_provider=lambda aws_account_id, region, user_id: _get_boto_client_for(
+                client_name="cloudwatch", aws_account_id=aws_account_id, region=region, user_id=user_id
+            )
+        ),
+        idle_config=idle_signals.IdleStopConfig.model_validate(app_config.get_workbench_idle_stop()),
     )
 
     def _initiate_batch_stop_handler_factory():

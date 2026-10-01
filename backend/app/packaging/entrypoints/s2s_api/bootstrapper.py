@@ -68,8 +68,6 @@ from app.packaging.domain.commands.component import (
     update_mandatory_components_list_command,
 )
 from app.packaging.domain.commands.image import create_image_command, release_base_image_command
-from app.packaging.domain.model.recipe import base_image_channels as base_image_channels_model
-from app.packaging.domain.ports.base_image_release_service import BaseImageParameterService
 from app.packaging.domain.commands.pipeline import (
     create_pipeline_command,
     retire_pipeline_command,
@@ -83,6 +81,8 @@ from app.packaging.domain.commands.recipe import (
     retire_recipe_version_command,
     update_recipe_version_command,
 )
+from app.packaging.domain.model.recipe import base_image_channels as base_image_channels_model
+from app.packaging.domain.ports.base_image_release_service import BaseImageParameterService
 from app.packaging.domain.ports.service_client_project_access_service import ServiceClientProjectAccessService
 from app.packaging.domain.query_services import (
     component_domain_query_service,

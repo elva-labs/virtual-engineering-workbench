@@ -159,7 +159,7 @@ class WorkbenchLifecycleService:
         return {"dryRun": dry_run, "changed": changed, "failed": failed}
 
     def idle_stop(self, dry_run: bool = False) -> dict:
-        """ADR 0026: stops running workbenches whose signals stayed quiet for their inactivity timeout.
+        """Stops running workbenches whose signals stayed quiet for their inactivity timeout.
 
         stopped: stopped now (or would be, in a dry run); missing: running without any signal for
         missingSignalAlarmMinutes - never stopped, the job counts them for an alarm; failed: the
@@ -173,51 +173,66 @@ class WorkbenchLifecycleService:
             return result
         programs = self.programs()
         now = self._clock()
-        metric_names = [idle_signals.SIGNAL_METRICS[s] for s in config.signals]
         for pp in self._workbenches(product_status.ProductStatus.Running):
             pp_id = pp.provisionedProductId
-            effective = self.effective_for(pp, programs.get(pp.projectId))
-            toggles = product_feature_toggles.ProductFeatureToggles(outputs=pp.outputs)
-            if not effective.idleStopEnabled or toggles.is_enabled(
-                product_feature_toggles.ProductFeature.AutoStopProtection
-            ):
-                result["kept"][pp_id] = "idle stop off"
-                continue
-            if not pp.instanceId:
-                result["kept"][pp_id] = "no instance"
-                continue
-            lookback = idle_signals.lookback_minutes(effective.idleStopMinutes, config)
-            try:
-                raw = self._signals_srv.get_signals(
-                    aws_account_id=pp.awsAccountId,
-                    region=pp.region,
-                    instance_id=pp.instanceId,
-                    metric_names=metric_names,
-                    start=now - timedelta(minutes=lookback),
-                    end=now,
-                )
-            except Exception as error:  # one unreadable spoke must not stop the others
-                result["failed"].append(pp_id)
-                self._logger.warning({"job": "idle-stop", "pp": pp_id, "error": str(error)})
-                continue
-            by_signal = {s: raw.get(idle_signals.SIGNAL_METRICS[s], []) for s in config.signals}
-            decision = idle_signals.decide(
-                signals=by_signal,
-                idle_minutes=effective.idleStopMinutes,
-                now=now,
-                started_at=_parse_time(pp.startDate),
-                config=config,
-            )
-            if decision.action == "missing":
-                result["missing"].append(pp_id)
-            elif decision.action == "keep":
-                result["kept"][pp_id] = decision.reason
+            action, reason = self._idle_decision(pp, programs, now)
+            if action == "keep":
+                result["kept"][pp_id] = reason
+            elif action in ("missing", "failed"):
+                result[action].append(pp_id)
             else:
                 result["stopped"].append(pp_id)
                 if not dry_run:
-                    self._stop(pp, IDLE_STOP_PROCESS_NAME, reason=decision.reason)
+                    self._stop(pp, IDLE_STOP_PROCESS_NAME, reason=reason)
         self._logger.info({"job": "idle-stop", **result})
         return result
+
+    def _idle_decision(
+        self, pp: provisioned_product.ProvisionedProduct, programs: dict, now: datetime
+    ) -> tuple[str, str]:
+        """One workbench: (stop | keep | missing | failed, reason)."""
+        effective = self.effective_for(pp, programs.get(pp.projectId))
+        skip = self._idle_skip_reason(pp, effective)
+        if skip:
+            return "keep", skip
+        try:
+            signals = self._read_idle_signals(pp, effective.idleStopMinutes, now)
+        except Exception as error:  # one unreadable account must not stop the others
+            self._logger.warning({"job": "idle-stop", "pp": pp.provisionedProductId, "error": str(error)})
+            return "failed", str(error)
+        decision = idle_signals.decide(
+            signals=signals,
+            idle_minutes=effective.idleStopMinutes,
+            now=now,
+            started_at=_parse_time(pp.startDate),
+            config=self._idle_config,
+        )
+        return decision.action, decision.reason
+
+    @staticmethod
+    def _idle_skip_reason(
+        pp: provisioned_product.ProvisionedProduct, effective: workbench_lifecycle.EffectiveLifecycle
+    ) -> str | None:
+        toggles = product_feature_toggles.ProductFeatureToggles(outputs=pp.outputs)
+        if not effective.idleStopEnabled or toggles.is_enabled(
+            product_feature_toggles.ProductFeature.AutoStopProtection
+        ):
+            return "idle stop off"
+        if not pp.instanceId:
+            return "no instance"
+        return None
+
+    def _read_idle_signals(self, pp: provisioned_product.ProvisionedProduct, idle_minutes: int, now: datetime) -> dict:
+        config = self._idle_config
+        raw = self._signals_srv.get_signals(
+            aws_account_id=pp.awsAccountId,
+            region=pp.region,
+            instance_id=pp.instanceId,
+            metric_names=[idle_signals.SIGNAL_METRICS[s] for s in config.signals],
+            start=now - timedelta(minutes=idle_signals.lookback_minutes(idle_minutes, config)),
+            end=now,
+        )
+        return {s: raw.get(idle_signals.SIGNAL_METRICS[s], []) for s in config.signals}
 
     # Internals ------------------------------------------------------------------------------------
 

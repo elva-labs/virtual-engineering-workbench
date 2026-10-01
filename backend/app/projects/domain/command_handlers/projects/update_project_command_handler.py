@@ -26,6 +26,8 @@ def handle_update_project_command(
         proj.projectName = cmd.name
         proj.projectDescription = cmd.description
         proj.isActive = cmd.isActive
+        if cmd.remoteSupportEnabled is not None:
+            proj.remoteSupportEnabled = cmd.remoteSupportEnabled
         proj.lastUpdateDate = current_time
 
         uow.get_repository(project.ProjectPrimaryKey, project.Project).update_entity(
@@ -34,11 +36,6 @@ def handle_update_project_command(
         )
         uow.commit()
 
-    msg_bus.publish(
-        project_updated.ProjectUpdated(
-            projectId=cmd.id.value,
-            projectName=cmd.name,
-            projectDescription=cmd.description,
-            isActive=cmd.isActive,
-        )
-    )
+    # The full current state, so the Authorization BC keeps the remote-support setting and the
+    # management mode (an event without them would reset them).
+    msg_bus.publish(project_updated.from_project(proj))

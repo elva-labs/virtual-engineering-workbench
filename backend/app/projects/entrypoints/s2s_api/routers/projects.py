@@ -46,6 +46,7 @@ def init(dependencies: bootstrapper.Dependencies) -> Router:  # noqa: C901
                 request.name,
                 request.description,
                 request.isActive,
+                request.remoteSupportEnabled,
             )
         except ValueError as exc:
             raise ServiceError(409, str(exc)) from exc
@@ -78,7 +79,7 @@ def init(dependencies: bootstrapper.Dependencies) -> Router:  # noqa: C901
         )
         try:
             updated = dependencies.project_lifecycle_service.update(
-                project_id, request.name, request.description, request.isActive
+                project_id, request.name, request.description, request.isActive, request.remoteSupportEnabled
             )
         except KeyError as exc:
             raise NotFoundError("Project not found") from exc

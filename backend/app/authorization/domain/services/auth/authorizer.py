@@ -31,6 +31,8 @@ class AuthorizationContext(BaseModel):
     domains: list[str] | None = Field(None)
     trusted_group_ids: list[str] = Field(default_factory=list)
     project_assignments: list[project_assignment.Assignment] = Field([])
+    # Setting of the project in the request path; the default applies when no project is in the path.
+    remote_support_enabled: bool = Field(True)
     api_auth_cfg: APIAuthConfig = Field(...)
     project_scoped_bounded_contexts: list[str] = Field([])
     # Whether an external tool manages the project in the request path, and where its configuration

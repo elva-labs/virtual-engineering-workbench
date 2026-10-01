@@ -11,4 +11,6 @@ class UpdateProjectCommand(command_bus.Command):
     name: str
     description: Optional[str] = None
     isActive: bool
+    # None keeps the current setting.
+    remoteSupportEnabled: Optional[bool] = None
     model_config = ConfigDict(arbitrary_types_allowed=True)

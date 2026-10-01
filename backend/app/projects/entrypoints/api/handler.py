@@ -58,8 +58,8 @@ from app.projects.domain.value_objects import (
 from app.projects.entrypoints.api import bootstrapper, config, group_access, user_profiles
 from app.projects.entrypoints.api.model import api_model
 from app.shared.adapters.boto import paging_utils
-from app.shared.logging.helpers import clear_auth_headers
 from app.shared.identity.entra_groups import effective_roles, group_ids
+from app.shared.logging.helpers import clear_auth_headers
 from app.shared.middleware import authorization, exception_handler, externally_managed
 from app.shared.middleware.metric import metric_handlers
 from app.shared.middleware.metric.types import MetricDimensionNames
@@ -118,6 +118,53 @@ def _trusted_group_ids() -> list[str]:
         return []
 
 
+def _all_inventory_projects() -> dict:
+    projects = {}
+    token = None
+    seen_tokens = set()
+    while True:
+        inventory, token, _ = dependencies.projects_query_service.list_projects(
+            page_size=100, next_token=token, user_id=None
+        )
+        projects.update({project.projectId: project for project in inventory})
+        if not token:
+            return projects
+        token_key = json.dumps(token, sort_keys=True)
+        if token_key in seen_tokens:
+            raise RuntimeError("Repeated inventory page token")
+        seen_tokens.add(token_key)
+
+
+def _all_direct_projects(user_id: str) -> tuple[dict, list]:
+    projects = {}
+    assignments = []
+    token = None
+    seen_tokens = set()
+    while True:
+        direct_projects, token, batch = dependencies.projects_query_service.list_projects_by_user(
+            user_id=user_id, page_size=100, next_token=token
+        )
+        projects.update({project.projectId: project for project in direct_projects})
+        assignments.extend(batch)
+        if not token:
+            return projects, assignments
+        token_key = json.dumps(token, sort_keys=True)
+        if token_key in seen_tokens:
+            raise RuntimeError("Repeated direct project page token")
+        seen_tokens.add(token_key)
+
+
+def _add_group_projects(all_projects: dict, inventory_projects: dict, groups: list) -> None:
+    for assignment in groups:
+        if assignment.projectId in all_projects:
+            continue
+        project = inventory_projects.get(assignment.projectId) or dependencies.projects_query_service.get_project_by_id(
+            assignment.projectId
+        )
+        if project is not None:
+            all_projects[project.projectId] = project
+
+
 @tracer.capture_method
 @app.get("/projects")
 def get_projects(
@@ -135,49 +182,17 @@ def get_projects(
 
     # Build one ordered page from the inventory and both grant sources. The
     # inventory remains visible for project enrolment, even without a grant.
-    inventory_projects = {}
-    inventory_token = None
-    seen_inventory_tokens = set()
-    while True:
-        inventory, inventory_token, _ = dependencies.projects_query_service.list_projects(
-            page_size=100, next_token=inventory_token, user_id=None
-        )
-        inventory_projects.update({project.projectId: project for project in inventory})
-        if not inventory_token:
-            break
-        token_key = json.dumps(inventory_token, sort_keys=True)
-        if token_key in seen_inventory_tokens:
-            raise RuntimeError("Repeated inventory page token")
-        seen_inventory_tokens.add(token_key)
+    inventory_projects = _all_inventory_projects()
 
     # Without self-enrolment the inventory is not shown to everyone: users see the projects they hold a
     # role on, platform admins see all of them.
     all_projects = dict(inventory_projects) if SELF_ENROLMENT_ENABLED or platform_admin else {}
 
-    direct_assignments = []
-    direct_token = None
-    seen_direct_tokens = set()
-    while True:
-        direct_projects, direct_token, batch = dependencies.projects_query_service.list_projects_by_user(
-            user_id=user_principal_name, page_size=100, next_token=direct_token
-        )
-        all_projects.update({project.projectId: project for project in direct_projects})
-        direct_assignments.extend(batch)
-        if not direct_token:
-            break
-        token_key = json.dumps(direct_token, sort_keys=True)
-        if token_key in seen_direct_tokens:
-            raise RuntimeError("Repeated direct project page token")
-        seen_direct_tokens.add(token_key)
+    direct_projects, direct_assignments = _all_direct_projects(user_principal_name)
+    all_projects.update(direct_projects)
 
     groups = dependencies.projects_query_service.get_group_assignments(trusted_groups)
-    for assignment in groups:
-        if assignment.projectId not in all_projects:
-            project = inventory_projects.get(assignment.projectId)
-            if project is None:
-                project = dependencies.projects_query_service.get_project_by_id(assignment.projectId)
-            if project is not None:
-                all_projects[project.projectId] = project
+    _add_group_projects(all_projects, inventory_projects, groups)
 
     roles_by_project = effective_roles(direct_assignments, groups)
     if platform_admin:
@@ -186,11 +201,14 @@ def get_projects(
                 {*roles_by_project.get(project_id, []), project_assignment.Role.ADMIN}
             )
     project_ids = sorted(all_projects)
-    page_ids = project_ids[offset:offset + requested_size]
+    page_ids = project_ids[offset : offset + requested_size]
     projects = [all_projects[project_id] for project_id in page_ids]
     assignments = [assignment for assignment in direct_assignments if assignment.projectId in page_ids]
-    access = [api_model.EffectiveProjectAccess(projectId=project_id, roles=roles_by_project[project_id])
-              for project_id in page_ids if project_id in roles_by_project]
+    access = [
+        api_model.EffectiveProjectAccess(projectId=project_id, roles=roles_by_project[project_id])
+        for project_id in page_ids
+        if project_id in roles_by_project
+    ]
     last_evaluated_key = {"offset": offset + requested_size} if offset + requested_size < len(project_ids) else None
 
     enrolments, _ = dependencies.enrolment_query_service.list_enrolments_by_user(
@@ -280,6 +298,7 @@ def update_project(
             name=request.name,
             description=request.description,
             isActive=request.isActive,
+            remoteSupportEnabled=request.remoteSupportEnabled,
         )
     )
 
@@ -460,6 +479,7 @@ def get_project_groups(project_id: str) -> api_gateway.Response[api_model.GetPro
         ),
         content_type=content_types.APPLICATION_JSON,
     )
+
 
 @tracer.capture_method
 @app.delete("/projects/<project_id>/users/<user_id>")

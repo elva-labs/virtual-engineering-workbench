@@ -69,26 +69,18 @@ def make_dependencies():
     return deps, query, lifecycle, groups, command_bus
 
 
-def invoke(
-    deps, authenticated_event, lambda_context, method, path, body=None, key=None
-):
-    with mock.patch(
-        "app.projects.entrypoints.s2s_api.bootstrapper.bootstrap", return_value=deps
-    ):
+def invoke(deps, authenticated_event, lambda_context, method, path, body=None, key=None):
+    with mock.patch("app.projects.entrypoints.s2s_api.bootstrapper.bootstrap", return_value=deps):
         from app.projects.entrypoints.s2s_api import handler
 
         importlib.reload(handler)
-        event = authenticated_event(
-            json.dumps(body) if body is not None else None, path, method
-        )
+        event = authenticated_event(json.dumps(body) if body is not None else None, path, method)
         if key:
             event["headers"]["Idempotency-Key"] = key
         return handler.handler(event, lambda_context)
 
 
-def test_project_create_exact_inactive_update_and_deactivate(
-    lambda_context, authenticated_event
-):
+def test_project_create_exact_inactive_update_and_deactivate(lambda_context, authenticated_event):
     deps, query, lifecycle, _, _ = make_dependencies()
     key = str(uuid4())
     response = invoke(
@@ -102,10 +94,8 @@ def test_project_create_exact_inactive_update_and_deactivate(
     )
     assert response["statusCode"] == 201
     assert json.loads(response["body"]) == {"projectId": "project-id"}
-    lifecycle.create.assert_called_once_with("fake_client_id", key, "New", None, True)
-    response = invoke(
-        deps, authenticated_event, lambda_context, "GET", "/projects/project-id"
-    )
+    lifecycle.create.assert_called_once_with("fake_client_id", key, "New", None, True, None)
+    response = invoke(deps, authenticated_event, lambda_context, "GET", "/projects/project-id")
     assert response["statusCode"] == 200
     assert json.loads(response["body"])["isActive"] is False
     response = invoke(
@@ -118,9 +108,7 @@ def test_project_create_exact_inactive_update_and_deactivate(
     )
     assert response["statusCode"] == 200
     assert json.loads(response["body"])["isActive"] is True
-    response = invoke(
-        deps, authenticated_event, lambda_context, "DELETE", "/projects/project-id"
-    )
+    response = invoke(deps, authenticated_event, lambda_context, "DELETE", "/projects/project-id")
     assert response["statusCode"] == 200
     assert json.loads(response["body"])["isActive"] is False
 
@@ -193,9 +181,7 @@ def test_group_wire_and_project_isolation(lambda_context, authenticated_event):
     assert response["statusCode"] == 403
 
 
-def test_direct_user_exact_distinguishes_absent_and_empty_with_metadata(
-    lambda_context, authenticated_event
-):
+def test_direct_user_exact_distinguishes_absent_and_empty_with_metadata(lambda_context, authenticated_event):
     deps, query, _, _, commands = make_dependencies()
     path = "/projects/project-id/users/UNKNOWN-USER"
     response = invoke(deps, authenticated_event, lambda_context, "GET", path)
@@ -232,7 +218,4 @@ def test_direct_user_exact_distinguishes_absent_and_empty_with_metadata(
     assert response["statusCode"] == 200
     assert json.loads(response["body"])["userDisplayName"] == "New User"
     command = commands.handle.call_args.args[0]
-    assert (
-        command.user_email == "new@example.com"
-        and command.user_display_name == "New User"
-    )
+    assert command.user_email == "new@example.com" and command.user_display_name == "New User"

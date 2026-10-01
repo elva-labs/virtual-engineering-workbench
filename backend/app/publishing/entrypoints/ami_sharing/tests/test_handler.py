@@ -169,3 +169,42 @@ def test_handle_fail_ami_sharing(mock_dependencies, lambda_context):
     # ASSERT
     assertpy.assert_that(response).is_not_none()
     assertpy.assert_that(response).is_equal_to(step_function_model.FailAmiSharingResponse().model_dump(by_alias=True))
+
+
+def test_handle_store_and_restore_ami(mock_dependencies, lambda_context, mock_restore_ami_command_handler):
+    # ARRANGE
+    from app.publishing.entrypoints.ami_sharing import handler
+
+    handler.dependencies = mock_dependencies
+
+    # ACT
+    stored = handler.handler(
+        step_function_model.StoreAmiRequest(
+            sourceAmiId="ami-54321", region="eu-west-3", awsAccountId="123456789012"
+        ).model_dump(by_alias=True),
+        lambda_context,
+    )
+    store_verified = handler.handler(
+        step_function_model.VerifyStoreRequest(sourceAmiId="ami-54321", region="eu-west-3").model_dump(by_alias=True),
+        lambda_context,
+    )
+    restored = handler.handler(
+        step_function_model.RestoreAmiRequest(
+            originalAmiId="ami-12345", objectKey="ami-54321.bin", region="eu-west-3", awsAccountId="123456789012"
+        ).model_dump(by_alias=True),
+        lambda_context,
+    )
+    restore_verified = handler.handler(
+        step_function_model.VerifyRestoreRequest(
+            distributedAmiId="ami-target1", region="eu-west-3", awsAccountId="123456789012"
+        ).model_dump(by_alias=True),
+        lambda_context,
+    )
+
+    # ASSERT
+    assertpy.assert_that(stored["objectKey"]).is_equal_to("ami-54321.bin")
+    assertpy.assert_that(store_verified["isStoreVerified"]).is_true()
+    assertpy.assert_that(restored["distributedAmiId"]).is_equal_to("ami-target1")
+    assertpy.assert_that(restore_verified["isRestoreVerified"]).is_true()
+    command = mock_restore_ami_command_handler.call_args.args[0]
+    assertpy.assert_that(command.objectKey).is_equal_to("ami-54321.bin")

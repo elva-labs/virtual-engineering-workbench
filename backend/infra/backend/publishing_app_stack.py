@@ -4,15 +4,7 @@ import typing
 import aws_cdk
 import cdk_nag
 import constructs
-from aws_cdk import (
-    aws_apigateway,
-    aws_dynamodb,
-    aws_ec2,
-    aws_events,
-    aws_iam,
-    aws_scheduler,
-    aws_ssm,
-)
+from aws_cdk import aws_apigateway, aws_dynamodb, aws_ec2, aws_events, aws_iam, aws_scheduler, aws_ssm
 
 from app.publishing import domain
 from app.shared.api import bounded_contexts
@@ -31,6 +23,7 @@ from infra.constructs import (
 from infra.constructs.ami_sharing import ami_sharing_state_machine
 from infra.constructs.eventbridge import l3_event_bus
 from infra.helpers import ops_monitoring
+from infra.helpers.image_distribution import image_distribution
 
 # Global variables
 VEW_SERVICE = "Publishing"
@@ -398,6 +391,7 @@ class PublishingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                                 PRODUCT_PUBLISHING_IMAGE_SERVICE_KEY_NAME,
                             ]
                         ),
+                        **self._image_distribution_environment(app_config),
                     },
                     permissions=[
                         lambda lambda_f: self._storage.table.grant_read_write_data(lambda_f),
@@ -410,10 +404,13 @@ class PublishingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                                 effect=aws_iam.Effect.ALLOW,
                                 resources=[
                                     f"arn:aws:iam::*:role/{PRODUCT_PUBLISHING_IMAGE_SERVICE_ROLE}",
+                                    # "store-restore": restores images inside each target account
+                                    f"arn:aws:iam::*:role/{constants.PRODUCT_PUBLISHING_IMAGE_IMPORT_ROLE}",
                                 ],
                             )
                         ),
                         lambda lambda_f: self._event_bus.grant_put_events_to(lambda_f),
+                        lambda lambda_f: self._grant_store_with_function_role(app_config, lambda_f),
                     ],
                     reserved_concurrency=None,
                     provisioned_concurrency=None,
@@ -740,6 +737,67 @@ class PublishingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
             ).string_value
 
         return self._tools_account_id
+
+    @staticmethod
+    def _image_distribution_environment(app_config: config.AppConfig) -> dict:
+        settings = image_distribution(app_config)
+        return {
+            "IMAGE_DISTRIBUTION_MODE": settings["mode"],
+            "IMAGE_IMPORT_ROLE": constants.PRODUCT_PUBLISHING_IMAGE_IMPORT_ROLE,
+            "IMAGE_IMPORT_BUCKET_PREFIX": constants.PRODUCT_PUBLISHING_IMAGE_IMPORT_BUCKET_PREFIX,
+            "IMAGE_STORE_WITH_FUNCTION_ROLE": str(bool(settings["storeWithFunctionRole"])).lower(),
+        }
+
+    @staticmethod
+    def _grant_store_with_function_role(app_config: config.AppConfig, lambda_f) -> None:
+        """ "store-restore" with storeWithFunctionRole: the ami-sharing function stores images itself
+        (the image service account is this account), reading the image's snapshots, decrypting them
+        with the image key here and writing into the target accounts' import buckets."""
+        settings = image_distribution(app_config)
+        if settings["mode"] != "store-restore" or not settings["storeWithFunctionRole"]:
+            return
+        lambda_f.add_to_role_policy(
+            aws_iam.PolicyStatement(
+                actions=[
+                    "ec2:CreateStoreImageTask",
+                    "ec2:DescribeStoreImageTasks",
+                    "ec2:DescribeImages",
+                    "ec2:DescribeTags",
+                    "ebs:GetSnapshotBlock",
+                    "ebs:ListSnapshotBlocks",
+                ],
+                resources=["*"],
+            )
+        )
+        lambda_f.add_to_role_policy(
+            aws_iam.PolicyStatement(
+                actions=["kms:Decrypt", "kms:DescribeKey"],
+                resources=[f"arn:aws:kms:*:{aws_cdk.Aws.ACCOUNT_ID}:key/*"],
+                conditions={
+                    "ForAnyValue:StringLike": {
+                        "kms:ResourceAliases": (
+                            f"alias/{app_config.get_organization_prefix()}-{app_config.get_application_prefix()}-"
+                            f"{PRODUCT_PUBLISHING_IMAGE_SERVICE_KEY_NAME}*"
+                        )
+                    }
+                },
+            )
+        )
+        lambda_f.add_to_role_policy(
+            aws_iam.PolicyStatement(
+                actions=[
+                    "s3:PutObject",
+                    "s3:PutObjectTagging",
+                    "s3:AbortMultipartUpload",
+                    "s3:ListBucket",
+                    "s3:GetObject",
+                ],
+                resources=[
+                    f"arn:aws:s3:::{constants.PRODUCT_PUBLISHING_IMAGE_IMPORT_BUCKET_PREFIX}-*",
+                    f"arn:aws:s3:::{constants.PRODUCT_PUBLISHING_IMAGE_IMPORT_BUCKET_PREFIX}-*/*",
+                ],
+            )
+        )
 
     def get_image_service_account_id(self, app_config: config.AppConfig):
         image_service_account_param_name = "image-service-account-id-ssm-param"

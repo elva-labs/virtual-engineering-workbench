@@ -334,7 +334,9 @@ class ProvisioningAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                         "EXPERIMENTAL_PROVISIONED_PRODUCT_PER_PROJECT_LIMIT_PARAMETER_NAME": experimental_provisioned_product_per_project_limit_param.parameter_name,
                         "LAMBDA_IAM_ROLE": f"{scheduler_role.role_arn}",
                         "LAYER_VERSION": self._shared_app_layer.layer.layer_version_arn,
-                        "WORKBENCH_LIFECYCLE_DEFAULTS": json.dumps(app_config.component_specific["workbench-lifecycle"]),
+                        "WORKBENCH_LIFECYCLE_DEFAULTS": json.dumps(
+                            app_config.component_specific["workbench-lifecycle"]
+                        ),
                     },
                     permissions=[
                         lambda lambda_f: lambda_f.add_to_role_policy(
@@ -633,7 +635,9 @@ class ProvisioningAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                         "PROVISIONED_PRODUCT_CLEANUP_CONFIG": json.dumps(
                             app_config.component_specific["pp-cleanup-config"]
                         ),
-                        "WORKBENCH_LIFECYCLE_DEFAULTS": json.dumps(app_config.component_specific["workbench-lifecycle"]),
+                        "WORKBENCH_LIFECYCLE_DEFAULTS": json.dumps(
+                            app_config.component_specific["workbench-lifecycle"]
+                        ),
                     },
                     permissions=[
                         lambda lambda_f: self._storage.table.grant_read_write_data(lambda_f),
@@ -859,9 +863,7 @@ class ProvisioningAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
             self,
             "sync-scheduler-rule",
             # Every few minutes, off the minutes of the 5-minute metrics job (config "sync-job-cron-minute").
-            schedule=aws_events.Schedule.cron(
-                minute=app_config.component_specific.get("sync-job-cron-minute", "2/5")
-            ),
+            schedule=aws_events.Schedule.cron(minute=app_config.component_specific.get("sync-job-cron-minute", "2/5")),
             targets=[
                 aws_events_targets.LambdaFunction(
                     self._backend_app.app_entries_functions[self._scheduled_jobs_handler_name],
@@ -1360,9 +1362,7 @@ class ProvisioningAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
             self,
             "workbench-lifecycle-scheduler-policy",
             roles=[scheduler_role],
-            statements=[
-                aws_iam.PolicyStatement(actions=["lambda:InvokeFunction"], resources=[jobs_fn.function_arn])
-            ],
+            statements=[aws_iam.PolicyStatement(actions=["lambda:InvokeFunction"], resources=[jobs_fn.function_arn])],
         )
         hour, minute = lifecycle["nightlyStopTime"].split(":")
         aws_scheduler.CfnSchedule(

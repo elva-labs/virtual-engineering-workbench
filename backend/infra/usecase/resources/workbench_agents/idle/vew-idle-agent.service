@@ -1,0 +1,8 @@
+[Unit]
+Description=VEW idle agent: report activity signals
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/vew-idle-agent.sh
+StandardOutput=append:/var/log/vew/idle-agent.log
+StandardError=append:/var/log/vew/idle-agent.log

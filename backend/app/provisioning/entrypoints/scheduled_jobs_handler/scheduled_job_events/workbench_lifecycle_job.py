@@ -8,5 +8,5 @@ class WorkbenchLifecycleJob(BaseModel):
     the deployment's time zone). reconcile: write the effective inactivity timeout to vew:autostop. dryRun only
     reports what would happen."""
 
-    action: Literal["nightly-stop", "reconcile"]
+    action: Literal["nightly-stop", "reconcile", "idle-stop"]
     dryRun: bool = False

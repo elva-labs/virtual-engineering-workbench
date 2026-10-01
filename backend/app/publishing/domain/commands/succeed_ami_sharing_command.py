@@ -8,6 +8,7 @@ from app.publishing.domain.value_objects import (
     event_name_value_object,
     product_id_value_object,
     product_type_value_object,
+    stage_value_object,
     version_id_value_object,
 )
 
@@ -16,6 +17,7 @@ class SucceedAmiSharingCommand(BaseModel):
     productId: product_id_value_object.ProductIdValueObject
     versionId: version_id_value_object.VersionIdValueObject
     awsAccountId: aws_account_id_value_object.AWSAccountIDValueObject
+    stage: stage_value_object.StageValueObject
     copiedAmiId: Optional[ami_id_value_object.AmiIdValueObject] = None
     previousEventName: event_name_value_object.EventNameValueObject
     oldVersionId: Optional[str] = None

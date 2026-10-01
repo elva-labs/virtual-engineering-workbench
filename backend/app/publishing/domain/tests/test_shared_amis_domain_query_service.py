@@ -13,6 +13,7 @@ from app.publishing.domain.value_objects import (
     product_id_value_object,
     product_type_value_object,
     region_value_object,
+    stage_value_object,
     version_id_value_object,
 )
 
@@ -87,6 +88,7 @@ def test_make_share_ami_decision_makes_correct_decision(
         product_id=product_id_value_object.from_str("prod-11111111"),
         version_id=version_id_value_object.from_str("vers-11111111"),
         aws_account_id=aws_account_id_value_object.from_str("123456789012"),
+        stage=stage_value_object.from_str("DEV"),
         product_type=product_type_value_object.from_str("WORKBENCH"),
     )
     # ASSERT

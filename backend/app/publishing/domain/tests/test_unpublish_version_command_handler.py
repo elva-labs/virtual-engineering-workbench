@@ -15,6 +15,7 @@ from app.publishing.domain.value_objects import (
     aws_account_id_value_object,
     product_id_value_object,
     region_value_object,
+    stage_value_object,
     version_id_value_object,
 )
 from app.shared.adapters.message_bus import message_bus
@@ -67,6 +68,7 @@ def command_mock():
         productId=product_id_value_object.from_str("prod-123"),
         versionId=version_id_value_object.from_str("vers-123"),
         awsAccountId=aws_account_id_value_object.from_str("123456789012"),
+        stage=stage_value_object.from_str("DEV"),
         region=region_value_object.from_str("us-east-1"),
     )
 
@@ -130,6 +132,7 @@ def test_unpublish_version_command_handler_unpublish_version(
             productId="prod-123",
             versionId="vers-123",
             awsAccountId="123456789012",
+            stage="DEV",
         ),
         lastUpdateDate="2023-07-13T00:00:00+00:00",
         status=version.VersionStatus.Retired,
@@ -177,6 +180,7 @@ def test_unpublish_version_command_handler_change_version_status_to_failed_if_er
                 productId="prod-123",
                 versionId="vers-123",
                 awsAccountId="123456789012",
+                stage="DEV",
             ),
             lastUpdateDate="2023-07-13T00:00:00+00:00",
             status=version.VersionStatus.Failed,
@@ -218,6 +222,7 @@ def test_unpublish_version_command_handler_deletes_sc_product_if_last_version(
             productId="prod-123",
             versionId="vers-123",
             awsAccountId="123456789012",
+            stage="DEV",
         ),
         lastUpdateDate="2023-07-13T00:00:00+00:00",
         status=version.VersionStatus.Retired,

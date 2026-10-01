@@ -9,6 +9,7 @@ from app.publishing.adapters.query_services import (
     dynamodb_versions_query_service,
 )
 from app.publishing.adapters.repository import dynamo_entity_config
+from app.publishing.adapters.repository.dynamo_entity_migrations import migrations_config
 from app.publishing.adapters.services import cloud_formation_service, s3_file_service
 from app.publishing.domain.command_handlers import (
     archive_product_command_handler,
@@ -49,7 +50,7 @@ from app.shared.adapters.message_bus import (
     in_memory_command_bus,
     message_bus_metrics,
 )
-from app.shared.adapters.unit_of_work_v2 import dynamodb_unit_of_work
+from app.shared.adapters.unit_of_work_v2 import dynamodb_migrations, dynamodb_unit_of_work
 from app.shared.api import aws_events_api, ssm_parameter_service
 from app.shared.instrumentation import power_tools_metrics
 from app.shared.logging import boto_logger
@@ -72,6 +73,15 @@ def bootstrap(  # noqa: C901
     session = boto_logger.loggable_session(boto3.session.Session(), logger)
 
     dynamodb = session.resource("dynamodb", region_name=app_config.get_default_region())
+
+    # The version key migration must run before the API reads versions (portfolios also migrate in the
+    # projects event handler); the migrator records completed scripts, so this is a no-op once done.
+    if app_config.get_table_name():
+        dynamodb_migrations.DynamoDBMigrator(
+            ddb_resource=dynamodb,
+            table_name=app_config.get_table_name(),
+            logger=logger,
+        ).register_migrations(migrations_config()).migrate()
 
     shared_uow = dynamodb_unit_of_work.DynamoDBUnitOfWork(
         table_name=app_config.get_table_name(),

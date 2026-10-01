@@ -23,7 +23,6 @@ from app.shared.adapters.message_bus import message_bus
 from app.shared.adapters.unit_of_work_v2 import unit_of_work
 from app.shared.api import parameter_service
 
-
 # The first version of a product, as for a version created in the portal (create_version_command_handler).
 INITIAL_VERSION = version.format_version_name("1", "0", "0", version.VersionType.ReleaseCandidate, "1")
 
@@ -237,6 +236,7 @@ def _create_and_save_version(
             product_id=version_entity.productId,
             version_id=version_entity.versionId,
             aws_account_id=version_entity.awsAccountId,
+            stage=version_entity.stage,
             product_type=product_entity.productType,
         )
     )

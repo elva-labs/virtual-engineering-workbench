@@ -11,6 +11,7 @@ from app.publishing.domain.value_objects import (
     product_id_value_object,
     project_id_value_object,
     region_value_object,
+    stage_value_object,
     version_id_value_object,
 )
 
@@ -40,6 +41,7 @@ def test_handler_product_version_ami_shared_event(
             productId=product_id_value_object.from_str(product_version_ami_shared_event_payload["productId"]),
             versionId=version_id_value_object.from_str(product_version_ami_shared_event_payload["versionId"]),
             awsAccountId=aws_account_id_value_object.from_str(product_version_ami_shared_event_payload["awsAccountId"]),
+            stage=stage_value_object.from_str(product_version_ami_shared_event_payload["stage"]),
             previousEventName=event_name_value_object.from_str(
                 product_version_ami_shared_event_payload["previousEventName"]
             ),
@@ -73,6 +75,7 @@ def test_product_version_name_updated_event(
             awsAccountId=aws_account_id_value_object.from_str(
                 product_version_name_updated_event_payload["awsAccountId"]
             ),
+            stage=stage_value_object.from_str(product_version_name_updated_event_payload["stage"]),
         )
     )
 
@@ -130,6 +133,7 @@ def test_product_version_retirement_started_handler(
             awsAccountId=aws_account_id_value_object.from_str(
                 product_version_retire_started_event_payload["awsAccountId"]
             ),
+            stage=stage_value_object.from_str(product_version_retire_started_event_payload["stage"]),
             region=region_value_object.from_str(product_version_retire_started_event_payload["region"]),
         )
     )

@@ -1,17 +1,9 @@
 import enum
 import hashlib
 
-from app.provisioning.domain.model import (
-    maintenance_window,
-    product_status,
-    provisioned_product,
-    user_profile,
-)
+from app.provisioning.domain.model import maintenance_window, product_status, provisioned_product, user_profile
 from app.provisioning.domain.read_models import product, version
-from app.shared.adapters.unit_of_work_v2 import (
-    dynamodb_repo_config,
-    dynamodb_repository,
-)
+from app.shared.adapters.unit_of_work_v2 import dynamodb_repo_config, dynamodb_repository
 
 REPLICATION_FACTOR = 3
 
@@ -33,9 +25,15 @@ class DBPrefix(enum.StrEnum):
     MAINTENANCE_WINDOW = "MAINTENANCE_WINDOW"
     ACTIVE = "ACTIVE"
     INACTIVE = "INACTIVE"
+    STAGE = "STAGE"
 
     def __str__(self):
         return str(self.value)
+
+
+def version_sort_key(version_id: str, aws_account_id: str, stage: str) -> str:
+    """VERSION#<version>#AWS_ACCOUNT#<account>#STAGE#<stage>: publishing's key (ADR 0013)."""
+    return f"{DBPrefix.VERSION}#{version_id}#{DBPrefix.AWS_ACCOUNT}#{aws_account_id}#{DBPrefix.STAGE}#{stage}"
 
 
 class PagingParams(enum.StrEnum):
@@ -116,8 +114,6 @@ class EntityConfigurator(dynamodb_repository.DynamoDBEntityConfiguratorBase):
         self,
         cfg: dynamodb_repo_config.GenericDynamoDBRepositoryConfig[version.VersionPrimaryKey, version.Version],
     ):
-        entity_name = DBPrefix.VERSION
-
         cfg.partition_key(
             name="PK",
             value_template=lambda product_id: f"{DBPrefix.PRODUCT}#{product_id}",
@@ -127,9 +123,9 @@ class EntityConfigurator(dynamodb_repository.DynamoDBEntityConfiguratorBase):
 
         cfg.sort_key(
             name="SK",
-            value_template=lambda version_id, aws_account_id: f"{entity_name}#{version_id}#{DBPrefix.AWS_ACCOUNT}#{aws_account_id}",
-            values_from_entity=lambda ent: [ent.versionId, ent.awsAccountId],
-            values_from_primary_key=lambda pk: [pk.versionId, pk.awsAccountId],
+            value_template=version_sort_key,
+            values_from_entity=lambda ent: [ent.versionId, ent.awsAccountId, str(ent.stage)],
+            values_from_primary_key=lambda pk: [pk.versionId, pk.awsAccountId, pk.stage],
         )
 
         """
@@ -137,7 +133,7 @@ class EntityConfigurator(dynamodb_repository.DynamoDBEntityConfiguratorBase):
 
         Examples:
         QPK_1: "SC_PROVISIONING_ARTIFACT_ID#pa-1234"
-        SK: "VERSION#vers-123#AWS_ACCOUNT#001234567890"
+        SK: "VERSION#vers-123#AWS_ACCOUNT#001234567890#STAGE#DEV"
         """
         cfg.enable_query_pattern(
             gsi_pk_name="QPK_1",

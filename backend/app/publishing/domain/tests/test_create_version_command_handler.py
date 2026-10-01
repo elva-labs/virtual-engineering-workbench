@@ -305,6 +305,7 @@ def test_handle_should_create_new_version_if_version_in_repository(
             product_id="prod-11111111",
             version_id="vers-11111111",
             aws_account_id="123456789012",
+            stage="DEV",
             product_type="WORKBENCH",
         )
     )
@@ -421,6 +422,7 @@ def test_handle_should_create_new_version_if_version_in_repository_for_container
             product_id="prod-11111111",
             version_id="vers-11111111",
             aws_account_id="123456789012",
+            stage="DEV",
             product_type="CONTAINER",
         )
     )

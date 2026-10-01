@@ -203,6 +203,7 @@ def handle(
                 product_id=version_entity.productId,
                 version_id=version_entity.versionId,
                 aws_account_id=version_entity.awsAccountId,
+                stage=version_entity.stage,
                 product_type=product_entity.productType,
             )
         )

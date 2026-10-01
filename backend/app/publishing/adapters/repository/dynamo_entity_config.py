@@ -3,10 +3,7 @@ import enum
 from app.publishing.adapters.services import dynamo_db_repositories as legacy_ddb_uow
 from app.publishing.domain.model import portfolio, product, shared_ami, version
 from app.publishing.domain.read_models import ami
-from app.shared.adapters.unit_of_work_v2 import (
-    dynamodb_repo_config,
-    dynamodb_repository,
-)
+from app.shared.adapters.unit_of_work_v2 import dynamodb_repo_config, dynamodb_repository
 
 
 class DBPrefix(enum.StrEnum):
@@ -17,9 +14,18 @@ class DBPrefix(enum.StrEnum):
     Project = "PROJECT"
     Version = "VERSION"
     Technology = "TECHNOLOGY"
+    Stage = "STAGE"
 
     def __str__(self):
         return str(self.value)
+
+
+def version_sort_key(version_id: str, aws_account_id: str, stage: str) -> str:
+    return f"{DBPrefix.Version}#{version_id}#{DBPrefix.AwsAccount}#{aws_account_id}#{DBPrefix.Stage}#{stage}"
+
+
+def portfolio_sort_key(aws_account_id: str, stage: str) -> str:
+    return f"{DBPrefix.AwsAccount}#{aws_account_id}#{DBPrefix.Stage}#{stage}"
 
 
 class PagingParams(enum.StrEnum):
@@ -82,12 +88,12 @@ class EntityConfigurator(dynamodb_repository.DynamoDBEntityConfiguratorBase):
             values_from_primary_key=lambda pk: pk.productId,
         )
 
-        # ex. VERSION#vers-12345#AWS_ACCOUNT#12345678912
+        # ex. VERSION#vers-12345#AWS_ACCOUNT#12345678912#STAGE#DEV (stage: ADR 0013)
         cfg.sort_key(
             name="SK",
-            value_template=lambda version_id, aws_account_id: f"{DBPrefix.Version}#{version_id}#{DBPrefix.AwsAccount}#{aws_account_id}",
-            values_from_entity=lambda ent: [ent.versionId, ent.awsAccountId],
-            values_from_primary_key=lambda pk: [pk.versionId, pk.awsAccountId],
+            value_template=version_sort_key,
+            values_from_entity=lambda ent: [ent.versionId, ent.awsAccountId, str(ent.stage)],
+            values_from_primary_key=lambda pk: [pk.versionId, pk.awsAccountId, pk.stage],
         )
 
         cfg.enable_query_all(gsi_partition_key_attribute_name=legacy_ddb_uow.DBPrefix.VERSION)
@@ -126,12 +132,12 @@ class EntityConfigurator(dynamodb_repository.DynamoDBEntityConfiguratorBase):
             values_from_primary_key=lambda pk: pk.technologyId,
         )
 
-        # ex. AWS_ACCOUNT#0000000000
+        # ex. AWS_ACCOUNT#0000000000#STAGE#DEV (stage: ADR 0013)
         cfg.sort_key(
             name="SK",
-            value_template=lambda aws_account_id: f"{DBPrefix.AwsAccount}#{aws_account_id}",
-            values_from_entity=lambda ent: ent.awsAccountId,
-            values_from_primary_key=lambda pk: pk.awsAccountId,
+            value_template=portfolio_sort_key,
+            values_from_entity=lambda ent: [ent.awsAccountId, str(ent.stage)],
+            values_from_primary_key=lambda pk: [pk.awsAccountId, pk.stage],
         )
 
         cfg.enable_query_all(gsi_partition_key_attribute_name=legacy_ddb_uow.DBPrefix.PORTFOLIO)

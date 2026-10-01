@@ -4,20 +4,13 @@ from pydantic import BaseModel, ConfigDict
 
 from app.publishing.adapters.query_services import service_catalog_query_service
 from app.publishing.adapters.repository import dynamo_entity_config
+from app.publishing.adapters.repository.dynamo_entity_migrations import migrations_config
 from app.publishing.adapters.services import service_catalog_service
-from app.publishing.domain.command_handlers import (
-    create_portfolio_command_handler,
-)
-from app.publishing.domain.commands import (
-    create_portfolio_command,
-)
+from app.publishing.domain.command_handlers import create_portfolio_command_handler
+from app.publishing.domain.commands import create_portfolio_command
 from app.publishing.entrypoints.projects_event_handler import config
-from app.shared.adapters.message_bus import (
-    command_bus,
-    command_bus_metrics,
-    in_memory_command_bus,
-)
-from app.shared.adapters.unit_of_work_v2 import dynamodb_unit_of_work
+from app.shared.adapters.message_bus import command_bus, command_bus_metrics, in_memory_command_bus
+from app.shared.adapters.unit_of_work_v2 import dynamodb_migrations, dynamodb_unit_of_work
 from app.shared.instrumentation import power_tools_metrics
 from app.shared.logging import boto_logger
 
@@ -33,6 +26,13 @@ def bootstrap(
 ) -> Dependencies:
     session = boto_logger.loggable_session(boto3.session.Session(), logger)
     dynamodb = session.resource("dynamodb", region_name=app_config.get_default_region())
+
+    # Portfolios are written only here, so their key migration (ADR 0013) runs here too.
+    dynamodb_migrations.DynamoDBMigrator(
+        ddb_resource=dynamodb,
+        table_name=app_config.get_table_name(),
+        logger=logger,
+    ).register_migrations(migrations_config()).migrate()
 
     shared_uow = dynamodb_unit_of_work.DynamoDBUnitOfWork(
         table_name=app_config.get_table_name(),

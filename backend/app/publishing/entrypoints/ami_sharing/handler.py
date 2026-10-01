@@ -5,7 +5,9 @@ from aws_lambda_powertools.utilities.data_classes import event_source
 from app.publishing.domain.commands import (
     copy_ami_command,
     fail_ami_sharing_command,
+    restore_ami_command,
     share_ami_command,
+    store_ami_command,
     succeed_ami_sharing_command,
 )
 from app.publishing.domain.model import product
@@ -66,6 +68,50 @@ def handle_copy_ami(event: step_function_model.CopyAmiRequest):
     copied_ami_id = dependencies.command_bus.handle(command)
 
     return step_function_model.CopyAmiResponse(copiedAmiId=copied_ami_id).model_dump(by_alias=True)
+
+
+@app.handle(step_function_model.StoreAmiRequest)
+def handle_store_ami(event: step_function_model.StoreAmiRequest):
+    """Stores an AMI into the target account's import bucket ("store-restore" distribution)"""
+    command = store_ami_command.StoreAmiCommand(
+        sourceAmiId=ami_id_value_object.from_str(event.source_ami_id),
+        region=region_value_object.from_str(event.region),
+        awsAccountId=aws_account_id_value_object.from_str(event.aws_account_id),
+    )
+    object_key = dependencies.command_bus.handle(command)
+    return step_function_model.StoreAmiResponse(objectKey=object_key).model_dump(by_alias=True)
+
+
+@app.handle(step_function_model.VerifyStoreRequest)
+def handle_verify_store(event: step_function_model.VerifyStoreRequest):
+    is_store_verified = dependencies.shared_amis_domain_qry_svc.verify_store(
+        region=region_value_object.from_str(event.region),
+        source_ami_id=ami_id_value_object.from_str(event.source_ami_id),
+    )
+    return step_function_model.VerifyStoreResponse(isStoreVerified=is_store_verified).model_dump(by_alias=True)
+
+
+@app.handle(step_function_model.RestoreAmiRequest)
+def handle_restore_ami(event: step_function_model.RestoreAmiRequest):
+    """Restores a stored AMI in the target account ("store-restore" distribution)"""
+    command = restore_ami_command.RestoreAmiCommand(
+        originalAmiId=ami_id_value_object.from_str(event.original_ami_id),
+        objectKey=event.object_key,
+        region=region_value_object.from_str(event.region),
+        awsAccountId=aws_account_id_value_object.from_str(event.aws_account_id),
+    )
+    distributed_ami_id = dependencies.command_bus.handle(command)
+    return step_function_model.RestoreAmiResponse(distributedAmiId=distributed_ami_id).model_dump(by_alias=True)
+
+
+@app.handle(step_function_model.VerifyRestoreRequest)
+def handle_verify_restore(event: step_function_model.VerifyRestoreRequest):
+    is_restore_verified = dependencies.shared_amis_domain_qry_svc.verify_distribution(
+        region=region_value_object.from_str(event.region),
+        distributed_ami_id=ami_id_value_object.from_str(event.distributed_ami_id),
+        aws_account_id=aws_account_id_value_object.from_str(event.aws_account_id),
+    )
+    return step_function_model.VerifyRestoreResponse(isRestoreVerified=is_restore_verified).model_dump(by_alias=True)
 
 
 @app.handle(step_function_model.ShareAmiRequest)

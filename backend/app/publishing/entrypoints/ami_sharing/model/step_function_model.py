@@ -42,6 +42,54 @@ class ShareAmiResponse(BaseModel):
     event_type: str = Field("ShareAmiResponse", alias="eventType")
 
 
+class StoreAmiRequest(BaseModel):
+    event_type: str = Field("StoreAmiRequest", alias="eventType")
+    source_ami_id: str = Field(..., alias="sourceAmiId")
+    region: str = Field(..., alias="region")
+    aws_account_id: str = Field(..., alias="awsAccountId")
+
+
+class StoreAmiResponse(BaseModel):
+    event_type: str = Field("StoreAmiResponse", alias="eventType")
+    object_key: str = Field(..., alias="objectKey")
+
+
+class VerifyStoreRequest(BaseModel):
+    event_type: str = Field("VerifyStoreRequest", alias="eventType")
+    source_ami_id: str = Field(..., alias="sourceAmiId")
+    region: str = Field(..., alias="region")
+
+
+class VerifyStoreResponse(BaseModel):
+    event_type: str = Field("VerifyStoreResponse", alias="eventType")
+    is_store_verified: bool = Field(..., alias="isStoreVerified")
+
+
+class RestoreAmiRequest(BaseModel):
+    event_type: str = Field("RestoreAmiRequest", alias="eventType")
+    original_ami_id: str = Field(..., alias="originalAmiId")
+    object_key: str = Field(..., alias="objectKey")
+    region: str = Field(..., alias="region")
+    aws_account_id: str = Field(..., alias="awsAccountId")
+
+
+class RestoreAmiResponse(BaseModel):
+    event_type: str = Field("RestoreAmiResponse", alias="eventType")
+    distributed_ami_id: str = Field(..., alias="distributedAmiId")
+
+
+class VerifyRestoreRequest(BaseModel):
+    event_type: str = Field("VerifyRestoreRequest", alias="eventType")
+    distributed_ami_id: str = Field(..., alias="distributedAmiId")
+    region: str = Field(..., alias="region")
+    aws_account_id: str = Field(..., alias="awsAccountId")
+
+
+class VerifyRestoreResponse(BaseModel):
+    event_type: str = Field("VerifyRestoreResponse", alias="eventType")
+    is_restore_verified: bool = Field(..., alias="isRestoreVerified")
+
+
 class VerifyCopyRequest(BaseModel):
     event_type: str = Field("VerifyCopyRequest", alias="eventType")
     region: str = Field(..., alias="region")

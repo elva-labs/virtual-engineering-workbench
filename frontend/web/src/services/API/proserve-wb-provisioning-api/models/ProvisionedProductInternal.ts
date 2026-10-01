@@ -80,6 +80,12 @@ export interface ProvisionedProductInternal {
      */
     userId: string;
     /**
+     * The owner's e-mail address.
+     * @type {string}
+     * @memberof ProvisionedProductInternal
+     */
+    ownerEmail?: string;
+    /**
      * Status.
      * @type {string}
      * @memberof ProvisionedProductInternal
@@ -335,6 +341,7 @@ export function ProvisionedProductInternalFromJSONTyped(json: any, ignoreDiscrim
         'provisionedProductName': json['provisionedProductName'],
         'provisionedProductType': !exists(json, 'provisionedProductType') ? undefined : json['provisionedProductType'],
         'userId': json['userId'],
+        'ownerEmail': !exists(json, 'ownerEmail') ? undefined : json['ownerEmail'],
         'status': json['status'],
         'statusReason': !exists(json, 'statusReason') ? undefined : json['statusReason'],
         'failure': !exists(json, 'failure') ? undefined : WorkbenchFailureFromJSON(json['failure']),
@@ -388,6 +395,7 @@ export function ProvisionedProductInternalToJSON(value?: ProvisionedProductInter
         'provisionedProductName': value.provisionedProductName,
         'provisionedProductType': value.provisionedProductType,
         'userId': value.userId,
+        'ownerEmail': value.ownerEmail,
         'status': value.status,
         'statusReason': value.statusReason,
         'failure': WorkbenchFailureToJSON(value.failure),

@@ -117,6 +117,8 @@ class ProvisionedProduct(unit_of_work.Entity):
     createDate: str = Field(..., title="CreateDate")
     lastUpdateDate: str = Field(..., title="LastUpdateDate")
     createdBy: str = Field(..., title="CreatedBy")
+    # A human-readable owner next to the opaque createdBy/userId.
+    ownerEmail: Optional[str] = Field(None, title="OwnerEmail")
     lastUpdatedBy: str = Field(..., title="LastUpdatedBy")
     instanceRecommendationReason: Optional[str] = Field(None, title="InstanceRecommendationReason")
     recommendedInstanceType: Optional[str] = Field(None, title="RecommendedInstanceType")

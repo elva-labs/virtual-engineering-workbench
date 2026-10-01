@@ -368,6 +368,19 @@ _dev_provisioning_config = {
         "timezone": "UTC",
         "weekendStop": True,
         "reconcileEveryMinutes": 5,
+        # The hub decides the idle stop from the signals the workbench agent reports (DCV clients,
+        # interactive sessions, load per CPU) and stops through VEW. Off by default; missing data never
+        # stops a workbench (alarm IdleSignalMissing). docs/idle-stop.md.
+        "idleStop": {
+            "enabled": False,
+            "dryRun": False,
+            "everyMinutes": 5,
+            "signals": ["dcvConnections", "interactiveSessions", "load"],
+            "loadPerCpuThreshold": 0.15,
+            "minCoverage": 0.8,
+            "graceMinutesAfterStart": 15,
+            "missingSignalAlarmMinutes": 120,
+        },
     },
 }
 

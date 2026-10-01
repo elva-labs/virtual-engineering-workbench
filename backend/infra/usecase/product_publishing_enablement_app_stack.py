@@ -415,6 +415,13 @@ class ProductPublishingEnablementAppStack(Stack):
                     ],
                     resources=["*"],
                 ),
+                # The hub's idle decision reads the workbench agents' signals (namespace
+                # VEW/Workbench). GetMetricData has no resource-level permissions; it only reads metrics.
+                iam.PolicyStatement(
+                    effect=iam.Effect.ALLOW,
+                    actions=["cloudwatch:GetMetricData"],
+                    resources=["*"],
+                ),
                 iam.PolicyStatement(
                     effect=iam.Effect.ALLOW,
                     actions=["secretsmanager:GetSecretValue"],

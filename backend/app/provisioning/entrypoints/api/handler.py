@@ -131,6 +131,7 @@ def launch_product(
         provisioned_product_id=provisioned_product_id_value_object.get_new_provisioned_product_id(),
         project_id=project_id_value_object.from_str(project_id),
         user_id=user_id_value_object.from_str(app.context.get("user_principal").user_name),
+        user_email=app.context.get("user_principal").user_email,
         user_domains=user_domains_value_object.from_list(app.context.get("user_principal").user_domains),
         product_id=product_id_value_object.from_str(launch_product_request.productId),
         version_id=product_version_id_value_object.from_str(launch_product_request.versionId),
@@ -671,7 +672,9 @@ def _workbench_for_lifecycle(project_id: str, provisioned_product_id: str):
     """The owner may change the settings; program owners and admins may read them."""
     principal = app.context.get("user_principal")
     roles = set(principal.user_roles or [])
-    oversight = bool(roles & {authorization.VirtualWorkbenchRoles.Admin, authorization.VirtualWorkbenchRoles.ProgramOwner})
+    oversight = bool(
+        roles & {authorization.VirtualWorkbenchRoles.Admin, authorization.VirtualWorkbenchRoles.ProgramOwner}
+    )
     pp, _ = dependencies.virtual_targets_domain_qry_srv.get_provisioned_product(
         project_id=project_id_value_object.from_str(project_id),
         provisioned_product_id=provisioned_product_id_value_object.from_str(provisioned_product_id),

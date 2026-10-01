@@ -186,19 +186,7 @@ class ProductProvisioningAggregate(aggregate.Aggregate):
                 f"Products of type {product_read_model.productType} are not supported."
             )
 
-        assignment = projects_qs.get_project_assignment(
-            project_id=command.project_id.value, user_id=command.user_id.value
-        )
-        if not assignment or not assignment.roles:
-            raise domain_exception.DomainException(
-                "User does not have a role in the project to allow product provisioning"
-            )
-        # Enforced here, not only in the listing: every launch path (portal, internal, S2S) passes
-        # through this check with the user's project roles.
-        if not stage_access.is_allowed(assignment.roles, command.stage.value):
-            raise domain_exception.DomainException(
-                f"User role does not allow launching products from the {command.stage.value} stage"
-            )
+        assignment = self.__get_launching_assignment(projects_qs, command)
 
         version_distribution = self.__get_version_distribution(
             versions_qs=versions_qs,
@@ -279,6 +267,8 @@ class ProductProvisioningAggregate(aggregate.Aggregate):
             lastUpdateDate=current_time,
             createdBy=command.user_id.value,
             lastUpdatedBy=command.user_id.value,
+            # The portal's authorizer knows the e-mail; S2S and internal launches use the assignment's.
+            ownerEmail=command.user_email or assignment.userEmail,
             additionalConfigurations=command.additional_configurations.value,
             experimental=experimental_provisioning_parameter_value,
             componentVersionDetails=version_distribution.componentVersionDetails,
@@ -2486,6 +2476,27 @@ class ProductProvisioningAggregate(aggregate.Aggregate):
             )
 
         return self._route_tables
+
+    def __get_launching_assignment(
+        self,
+        projects_qs: projects_query_service.ProjectsQueryService,
+        command: launch_product_command.LaunchProductCommand,
+    ):
+        """The launching user's project assignment, if their roles allow launching from the stage."""
+        assignment = projects_qs.get_project_assignment(
+            project_id=command.project_id.value, user_id=command.user_id.value
+        )
+        if not assignment or not assignment.roles:
+            raise domain_exception.DomainException(
+                "User does not have a role in the project to allow product provisioning"
+            )
+        # Enforced here, not only in the listing: every launch path (portal, internal, S2S) passes
+        # through this check with the user's project roles.
+        if not stage_access.is_allowed(assignment.roles, command.stage.value):
+            raise domain_exception.DomainException(
+                f"User role does not allow launching products from the {command.stage.value} stage"
+            )
+        return assignment
 
     def __raise_if_account_not_active(
         self,

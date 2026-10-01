@@ -433,6 +433,7 @@ class ProvisionedProduct(BaseModel):
         None, description="Provisioned Product type.", title="ProvisionedProductType"
     )
     userId: str = Field(..., description="User Id.", title="UserId")
+    ownerEmail: Optional[str] = Field(None, description="The owner's e-mail address.", title="OwnerEmail")
     status: str = Field(..., description="Status.", title="Status")
     statusReason: Optional[str] = Field(None, description="Status reason.", title="StatusReason")
     productId: str = Field(..., description="Product Id.", title="ProductId")

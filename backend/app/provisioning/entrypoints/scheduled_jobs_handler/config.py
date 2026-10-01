@@ -51,3 +51,7 @@ class AppConfig(config.VEWBaseConfig):
     def get_workbench_lifecycle_defaults(self) -> dict:
         """The deployment's workbench stop policy defaults (infra/config.py workbench-lifecycle); {} = built-in."""
         return json.loads(os.environ.get("WORKBENCH_LIFECYCLE_DEFAULTS") or "{}")
+
+    def get_workbench_idle_stop(self) -> dict:
+        """The deployment's idle stop rules (workbench-lifecycle idleStop), as JSON; empty = built-in defaults."""
+        return json.loads(os.environ.get("WORKBENCH_IDLE_STOP") or "{}")

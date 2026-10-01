@@ -7,6 +7,7 @@ import cdk_nag
 import constructs
 from aws_cdk import (
     aws_apigateway,
+    aws_cloudwatch,
     aws_dynamodb,
     aws_ec2,
     aws_events,
@@ -637,6 +638,9 @@ class ProvisioningAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                         ),
                         "WORKBENCH_LIFECYCLE_DEFAULTS": json.dumps(
                             app_config.component_specific["workbench-lifecycle"]
+                        ),
+                        "WORKBENCH_IDLE_STOP": json.dumps(
+                            app_config.component_specific["workbench-lifecycle"].get("idleStop", {})
                         ),
                     },
                     permissions=[
@@ -1295,6 +1299,7 @@ class ProvisioningAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
             .with_dynamodb_table(self._storage.table)
             .with_api_gateway(self._open_api.api)
             .with_api_gateway(self._s2s_open_api.api)
+            .with_alarms(getattr(self, "_idle_signal_alarms", []))
             .with_command_monitoring(
                 domain_module=domain,
                 critical_commands=[
@@ -1398,3 +1403,48 @@ class ProvisioningAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
             ],
             rule_name=app_config.format_resource_name("workbench-lifecycle-reconcile"),
         )
+
+        # The idle stop: the hub decides from the signals the workbench agents report and stops through
+        # VEW's stop path (docs/idle-stop.md). The rule runs even in dry run, so the counts show what
+        # would happen.
+        idle_stop = lifecycle.get("idleStop", {})
+        aws_events.Rule(
+            self,
+            "workbench-idle-stop-rule",
+            schedule=aws_events.Schedule.rate(aws_cdk.Duration.minutes(idle_stop.get("everyMinutes", 5))),
+            enabled=bool(idle_stop.get("enabled", False)),
+            targets=[
+                aws_events_targets.LambdaFunction(
+                    jobs_fn,
+                    event=aws_events.RuleTargetInput.from_object(
+                        {"jobName": "WorkbenchLifecycleJob", "parameters": {"action": "idle-stop", "dryRun": False}}
+                    ),
+                )
+            ],
+            rule_name=app_config.format_resource_name("workbench-idle-stop"),
+        )
+        # Missing data never stops a workbench - it raises this instead. Part of the stack's
+        # system-health composite alarm.
+        self._idle_signal_alarms = [
+            aws_cloudwatch.Alarm(
+                self,
+                "AlarmIdleSignalMissing",
+                alarm_name=app_config.format_resource_name("idle-signal-missing"),
+                alarm_description=(
+                    "Running workbenches report no idle signals: the agent or its SSM association is broken "
+                    "on them, so the idle stop cannot act (docs/idle-stop.md)."
+                ),
+                metric=aws_cloudwatch.Metric(
+                    namespace=constants.VEW_NAMESPACE,
+                    metric_name="IdleSignalMissing",
+                    dimensions_map={"service": VEW_SERVICE, "type": "IdleStop"},
+                    statistic="Maximum",
+                    period=aws_cdk.Duration.minutes(15),
+                ),
+                threshold=1,
+                evaluation_periods=2,
+                datapoints_to_alarm=2,
+                comparison_operator=aws_cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+                treat_missing_data=aws_cloudwatch.TreatMissingData.NOT_BREACHING,
+            )
+        ]

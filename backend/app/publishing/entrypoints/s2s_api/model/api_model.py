@@ -3,6 +3,9 @@ from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 ProductType = Literal["WORKBENCH", "VIRTUAL_TARGET", "CONTAINER"]
+# PROGRAM: the program's own product. PLATFORM: released once by the releasing program, distributed to
+# and listed in every program (docs/platform-products.md).
+ProductScope = Literal["PROGRAM", "PLATFORM"]
 ProductStatus = Literal["CREATING", "CREATED", "FAILED", "PAUSED", "ARCHIVING", "ARCHIVED"]
 ProductStage = Literal["DEV", "QA", "PROD"]
 
@@ -14,6 +17,7 @@ class CreateProductRequest(BaseModel):
     productType: ProductType
     productDescription: str = Field("", max_length=100)
     technologyId: str = Field(..., min_length=1)
+    scope: ProductScope = "PROGRAM"
 
 
 class UpdateProductRequest(BaseModel):
@@ -38,6 +42,7 @@ class Product(BaseModel):
     status: ProductStatus
     recommendedVersionId: Optional[str] = None
     availableStages: list[ProductStage] = Field(default_factory=list)
+    scope: ProductScope = "PROGRAM"
     createDate: str
     lastUpdateDate: str
 

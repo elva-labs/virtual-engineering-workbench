@@ -5,7 +5,7 @@ from app.publishing.domain.events import product_version_restoration_started
 from app.publishing.domain.exceptions import domain_exception
 from app.publishing.domain.model import portfolio, product, version
 from app.publishing.domain.ports import portfolios_query_service, template_service, versions_query_service
-from app.publishing.domain.query_services import template_domain_query_service
+from app.publishing.domain.query_services import distribution_portfolios, template_domain_query_service
 from app.shared.adapters.message_bus import message_bus
 from app.shared.adapters.unit_of_work_v2 import unit_of_work
 from app.shared.api import parameter_service
@@ -48,8 +48,8 @@ def handle(
     _handle_prev_version_distribution_errors(prev_vers_distributions)
 
     # Fetch dev portfolios & validate
-    dev_portfolios = portfolios_qry_srv.get_portfolios_by_tech_and_stage(
-        product_entity.technologyId, portfolio.PortfolioStage.DEV
+    dev_portfolios = distribution_portfolios.target_portfolios(
+        portfolios_qry_srv, product_entity, portfolio.PortfolioStage.DEV.value
     )
     if not dev_portfolios:
         raise domain_exception.DomainException("No portfolio found for stage 'DEV'. Account setup might be incomplete.")

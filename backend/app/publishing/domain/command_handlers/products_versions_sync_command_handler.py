@@ -59,6 +59,7 @@ def handle(
                         availableStages=stages,
                         availableRegions=sorted(regions),
                         lastUpdateDate=datetime.now(timezone.utc).isoformat(),
+                        scope=str(product_obj.scope),
                     )
                 )
             except Exception as e:

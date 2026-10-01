@@ -379,6 +379,13 @@ components:
     ProductType:
       type: string
       enum: [WORKBENCH, VIRTUAL_TARGET, CONTAINER]
+    ProductScope:
+      description: >-
+        PROGRAM - the program's own product. PLATFORM - built, tested and promoted once by the
+        releasing program, distributed to and listed in every program (docs/platform-products.md). Only the releasing
+        program creates PLATFORM products (409 RELEASING_PROJECT_ONLY otherwise).
+      type: string
+      enum: [PROGRAM, PLATFORM]
     ProductStatus:
       type: string
       enum: [CREATING, CREATED, FAILED, PAUSED, ARCHIVING, ARCHIVED]
@@ -397,6 +404,7 @@ components:
         productType: {$ref: '#/components/schemas/ProductType'}
         productDescription: {$ref: '#/components/schemas/ProductDescription'}
         technologyId: {type: string, minLength: 1}
+        scope: {$ref: '#/components/schemas/ProductScope'}
     UpdateProductRequest:
       type: object
       additionalProperties: false
@@ -425,6 +433,7 @@ components:
         availableStages:
           type: array
           items: {type: string, enum: [DEV, QA, PROD]}
+        scope: {$ref: '#/components/schemas/ProductScope'}
         createDate: {type: string}
         lastUpdateDate: {type: string}
     ProductPage:

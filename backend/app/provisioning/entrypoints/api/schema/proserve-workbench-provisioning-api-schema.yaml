@@ -1963,6 +1963,11 @@ components:
           items:
             type: string
           description: Operating System versions available for the product.
+        scope:
+          title: Scope
+          type: string
+          default: PROGRAM
+          description: PROGRAM for the program's own products, PLATFORM for products the platform releases to every program.
     GetAvailableProductsResponse:
       title: GetAvailableProductsResponse
       type: object

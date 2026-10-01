@@ -160,6 +160,8 @@ class PublishingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
             app_config=app_config,
             global_env_vars={
                 "POWERTOOLS_SERVICE_NAME": VEW_SERVICE,
+                # Platform products (docs/platform-products.md); empty switches them off.
+                "PLATFORM_PROGRAM_ID": app_config.component_specific.get("platform-program-id", ""),
             },
             app_entry_points=[
                 backend_app_entrypoints.AppEntryPoint(

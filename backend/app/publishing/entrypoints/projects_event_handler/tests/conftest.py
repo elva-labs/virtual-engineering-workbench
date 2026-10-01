@@ -101,7 +101,8 @@ def mock_dependencies(
     return bootstrapper.Dependencies(
         command_bus=in_memory_command_bus.InMemoryCommandBus(
             logger=mock_logger,
-        ).register_handler(
+        )
+        .register_handler(
             create_portfolio_command.CreatePortfolioCommand,
             mock_create_portfolio_command_handler,
         )

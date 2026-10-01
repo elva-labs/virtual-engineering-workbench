@@ -58,6 +58,8 @@ def test_packaging_resource_server_exposes_all_supported_scopes():
         "pipeline.execute",
         "base_image.read",
         "base_image.write",
+        "mandatory_components_list.read",
+        "mandatory_components_list.write",
     }
     assert "operation.read" not in scopes
 
@@ -86,6 +88,8 @@ def test_sample_s2s_client_is_granted_all_packaging_scopes():
         "pipeline.execute",
         "base_image.read",
         "base_image.write",
+        "mandatory_components_list.read",
+        "mandatory_components_list.write",
     ):
         assert scope in allowed_scopes
     assert "operation.read" not in allowed_scopes

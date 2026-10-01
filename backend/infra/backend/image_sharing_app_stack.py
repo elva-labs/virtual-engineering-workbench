@@ -5,6 +5,7 @@ from aws_cdk import aws_iam, aws_kms
 
 from infra import config, constants
 from infra.constructs.iam import role
+from infra.helpers.image_distribution import image_distribution
 
 
 class ImageSharingAppStack(aws_cdk.Stack):
@@ -80,6 +81,7 @@ class ImageSharingAppStack(aws_cdk.Stack):
             ],
             role_name=constants.PRODUCT_PUBLISHING_IMAGE_SERVICE_ROLE,
         )
+        self.__grant_store_image_tasks(app_config)
 
         # Role assumed by the packaging bounded context to clean up unused images
         self.__packaging_image_service_role = role.Role(
@@ -154,6 +156,53 @@ class ImageSharingAppStack(aws_cdk.Stack):
 
         # Apply cdk-nag suppressions
         self.__apply_nag_suppressions()
+
+    def __grant_store_image_tasks(self, app_config: config.AppConfig) -> None:
+        """ "store-restore" image distribution (env config "image-distribution"): the image service role
+        stores images into the target accounts' import buckets. It reads the snapshots and decrypts them
+        with the image key in this account (already granted above), so no key leaves the account."""
+        settings = image_distribution(app_config)
+        if settings["mode"] != "store-restore" or settings["storeWithFunctionRole"]:
+            return
+        target = self.__product_publishing_image_service_role.role
+        target.add_to_policy(
+            aws_iam.PolicyStatement(
+                actions=[
+                    "ec2:CreateStoreImageTask",
+                    "ec2:DescribeStoreImageTasks",
+                    "ec2:DescribeImages",
+                    "ec2:DescribeTags",
+                    "ebs:GetSnapshotBlock",
+                    "ebs:ListSnapshotBlocks",
+                ],
+                resources=["*"],
+            )
+        )
+        target.add_to_policy(
+            aws_iam.PolicyStatement(
+                actions=[
+                    "s3:PutObject",
+                    "s3:PutObjectTagging",
+                    "s3:AbortMultipartUpload",
+                    "s3:ListBucket",
+                    "s3:GetObject",
+                ],
+                resources=[
+                    f"arn:aws:s3:::{constants.PRODUCT_PUBLISHING_IMAGE_IMPORT_BUCKET_PREFIX}-*",
+                    f"arn:aws:s3:::{constants.PRODUCT_PUBLISHING_IMAGE_IMPORT_BUCKET_PREFIX}-*/*",
+                ],
+            )
+        )
+        cdk_nag.NagSuppressions.add_resource_suppressions(
+            target,
+            [
+                cdk_nag.NagPackSuppression(
+                    id="AwsSolutions-IAM5",
+                    reason="Store image tasks and EBS direct reads take no resource ARNs; import buckets are per target account.",
+                )
+            ],
+            apply_to_children=True,
+        )
 
     @property
     def product_publishing_image_service_role(self) -> role.Role:

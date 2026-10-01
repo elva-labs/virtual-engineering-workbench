@@ -81,7 +81,7 @@ def _response_body(entity: mandatory_components_list.MandatoryComponentsList) ->
     )
 
 
-def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:
+def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa: C901
     router = api_gateway.Router()
 
     def get_list(key: tuple[str, str, str]) -> mandatory_components_list.MandatoryComponentsList | None:

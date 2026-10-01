@@ -16,7 +16,10 @@ def handle(
             for vers in versions_in_repo:
                 uow.get_repository(version.VersionPrimaryKey, version.Version).remove(
                     version.VersionPrimaryKey(
-                        productId=vers.productId, versionId=vers.versionId, awsAccountId=vers.awsAccountId
+                        productId=vers.productId,
+                        versionId=vers.versionId,
+                        awsAccountId=vers.awsAccountId,
+                        stage=vers.stage,
                     )
                 )
 
@@ -31,8 +34,8 @@ def handle(
             uow.commit()
     else:
         versions_in_repo = versions_qry_srv.get_product_version_distributions(product_obj.productId)
-        versions_keys_in_repo = {f"{vers.versionId}#{vers.awsAccountId}" for vers in versions_in_repo}
-        versions_keys_in_event = {f"{vers.versionId}#{vers.awsAccountId}" for vers in version_objs}
+        versions_keys_in_repo = {f"{vers.versionId}#{vers.awsAccountId}#{vers.stage}" for vers in versions_in_repo}
+        versions_keys_in_event = {f"{vers.versionId}#{vers.awsAccountId}#{vers.stage}" for vers in version_objs}
 
         versions_keys_in_both = versions_keys_in_repo.intersection(versions_keys_in_event)
         versions_keys_only_in_repo = versions_keys_in_repo.difference(versions_keys_in_event)
@@ -57,7 +60,7 @@ def handle(
             for vers_key in versions_keys_in_both:
                 version_entity_from_event = next(
                     filter(
-                        lambda vers: f"{vers.versionId}#{vers.awsAccountId}" == vers_key,
+                        lambda vers: f"{vers.versionId}#{vers.awsAccountId}#{vers.stage}" == vers_key,
                         version_objs,
                     ),
                     None,
@@ -68,15 +71,19 @@ def handle(
                         productId=product_obj.productId,
                         versionId=version_entity_from_event.versionId,
                         awsAccountId=version_entity_from_event.awsAccountId,
+                        stage=version_entity_from_event.stage,
                     ),
                     **version_entity_from_event.model_dump(),
                 )
             # Remove versions in repo if not present in the event
             for vers_key in versions_keys_only_in_repo:
-                version_id, aws_account_id = vers_key.split("#")
+                version_id, aws_account_id, stage = vers_key.split("#")
                 uow.get_repository(version.VersionPrimaryKey, version.Version).remove(
                     version.VersionPrimaryKey(
-                        productId=product_obj.productId, versionId=version_id, awsAccountId=aws_account_id
+                        productId=product_obj.productId,
+                        versionId=version_id,
+                        awsAccountId=aws_account_id,
+                        stage=stage,
                     )
                 )
 
@@ -84,7 +91,7 @@ def handle(
             for vers_key in versions_keys_only_in_event:
                 version_entity = next(
                     filter(
-                        lambda vers: f"{vers.versionId}#{vers.awsAccountId}" == vers_key,
+                        lambda vers: f"{vers.versionId}#{vers.awsAccountId}#{vers.stage}" == vers_key,
                         version_objs,
                     ),
                     None,

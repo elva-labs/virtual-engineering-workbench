@@ -33,6 +33,7 @@ class AmiSharingStateMachine(constructs.Construct):
                 "productId": "prod-dt3ycosm",
                 "versionId": "vers-1vbc9box",
                 "awsAccountId": "105249321508",
+                "stage": "DEV",  # ADR 0013: a distribution is per account and stage
                 "oldVersionId": "vers-12345abc"  # Only in ProductVersionRestorationStarted
                 "productType": "VIRTUAL_TARGET"
             }
@@ -107,6 +108,7 @@ class AmiSharingStateMachine(constructs.Construct):
                     "productId.$": "$.productId",
                     "versionId.$": "$.versionId",
                     "awsAccountId.$": "$.awsAccountId",
+                    "stage.$": "$.stage",
                 }
             ),
             result_selector={"eventType.$": "$.Payload.eventType"},
@@ -124,6 +126,7 @@ class AmiSharingStateMachine(constructs.Construct):
                     "productId.$": "$.productId",
                     "versionId.$": "$.versionId",
                     "awsAccountId.$": "$.awsAccountId",
+                    "stage.$": "$.stage",
                     "productType.$": "$.productType",
                 }
             ),
@@ -216,6 +219,7 @@ class AmiSharingStateMachine(constructs.Construct):
                     "productId.$": "$.productId",
                     "versionId.$": "$.versionId",
                     "awsAccountId.$": "$.awsAccountId",
+                    "stage.$": "$.stage",
                     "copiedAmiId.$": "$.copiedAmi.copiedAmiId",
                     "previousEventName.$": "$.eventName",
                     "oldVersionId.$": "$.PassOldVersionIdResponse.oldVersionId",

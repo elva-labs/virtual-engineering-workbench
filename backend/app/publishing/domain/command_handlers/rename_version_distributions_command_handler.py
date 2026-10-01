@@ -21,6 +21,7 @@ def handle(
                     productId=command.productId.value,
                     versionId=command.versionId.value,
                     awsAccountId=command.awsAccountId.value,
+                    stage=command.stage.value,
                 )
             )
 
@@ -36,6 +37,7 @@ def handle(
                     productId=command.productId.value,
                     versionId=command.versionId.value,
                     awsAccountId=command.awsAccountId.value,
+                    stage=command.stage.value,
                 ),
                 lastUpdateDate=datetime.now(timezone.utc).isoformat(),
                 status=version.VersionStatus.Failed if result == "FAILED" else version.VersionStatus.Created,
@@ -50,6 +52,7 @@ def handle(
                     productId=command.productId.value,
                     versionId=command.versionId.value,
                     awsAccountId=command.awsAccountId.value,
+                    stage=command.stage.value,
                 ),
                 lastUpdateDate=datetime.now(timezone.utc).isoformat(),
                 status=version.VersionStatus.Failed,

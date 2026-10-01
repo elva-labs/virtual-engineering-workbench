@@ -226,6 +226,7 @@ class ProjectsBCContextEnricher(authorizer.AuthorizerStep):
                 else []
             )
             settings = self.__assignments_query_service.get_project_settings(project_id=project_id)
+            context.remote_support_enabled = settings.remoteSupportEnabled
             context.project_managed_by = settings.managedBy
             context.project_managed_source = settings.managedSource
         elif self.__is_platform_admin(context):
@@ -270,6 +271,11 @@ class ProjectsBCContextEnricher(authorizer.AuthorizerStep):
 # Synthetic project id of a platform admin's assignment when no project is in the path; it matches
 # no real project (ids are proj-xxxxx), so it only feeds totalAdminAssignments.
 PLATFORM_ADMIN_PROJECT_ID = "platform-admin"
+
+
+# Project entity attributes for remote support; names match the Cedar schema (infra/auth/shared_auth_schema.py).
+SUPPORTERS_ATTRIBUTE = "supporters"
+REMOTE_SUPPORT_ENABLED_ATTRIBUTE = "remoteSupportEnabled"
 
 
 class AVPEntityType(enum.StrEnum):
@@ -326,8 +332,13 @@ class VEWProjectAssignmentEntityResolver(AVPEntityResolver):
                 entity_id=project_id,
                 entity_type=AVPEntityType.PROJECT,
             )
-            avp_entities.entities.append(self.__generate_project_entity(project_id=project_id))
+            avp_entities.entities.append(
+                self.__generate_project_entity(
+                    project_id=project_id, remote_support_enabled=context.remote_support_enabled
+                )
+            )
             avp_entities.entities.extend(self.__generate_project_assignment_inheritace_scheme(project_id=project_id))
+            avp_entities.entities.append(self.__generate_support_assignment_entity(project_id=project_id))
             avp_entities.entities.extend(
                 self.__generate_project_assignment_group_based_inheritace_scheme(project_id=project_id)
             )
@@ -379,7 +390,7 @@ class VEWProjectAssignmentEntityResolver(AVPEntityResolver):
 
         user_entity.attributes["totalAdminAssignments"] = {"long": total_admin_assignments}
 
-    def __generate_project_entity(self, project_id: str) -> dict:
+    def __generate_project_entity(self, project_id: str, remote_support_enabled: bool = True) -> dict:
 
         role_based_attributes = {
             groupName: {"entityIdentifier": identifier}
@@ -391,7 +402,12 @@ class VEWProjectAssignmentEntityResolver(AVPEntityResolver):
             for groupName, identifier in self.__generate_group_based_assignment_entity_set(project_id=project_id)
         }
 
-        combined_attributes = {**role_based_attributes, **group_based_attributed}
+        support_attributes = {
+            SUPPORTERS_ATTRIBUTE: {"entityIdentifier": self.__generate_support_assignment_id(project_id)},
+            REMOTE_SUPPORT_ENABLED_ATTRIBUTE: {"boolean": remote_support_enabled},
+        }
+
+        combined_attributes = {**role_based_attributes, **group_based_attributed, **support_attributes}
 
         return AVPEntity(
             identifier=AVPEntityIdentifier(
@@ -404,13 +420,25 @@ class VEWProjectAssignmentEntityResolver(AVPEntityResolver):
     def __generate_project_assignment_inheritace_scheme(self, project_id: str):
         assignmentIds = self.__generate_assignment_entity_set(project_id=project_id)
 
-        return [
+        entities = [
             AVPEntity(
                 identifier=assignmentId,
                 parents=([assignmentIds[idx + 1][1]] if idx + 1 < len(assignmentIds) else []),
             )
             for idx, (_, assignmentId) in enumerate(assignmentIds)
         ]
+        # ADMIN includes SUPPORT; SUPPORT itself is outside the user chain (no user rights of its own).
+        entities[0].parents.append(self.__generate_support_assignment_id(project_id))
+        return entities
+
+    def __generate_support_assignment_id(self, project_id: str) -> AVPEntityIdentifier:
+        return AVPEntityIdentifier(
+            entityType=AVPEntityType.PROJECT_ASSIGNMENT,
+            entityId=self.__generate_assignment_id(project_id, project_assignment.Role.SUPPORT.value),
+        )
+
+    def __generate_support_assignment_entity(self, project_id: str) -> AVPEntity:
+        return AVPEntity(identifier=self.__generate_support_assignment_id(project_id), parents=[])
 
     def __generate_project_assignment_group_based_inheritace_scheme(self, project_id: str):
         assignmentIds = self.__generate_group_based_assignment_entity_set(project_id=project_id)

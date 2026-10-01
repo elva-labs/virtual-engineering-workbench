@@ -32,6 +32,11 @@ class Project(BaseModel):
         description="Point in time where project is last updated.",
         title="LastUpdateDate",
     )
+    remoteSupportEnabled: Optional[bool] = Field(
+        None,
+        description="Whether remote support by SUPPORT staff is allowed on the project's workbenches.",
+        title="RemoteSupportEnabled",
+    )
     workbenchLifecycle: Optional[Dict[str, Any]] = Field(
         None,
         description="The project's workbench stop policy and what its users may change; null = the deployment's defaults.",
@@ -217,21 +222,15 @@ class GetProjectAssignmentsResponseItemADGroup(BaseModel):
 
 class GetProjectAssignmentsResponseItem(BaseModel):
     userId: Optional[str] = Field(None, description="User TID", title="UserId")
-    roles: Optional[List[str]] = Field(
-        None, description="User roles in the project", title="Roles"
-    )
-    userEmail: Optional[str] = Field(
-        None, description="Email address of the user", title="UserEmail"
-    )
+    roles: Optional[List[str]] = Field(None, description="User roles in the project", title="Roles")
+    userEmail: Optional[str] = Field(None, description="Email address of the user", title="UserEmail")
     userDisplayName: Optional[str] = Field(
         None, description="Display name supplied with the direct assignment", title="UserDisplayName"
     )
-    activeDirectoryGroups: Optional[List[GetProjectAssignmentsResponseItemADGroup]] = (
-        Field(
-            None,
-            description="Active directory groups that the user is member of",
-            title="ActiveDirectoryGroups",
-        )
+    activeDirectoryGroups: Optional[List[GetProjectAssignmentsResponseItemADGroup]] = Field(
+        None,
+        description="Active directory groups that the user is member of",
+        title="ActiveDirectoryGroups",
     )
     activeDirectoryGroupStatus: Optional[str] = Field(
         None,
@@ -262,9 +261,7 @@ class GetProjectGroupsResponse(BaseModel):
 
 class GetProjectAssignmentResponseItem(BaseModel):
     userId: str = Field(..., description="User TID", title="UserId")
-    roles: List[str] = Field(
-        ..., description="User roles in the project", title="Roles"
-    )
+    roles: List[str] = Field(..., description="User roles in the project", title="Roles")
     # For server-side callers (e.g. launch); group-only users get them from the identity provider.
     userEmail: Optional[str] = Field(None, description="Email address of the user", title="UserEmail")
     userDisplayName: Optional[str] = Field(None, description="Display name of the user", title="UserDisplayName")
@@ -347,6 +344,11 @@ class UpdateProjectRequest(BaseModel):
     name: str = Field(..., description="Name of the project", title="Name")
     description: Optional[str] = Field(None, description="Description of the project", title="Description")
     isActive: bool = Field(..., description="Project active flag", title="IsActive")
+    remoteSupportEnabled: Optional[bool] = Field(
+        None,
+        description="Allow remote support by SUPPORT staff on the project's workbenches; omitted keeps the current value",
+        title="RemoteSupportEnabled",
+    )
 
 
 class UpdateProjectResponse(BaseModel):

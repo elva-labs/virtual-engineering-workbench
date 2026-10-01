@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from app.projects.domain.commands.projects import create_project_command
-from app.projects.domain.events.projects import project_created
+from app.projects.domain.events.projects import project_created, project_updated
 from app.projects.domain.model import project
 from app.shared.adapters.message_bus import message_bus
 from app.shared.adapters.unit_of_work_v2 import unit_of_work
@@ -17,6 +17,7 @@ def handle_create_project_command(
         projectName=cmd.name,
         projectDescription=cmd.description,
         isActive=cmd.isActive,
+        remoteSupportEnabled=cmd.remoteSupportEnabled,
         createDate=current_time,
         lastUpdateDate=current_time,
     )
@@ -33,5 +34,9 @@ def handle_create_project_command(
             isActive=proj.isActive,
         )
     )
+    # The Authorization BC follows ProjectUpdated only and assumes remote support is enabled for a project
+    # it has not heard of: a project created without it says so.
+    if not proj.remoteSupportEnabled:
+        msg_bus.publish(project_updated.from_project(proj))
 
     return proj.projectId

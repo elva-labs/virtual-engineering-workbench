@@ -14,6 +14,8 @@ class Role(StrEnum):
     POWER_USER = "POWER_USER"
     PROGRAM_OWNER = "PROGRAM_OWNER"
     PRODUCT_CONTRIBUTOR = "PRODUCT_CONTRIBUTOR"
+    # Remote support staff: support sessions on the project's workbenches, if the project allows it.
+    SUPPORT = "SUPPORT"
 
 
 class Group(enum.StrEnum):

@@ -33,16 +33,17 @@ class ProjectLifecycleService:
         name: str,
         description: str | None,
         is_active: bool,
+        remote_support_enabled: bool | None = None,
     ) -> str:
         parsed_key = UUID(key)
         if parsed_key.variant != RFC_4122:
             raise ValueError("Idempotency key must be an RFC 4122 UUID")
         key = str(parsed_key)
-        body = json.dumps(
-            {"name": name, "description": description, "isActive": is_active},
-            sort_keys=True,
-            separators=(",", ":"),
-        )
+        fields = {"name": name, "description": description, "isActive": is_active}
+        if remote_support_enabled is not None:
+            # Only when given, so requests from before the setting existed keep their hash.
+            fields["remoteSupportEnabled"] = remote_support_enabled
+        body = json.dumps(fields, sort_keys=True, separators=(",", ":"))
         digest = hashlib.sha256(body.encode()).hexdigest()
         request_pk = project_create_request.ProjectCreateRequestPrimaryKey(clientId=client_id, idempotencyKey=key)
         with self._uow:
@@ -52,19 +53,7 @@ class ProjectLifecycleService:
             )
             existing = create_requests.get(request_pk)
             if existing:
-                if existing.requestHash != digest:
-                    raise ValueError("Idempotency key used for a different request")
-                project_id = existing.projectId
-                existing_project = self._uow.get_repository(project.ProjectPrimaryKey, project.Project).get(
-                    project.ProjectPrimaryKey(projectId=project_id)
-                )
-                if existing_project is None:
-                    raise RuntimeError("Reserved project is missing")
-                assignment = self._query.get_service_client_assignment(project_id, client_id)
-                if assignment is None:
-                    self._ensure_creator(client_id, project_id, None)
-                    self._uow.commit()
-                return project_id
+                return self._replay(existing, digest, client_id)
             project_id = project.generate_project_id()
             projects = self._uow.get_repository(project.ProjectPrimaryKey, project.Project)
             if projects.get(project.ProjectPrimaryKey(projectId=project_id)) is not None:
@@ -76,6 +65,8 @@ class ProjectLifecycleService:
                     projectName=name,
                     projectDescription=description,
                     isActive=is_active,
+                    # Remote support is on unless the caller turns it off.
+                    remoteSupportEnabled=True if remote_support_enabled is None else remote_support_enabled,
                     createDate=now,
                     lastUpdateDate=now,
                 )
@@ -90,6 +81,26 @@ class ProjectLifecycleService:
                 )
             )
             self._uow.commit()
+        self._publish_created(project_id, name, description, is_active, remote_support_enabled)
+        return project_id
+
+    def _replay(self, existing, digest: str, client_id: str) -> str:
+        """A retried create: the same request returns the reserved project; another one is refused."""
+        if existing.requestHash != digest:
+            raise ValueError("Idempotency key used for a different request")
+        project_id = existing.projectId
+        existing_project = self._uow.get_repository(project.ProjectPrimaryKey, project.Project).get(
+            project.ProjectPrimaryKey(projectId=project_id)
+        )
+        if existing_project is None:
+            raise RuntimeError("Reserved project is missing")
+        assignment = self._query.get_service_client_assignment(project_id, client_id)
+        if assignment is None:
+            self._ensure_creator(client_id, project_id, None)
+            self._uow.commit()
+        return project_id
+
+    def _publish_created(self, project_id, name, description, is_active, remote_support_enabled):
         self._events.publish(
             ProjectCreated(
                 projectId=project_id,
@@ -98,7 +109,11 @@ class ProjectLifecycleService:
                 isActive=is_active,
             )
         )
-        return project_id
+        if remote_support_enabled is False:
+            # The Authorization BC assumes remote support is on until told otherwise (ProjectUpdated).
+            created = self._query.get_project_by_id(project_id)
+            if created is not None:
+                self._events.publish(project_updated.from_project(created))
 
     def _ensure_creator(self, client_id, project_id, current):
         repo = self._uow.get_repository(
@@ -125,22 +140,33 @@ class ProjectLifecycleService:
                 current,
             )
 
-    def update(self, project_id: str, name: str, description: str | None, is_active: bool):
+    def update(
+        self,
+        project_id: str,
+        name: str,
+        description: str | None,
+        is_active: bool,
+        remote_support_enabled: bool | None = None,
+    ):
         with self._uow:
             repo = self._uow.get_repository(project.ProjectPrimaryKey, project.Project)
             pk = project.ProjectPrimaryKey(projectId=project_id)
             current = repo.get(pk)
             if current is None:
                 raise KeyError(project_id)
-            if (current.projectName, current.projectDescription, current.isActive) == (
+            # Omitted, the remote-support setting keeps its value.
+            remote_support = current.remoteSupportEnabled if remote_support_enabled is None else remote_support_enabled
+            if (current.projectName, current.projectDescription, current.isActive, current.remoteSupportEnabled) == (
                 name,
                 description,
                 is_active,
+                remote_support,
             ):
                 return current
             current.projectName = name
             current.projectDescription = description
             current.isActive = is_active
+            current.remoteSupportEnabled = remote_support
             current.lastUpdateDate = datetime.now(timezone.utc).isoformat()
             repo.update_entity(pk, current)
             self._uow.commit()

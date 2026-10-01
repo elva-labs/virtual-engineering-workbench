@@ -1734,6 +1734,9 @@ components:
           title: LastUpdateDate
           type: string
           description: Point in time where project is last updated.
+        remoteSupportEnabled:
+          type: boolean
+          description: Whether SUPPORT staff may support the project's workbenches.
         managedBy:
           title: ManagedBy
           type: string
@@ -2043,6 +2046,10 @@ components:
           nullable: true
         isActive:
           type: boolean
+        remoteSupportEnabled:
+          type: boolean
+          nullable: true
+          description: Omitted keeps the current value; a new project has remote support on.
     CreateProjectResponse:
       type: object
       required: [projectId]

@@ -9,7 +9,9 @@ from app.publishing.domain.commands import (
     copy_ami_command,
     create_license_grant_command,
     fail_ami_sharing_command,
+    restore_ami_command,
     share_ami_command,
+    store_ami_command,
     succeed_ami_sharing_command,
 )
 from app.publishing.domain.ports import license_manager_service
@@ -69,6 +71,16 @@ def mock_share_ami_command_handler():
 
 
 @pytest.fixture
+def mock_store_ami_command_handler():
+    return mock.Mock(return_value="ami-54321.bin")
+
+
+@pytest.fixture
+def mock_restore_ami_command_handler():
+    return mock.Mock(return_value="ami-target1")
+
+
+@pytest.fixture
 def mock_succeed_ami_sharing_command_handler():
     return mock.Mock()
 
@@ -105,6 +117,8 @@ def shared_amis_domain_qry_svc():
         copied_ami_id="ami-54321",
     )
     qry_svc.verify_copy.return_value = True
+    qry_svc.verify_store.return_value = True
+    qry_svc.verify_distribution.return_value = True
     return qry_svc
 
 
@@ -118,6 +132,8 @@ def mock_dependencies(
     mock_create_license_grant_command_handler,
     mock_accept_license_grant_command_handler,
     mock_license_manager_svc,
+    mock_store_ami_command_handler,
+    mock_restore_ami_command_handler,
     shared_amis_domain_qry_svc,
 ):
     return bootstrapper.Dependencies(
@@ -126,6 +142,8 @@ def mock_dependencies(
         )
         .register_handler(copy_ami_command.CopyAmiCommand, mock_copy_ami_command_handler)
         .register_handler(share_ami_command.ShareAmiCommand, mock_share_ami_command_handler)
+        .register_handler(store_ami_command.StoreAmiCommand, mock_store_ami_command_handler)
+        .register_handler(restore_ami_command.RestoreAmiCommand, mock_restore_ami_command_handler)
         .register_handler(
             succeed_ami_sharing_command.SucceedAmiSharingCommand, mock_succeed_ami_sharing_command_handler
         )

@@ -25,6 +25,18 @@ def lambda_context():
 
 
 @pytest.fixture(autouse=True)
+def no_table_migrations(request, monkeypatch):
+    """Test-only: the handler module bootstraps on first import, inside whichever test imports it, where no
+    publishing table exists. The bootstrapper's migration call itself is covered by test_bootstrapper.py
+    (marked "migrations"), which keeps the real behaviour."""
+    if request.node.get_closest_marker("migrations"):
+        return
+    from app.shared.adapters.unit_of_work_v2 import dynamodb_migrations
+
+    monkeypatch.setattr(dynamodb_migrations.DynamoDBMigrator, "migrate", lambda self: None)
+
+
+@pytest.fixture(autouse=True)
 def aws_credentials(monkeypatch):
     """Mocked AWS Credentials for moto."""
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "testing")

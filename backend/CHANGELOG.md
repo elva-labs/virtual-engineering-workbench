@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The publishing API fails fast again when the table migrations fail at bootstrap (#26 had made it log and continue, which could leave a deployment reading versions under the old keys). The unit tests stub the migrator explicitly instead (`no_table_migrations` in the API tests' conftest; the `migrations` marker keeps the real call), and a projects test no longer leaks `TABLE_NAME` into other modules.
 - Publishing keys portfolios (`AWS_ACCOUNT#<account>#STAGE#<stage>`) and product versions (`VERSION#<version>#AWS_ACCOUNT#<account>#STAGE#<stage>`) per account and stage, and carries the stage through version events, the AMI-sharing state machine, retries and the internal version API; provisioning's version read model follows. Migrations 001/002 (publishing) and 002 (provisioning) move existing records on first start.
 - Portal project updates publish the project's full state in `ProjectUpdated`, so they no longer reset the management mode the Authorization BC keeps.
 - The workbench status sync runs every 5 minutes (`sync-job-cron-minute`, default `2/5`) instead of hourly, and the portal polls every 5 seconds while a workbench changes.

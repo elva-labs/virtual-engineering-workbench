@@ -7,10 +7,7 @@ from freezegun import freeze_time
 
 from app.publishing.domain.command_handlers import promote_version_command_handler
 from app.publishing.domain.commands import promote_version_command
-from app.publishing.domain.events import (
-    product_version_name_updated,
-    product_version_promotion_started,
-)
+from app.publishing.domain.events import product_version_name_updated, product_version_promotion_started
 from app.publishing.domain.exceptions import domain_exception
 from app.publishing.domain.model import portfolio, product, version
 from app.publishing.domain.ports import portfolios_query_service, versions_query_service
@@ -235,6 +232,7 @@ def test_handle_should_promote_version_to_qa(
             product_id=TEST_PRODUCT_ID,
             version_id=TEST_VERSION_ID,
             aws_account_id=TEST_AWS_ACCOUNT_ID_2,
+            stage="QA",
             product_type=product_type,
         )
     )
@@ -300,6 +298,7 @@ def test_handle_should_promote_version_to_prod(
             productId=TEST_PRODUCT_ID,
             versionId="vers-11111111",
             awsAccountId="001234567890",
+            stage="QA",
         ),
         versionName="1.0.0",
         versionType=version.VersionType.Released.text,
@@ -314,6 +313,7 @@ def test_handle_should_promote_version_to_prod(
             version_id=TEST_VERSION_ID,
             version_name="1.0.0",
             aws_account_id=TEST_AWS_ACCOUNT_ID_2,
+            stage="DEV",
             integrations=TEST_INTEGRATIONS,
             has_integrations=True,
         )
@@ -325,6 +325,7 @@ def test_handle_should_promote_version_to_prod(
             product_id=TEST_PRODUCT_ID,
             version_id=TEST_VERSION_ID,
             aws_account_id=TEST_AWS_ACCOUNT_ID_2,
+            stage="PROD",
             product_type=product_type,
         )
     )

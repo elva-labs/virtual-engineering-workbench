@@ -117,6 +117,7 @@ def test_retry_version_updates_versions_and_publishes_events(
                     productId="prod-12345abc",
                     versionId="vers-12345abc",
                     awsAccountId="123456789012",
+                    stage="DEV",
                 ),
                 lastUpdateDate="2023-07-24T00:00:00+00:00",
                 lastUpdatedBy="T000002",
@@ -128,6 +129,7 @@ def test_retry_version_updates_versions_and_publishes_events(
                     productId="prod-12345abc",
                     versionId="vers-12345abc",
                     awsAccountId="123456789013",
+                    stage="DEV",
                 ),
                 lastUpdateDate="2023-07-24T00:00:00+00:00",
                 lastUpdatedBy="T000002",
@@ -145,6 +147,7 @@ def test_retry_version_updates_versions_and_publishes_events(
                     product_id="prod-12345abc",
                     version_id="vers-12345abc",
                     aws_account_id="123456789012",
+                    stage="DEV",
                     product_type="WORKBENCH",
                 )
             ),
@@ -153,6 +156,7 @@ def test_retry_version_updates_versions_and_publishes_events(
                     product_id="prod-12345abc",
                     version_id="vers-12345abc",
                     aws_account_id="123456789013",
+                    stage="DEV",
                     product_type="WORKBENCH",
                 )
             ),

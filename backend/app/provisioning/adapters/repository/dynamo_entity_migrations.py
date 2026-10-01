@@ -1,5 +1,6 @@
 import typing
 
+from boto3.dynamodb.conditions import Attr
 from mypy_boto3_dynamodb import service_resource, type_defs
 
 from app.provisioning.adapters.repository import dynamo_entity_config
@@ -68,4 +69,31 @@ def migrations_config(provisioned_products_qs: provisioned_products_query_servic
             "001.ProvisionedProduct_set_QPK_4_and_SequenceNo",
             provisioned_product_new_attributes_qpk_4_and_sequence_no,
         ),
+        (
+            "002.Version_Stage_In_Sort_Key",
+            version_read_model_stage_in_sort_key,
+        ),
     ]
+
+
+def version_read_model_stage_in_sort_key(table: service_resource.Table):
+    """002.Version_Stage_In_Sort_Key
+
+    Moves the version read model from SK VERSION#<version>#AWS_ACCOUNT#<account> to
+    VERSION#<version>#AWS_ACCOUNT#<account>#STAGE#<stage>, as publishing keys versions.
+    """
+
+    scan_kwargs: dict = {
+        "FilterExpression": Attr("PK").begins_with(f"{dynamo_entity_config.DBPrefix.PRODUCT}#")
+        & Attr("SK").begins_with(f"{dynamo_entity_config.DBPrefix.VERSION}#")
+    }
+    while True:
+        page = table.scan(**scan_kwargs)
+        for item in page.get("Items", []):
+            new_sort_key = dynamo_entity_config.version_sort_key(item["versionId"], item["awsAccountId"], item["stage"])
+            if item["SK"] != new_sort_key:
+                table.put_item(Item={**item, "SK": new_sort_key})
+                table.delete_item(Key={"PK": item["PK"], "SK": item["SK"]})
+        if "LastEvaluatedKey" not in page:
+            return
+        scan_kwargs["ExclusiveStartKey"] = page["LastEvaluatedKey"]

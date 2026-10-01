@@ -117,7 +117,9 @@ def test_create_portfolio_command_handler_should_create_portfolio_when_does_not_
     assertpy.assert_that(mock_unit_of_work.commit.call_count).is_equal_to(3)
     mock_portfolio_repo.update_attributes.assert_called_with(
         pk=portfolio.PortfolioPrimaryKey(
-            technologyId=command_mock.technologyId.value, awsAccountId=command_mock.awsAccountId.value
+            technologyId=command_mock.technologyId.value,
+            awsAccountId=command_mock.awsAccountId.value,
+            stage=command_mock.stage.value,
         ),
         status=portfolio.PortfolioStatus.Created,
         lastUpdateDate=mock_portfolio_repo.update_attributes.call_args.kwargs["lastUpdateDate"],
@@ -157,7 +159,9 @@ def test_create_portfolio_command_handler_should_not_create_portfolio_if_exists(
     mock_unit_of_work.commit.assert_called_once()
     mock_portfolio_repo.update_attributes.assert_called_once_with(
         pk=portfolio.PortfolioPrimaryKey(
-            technologyId=command_mock.technologyId.value, awsAccountId=command_mock.awsAccountId.value
+            technologyId=command_mock.technologyId.value,
+            awsAccountId=command_mock.awsAccountId.value,
+            stage=command_mock.stage.value,
         ),
         status=portfolio.PortfolioStatus.Created,
         lastUpdateDate=mock_portfolio_repo.update_attributes.call_args.kwargs["lastUpdateDate"],
@@ -204,7 +208,9 @@ def test_create_portfolio_command_handler_should_create_portfolio_if_exists_in_r
     assertpy.assert_that(mock_unit_of_work.commit.call_count).is_equal_to(2)
     mock_portfolio_repo.update_attributes.assert_called_with(
         pk=portfolio.PortfolioPrimaryKey(
-            technologyId=command_mock.technologyId.value, awsAccountId=command_mock.awsAccountId.value
+            technologyId=command_mock.technologyId.value,
+            awsAccountId=command_mock.awsAccountId.value,
+            stage=command_mock.stage.value,
         ),
         status=portfolio.PortfolioStatus.Created,
         lastUpdateDate=mock_portfolio_repo.update_attributes.call_args.kwargs["lastUpdateDate"],
@@ -323,4 +329,35 @@ def test_create_portfolio_should_clean_non_required_roles(
         sc_portfolio_id=mocked_portfolio.scPortfolioId,
         aws_account_id=command_mock.awsAccountId.value,
         role_name="RandomRole",
+    )
+
+
+def test_create_portfolio_command_handler_creates_one_portfolio_per_stage_of_an_account(
+    command_mock, catalog_service_mock, catalog_query_service_mock, logger_mock, mock_unit_of_work, mock_portfolio_repo
+):
+    # ARRANGE: the account already has its DEV portfolio; PROD gets its own (ADR 0013)
+    command_mock.stage = stage_value_object.from_str("prod")
+    mock_portfolio_repo.get.return_value = None
+    catalog_query_service_mock.does_portfolio_exist_in_sc.return_value = False
+
+    # ACT
+    create_portfolio_command_handler.handle(
+        cmd=command_mock,
+        uow=mock_unit_of_work,
+        catalog_qry_srv=catalog_query_service_mock,
+        catalog_srv=catalog_service_mock,
+        logger=logger_mock,
+        main_account_roles=MAIN_ACCOUNT_ROLES,
+        spoke_account_roles=SPOKE_ACCOUNT_ROLES,
+    )
+
+    # ASSERT
+    mock_portfolio_repo.get.assert_called_once_with(
+        pk=portfolio.PortfolioPrimaryKey(technologyId="tech-12345", awsAccountId="123456789012", stage="PROD")
+    )
+    added = mock_portfolio_repo.add.call_args.args[0]
+    assertpy.assert_that(added.stage).is_equal_to(portfolio.PortfolioStage.PROD)
+    assertpy.assert_that(added.scPortfolioName).is_equal_to("portfolio-tech-12345-123456789012-prod")
+    assertpy.assert_that(catalog_service_mock.create_portfolio.call_args.kwargs["portfolio_name"]).is_equal_to(
+        "portfolio-tech-12345-123456789012-prod"
     )

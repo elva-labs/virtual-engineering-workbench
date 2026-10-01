@@ -8,6 +8,7 @@ class DecideActionRequest(BaseModel):
     product_id: str = Field(..., alias="productId")
     version_id: str = Field(..., alias="versionId")
     aws_account_id: str = Field(..., alias="awsAccountId")
+    stage: str = Field(..., alias="stage")
     product_type: str = Field(..., alias="productType")
 
 
@@ -111,6 +112,7 @@ class SucceedAmiSharingRequest(BaseModel):
     product_id: str = Field(..., alias="productId")
     version_id: str = Field(..., alias="versionId")
     aws_account_id: str = Field(..., alias="awsAccountId")
+    stage: str = Field(..., alias="stage")
     copied_ami_id: Optional[str] = Field(
         ..., alias="copiedAmiId"
     )  # Required but nullable: callers must explicitly pass this field, even if the value is None
@@ -132,6 +134,7 @@ class FailAmiSharingRequest(BaseModel):
     # either from a task catch or from the Pass on a failing Choice branch.
     # Optional so an older in-flight execution without it still parses.
     error: Optional[dict] = Field(None, alias="error")
+    stage: str = Field(..., alias="stage")
 
 
 class FailAmiSharingResponse(BaseModel):

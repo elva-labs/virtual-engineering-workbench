@@ -32,9 +32,13 @@ class VersionsDomainQueryService:
         product_id: product_id_value_object.ProductIdValueObject,
         version_id: version_id_value_object.VersionIdValueObject,
         aws_account_id: aws_account_id_value_object.AWSAccountIDValueObject,
+        stage: stage_value_object.StageValueObject,
     ) -> version.Version | None:
         version_distribution = self._version_qry_srv.get_product_version_distribution(
-            product_id=product_id.value, version_id=version_id.value, aws_account_id=aws_account_id.value
+            product_id=product_id.value,
+            version_id=version_id.value,
+            aws_account_id=aws_account_id.value,
+            stage=stage.value,
         )
         if version_distribution:
             vers_data = version_distribution.model_dump()

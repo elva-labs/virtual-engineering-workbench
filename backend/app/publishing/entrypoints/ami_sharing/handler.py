@@ -24,6 +24,7 @@ from app.publishing.domain.value_objects import (
     product_type_value_object,
     project_id_value_object,
     region_value_object,
+    stage_value_object,
     version_id_value_object,
 )
 from app.publishing.entrypoints.ami_sharing import bootstrapper, config, step_error
@@ -47,6 +48,7 @@ def handle_decide_action(event: step_function_model.DecideActionRequest):
         product_id=product_id_value_object.from_str(event.product_id),
         version_id=version_id_value_object.from_str(event.version_id),
         aws_account_id=aws_account_id_value_object.from_str(event.aws_account_id),
+        stage=stage_value_object.from_str(event.stage),
         product_type=product_type_value_object.from_str(event.product_type),
     )
     return step_function_model.DecideActionResponse(
@@ -153,6 +155,7 @@ def handle_succeed_ami_sharing(event: step_function_model.SucceedAmiSharingReque
         productId=product_id_value_object.from_str(event.product_id),
         versionId=version_id_value_object.from_str(event.version_id),
         awsAccountId=aws_account_id_value_object.from_str(event.aws_account_id),
+        stage=stage_value_object.from_str(event.stage),
         copiedAmiId=(ami_id_value_object.from_str(event.copied_ami_id) if event.copied_ami_id else None),
         previousEventName=event_name_value_object.from_str(event.previous_event_name),
         oldVersionId=event.old_version_id,
@@ -172,6 +175,7 @@ def handle_fail_ami_sharing(event: step_function_model.FailAmiSharingRequest):
         versionId=version_id_value_object.from_str(event.version_id),
         awsAccountId=aws_account_id_value_object.from_str(event.aws_account_id),
         statusReason=step_error.summarize(event.error),
+        stage=stage_value_object.from_str(event.stage),
     )
 
     dependencies.command_bus.handle(command)

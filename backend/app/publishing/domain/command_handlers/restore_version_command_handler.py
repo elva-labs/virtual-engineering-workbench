@@ -138,6 +138,7 @@ def handle(
                     product_id=version_entity.productId,
                     version_id=version_entity.versionId,
                     aws_account_id=version_entity.awsAccountId,
+                    stage=version_entity.stage,
                     old_version_id=original_version_entity.versionId,
                     product_type=product_entity.productType,
                 )

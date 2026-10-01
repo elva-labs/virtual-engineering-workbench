@@ -154,6 +154,7 @@ class ProvisionedProductsDomainQueryService:
             product_id=provisioned_product_entity.productId,
             version_id=provisioned_product_entity.versionId,
             aws_account_ids=[provisioned_product_entity.awsAccountId],
+            stage=provisioned_product_entity.stage,
         )
 
         if not return_technical_params:

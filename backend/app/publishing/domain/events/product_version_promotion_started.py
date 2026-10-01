@@ -10,5 +10,6 @@ class ProductVersionPromotionStarted(message_bus.Message):
     product_id: str = Field(..., alias="productId")
     version_id: str = Field(..., alias="versionId")
     aws_account_id: str = Field(..., alias="awsAccountId")
+    stage: str = Field(..., alias="stage")
     product_type: str = Field(..., alias="productType")
     model_config = ConfigDict(populate_by_name=True)

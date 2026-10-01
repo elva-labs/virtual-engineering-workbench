@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `several-stages-per-account` env config (default `false`): one AWS account may serve several stages (dev, qa, prod) of one project, one account record per type, stage, technology and region (portal and S2S onboarding); each stage then gets its own Service Catalog product (`<product>-<account>-<stage>`).
 - `image-distribution` env config (`mode`: `share` default, or `store-restore`): with `store-restore`, publishing moves a version's image into each account (EC2 store image task into the account's import bucket, restore image task there) instead of sharing the image and its KMS key; the account launches its own copy, encrypted with its default EBS key. The product publishing enablement stack creates the import bucket and the `ProductPublishingImageImportRole` only in that mode. `storeWithFunctionRole` lets the ami-sharing function store the image itself where the image service account is the web application account.
 - `ownerEmail` on provisioned products (record, provisioning API, workbench administration pages): the portal's sign-in e-mail, or for S2S and internal launches the project assignment's `userEmail`. The pages show it instead of the opaque user id when it is known.
 - Added mandatory components lists to the Packaging S2S API: `GET /mandatory-components-lists` and `GET|PUT|DELETE /mandatory-components-lists/{platform}/{osVersion}/{architecture}` with `mandatory_components_list.read|write` scopes. `PUT` upserts a list from component and version ids (names are resolved), `DELETE` is idempotent. A change needs the client's assignment to the request's project and, when the deployment configures a releasing project for base images, must come from that project.
@@ -24,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Publishing keys portfolios (`AWS_ACCOUNT#<account>#STAGE#<stage>`) and product versions (`VERSION#<version>#AWS_ACCOUNT#<account>#STAGE#<stage>`) per account and stage, and carries the stage through version events, the AMI-sharing state machine, retries and the internal version API; provisioning's version read model follows. Migrations 001/002 (publishing) and 002 (provisioning) move existing records on first start.
 - Portal project updates publish the project's full state in `ProjectUpdated`, so they no longer reset the management mode the Authorization BC keeps.
 - The workbench status sync runs every 5 minutes (`sync-job-cron-minute`, default `2/5`) instead of hourly, and the portal polls every 5 seconds while a workbench changes.
 - Server-side role checks (the internal user-assignment route that launch reads, and `GET /projects/{projectId}/users/{userId}`) include the roles Entra group grants give, read from the user's Cognito record; a user reached only through a group could not launch.

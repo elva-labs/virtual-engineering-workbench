@@ -10,4 +10,5 @@ class ProductVersionRetirementStarted(message_bus.Message):
     product_id: str = Field(..., alias="productId")
     version_id: str = Field(..., alias="versionId")
     aws_account_id: str = Field(..., alias="awsAccountId")
+    stage: str = Field(..., alias="stage")
     model_config = ConfigDict(populate_by_name=True)

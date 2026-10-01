@@ -10,11 +10,7 @@ from app.publishing.domain.commands import restore_version_command
 from app.publishing.domain.events import product_version_restoration_started
 from app.publishing.domain.exceptions import domain_exception
 from app.publishing.domain.model import portfolio, product, version
-from app.publishing.domain.ports import (
-    portfolios_query_service,
-    template_service,
-    versions_query_service,
-)
+from app.publishing.domain.ports import portfolios_query_service, template_service, versions_query_service
 from app.publishing.domain.query_services import template_domain_query_service
 from app.publishing.domain.read_models import component_version_detail
 from app.publishing.domain.value_objects import (
@@ -289,6 +285,7 @@ def test_restore_version_command_handler_starts_restoration_in_dev(
                     productId="prod-12345abc",
                     versionId=version_id,
                     awsAccountId="123456789012",
+                    stage="DEV",
                     oldVersionId="vers-12345abc",
                     product_type="WORKBENCH",
                 )
@@ -298,6 +295,7 @@ def test_restore_version_command_handler_starts_restoration_in_dev(
                     productId="prod-12345abc",
                     versionId=version_id,
                     awsAccountId="123456789013",
+                    stage="DEV",
                     oldVersionId="vers-12345abc",
                     product_type="WORKBENCH",
                 )
@@ -428,6 +426,7 @@ def test_restore_version_command_handler_increases_restored_version_counter(
                     productId="prod-12345abc",
                     versionId=version_id,
                     awsAccountId="123456789012",
+                    stage="DEV",
                     oldVersionId="vers-12345abc",
                     product_type="WORKBENCH",
                 )
@@ -437,6 +436,7 @@ def test_restore_version_command_handler_increases_restored_version_counter(
                     productId="prod-12345abc",
                     versionId=version_id,
                     awsAccountId="123456789013",
+                    stage="DEV",
                     oldVersionId="vers-12345abc",
                     product_type="WORKBENCH",
                 )

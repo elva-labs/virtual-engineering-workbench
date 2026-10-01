@@ -155,6 +155,7 @@ def bootstrap(  # noqa: C901
                 file_srv=file_service,
                 shared_amis_qry_srv=shared_amis_qry_svc,
                 template_qry_srv=template_domain_qry_srv,
+                stage_in_sc_product_name=app_config.get_several_stages_per_account(),
             )
 
         return _handle_command

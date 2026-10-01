@@ -65,3 +65,30 @@ def test_001_qpk_4_and_seq_no(
         "PROVISIONED_PRODUCT#PROVISIONING"
     )
     assertpy.assert_that(set([item.get("sequenceNo") for item in all_items.get("Items")])).contains_only(0)
+
+
+def test_002_version_read_model_moves_to_the_stage_sort_key(mock_dynamodb, backend_app_dynamodb_table, mock_table_name):
+    # ARRANGE: a version read model written before stages were part of the key
+    table = mock_dynamodb.Table(mock_table_name)
+    table.put_item(
+        Item={
+            "PK": "PRODUCT#prod-1",
+            "SK": "VERSION#vers-1#AWS_ACCOUNT#123456789012",
+            "entity": "VERSION",
+            "productId": "prod-1",
+            "versionId": "vers-1",
+            "awsAccountId": "123456789012",
+            "stage": "PROD",
+        }
+    )
+    scripts = dict(migrations_config(provisioned_products_qs=None))
+
+    # ACT: twice - the migration is idempotent
+    scripts["002.Version_Stage_In_Sort_Key"](table)
+    scripts["002.Version_Stage_In_Sort_Key"](table)
+
+    # ASSERT
+    items = table.scan(FilterExpression=Attr("PK").eq("PRODUCT#prod-1"))["Items"]
+    assertpy.assert_that([item["SK"] for item in items]).is_equal_to(
+        ["VERSION#vers-1#AWS_ACCOUNT#123456789012#STAGE#PROD"]
+    )

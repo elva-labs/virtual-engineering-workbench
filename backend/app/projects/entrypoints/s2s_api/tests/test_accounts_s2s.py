@@ -378,6 +378,102 @@ def test_create_conflicts_when_aws_account_is_owned_by_another_project(monkeypat
     assert handled_commands == []
 
 
+def test_create_accepts_another_stage_of_the_same_project(monkeypatch, lambda_context):
+    monkeypatch.setattr(accounts, "SEVERAL_STAGES_PER_ACCOUNT", True)
+    # ADR 0013: one AWS account serves DEV and PROD of the same program.
+    dev_account = _account(accountStatus="Active")
+    dependencies, _, handled_commands = _dependencies(accounts_list=[], global_accounts=[dev_account])
+    monkeypatch.setattr(common, "authorize", Mock(return_value="client-1"))
+    app = _resolver(dependencies)
+
+    result = app.resolve(
+        _event(
+            "/projects/project-1/accounts",
+            "POST",
+            body=_request_body(stage="prod", name="Production"),
+            scope="clients/projects/account.write",
+            idempotency_key="a77bcf2e-650c-497d-9974-e80c251f0ad6",
+        ),
+        lambda_context,
+    )
+
+    assert result["statusCode"] == HTTPStatus.ACCEPTED
+    assert len(handled_commands) == 1
+    assert handled_commands[0].stage == project_account.ProjectAccountStageEnum.PROD
+    assert handled_commands[0].reserved_account_id != dev_account.id
+
+
+def test_create_does_not_reuse_an_inactive_record_of_another_stage(monkeypatch, lambda_context):
+    monkeypatch.setattr(accounts, "SEVERAL_STAGES_PER_ACCOUNT", True)
+    inactive_dev = _account()
+    active_prod = _account(id="prod-record-id", stage="prod", accountStatus="Active")
+    dependencies, _, handled_commands = _dependencies(global_accounts=[inactive_dev, active_prod])
+    monkeypatch.setattr(common, "authorize", Mock(return_value="client-1"))
+    app = _resolver(dependencies)
+
+    result = app.resolve(
+        _event(
+            "/projects/project-1/accounts",
+            "POST",
+            body=_request_body(stage="qa"),
+            scope="clients/projects/account.write",
+            idempotency_key="a88bcf2e-650c-497d-9974-e80c251f0ad6",
+        ),
+        lambda_context,
+    )
+
+    assert result["statusCode"] == HTTPStatus.ACCEPTED
+    assert handled_commands[0].reserved_account_id not in (inactive_dev.id, active_prod.id)
+
+
+def test_create_reuses_the_inactive_record_of_the_same_stage_next_to_other_stages(monkeypatch, lambda_context):
+    monkeypatch.setattr(accounts, "SEVERAL_STAGES_PER_ACCOUNT", True)
+    inactive_dev = _account()
+    active_prod = _account(id="prod-record-id", stage="prod", accountStatus="Active")
+    dependencies, project_queries, handled_commands = _dependencies(global_accounts=[inactive_dev, active_prod])
+    project_queries.get_project_account_by_id.side_effect = lambda project_id, account_id: (
+        inactive_dev if account_id == inactive_dev.id else None
+    )
+    monkeypatch.setattr(common, "authorize", Mock(return_value="client-1"))
+    app = _resolver(dependencies)
+
+    result = app.resolve(
+        _event(
+            "/projects/project-1/accounts",
+            "POST",
+            body=_request_body(),
+            scope="clients/projects/account.write",
+            idempotency_key="a99bcf2e-650c-497d-9974-e80c251f0ad6",
+        ),
+        lambda_context,
+    )
+
+    assert result["statusCode"] == HTTPStatus.ACCEPTED
+    assert json.loads(result["body"]) == {"accountId": inactive_dev.id}
+    assert handled_commands[0].reserved_account_id == inactive_dev.id
+
+
+def test_create_conflicts_for_an_active_record_of_the_same_stage(monkeypatch, lambda_context):
+    active_dev = _account(accountStatus="Active")
+    dependencies, _, handled_commands = _dependencies(accounts_list=[active_dev], global_accounts=[active_dev])
+    monkeypatch.setattr(common, "authorize", Mock(return_value="client-1"))
+    app = _resolver(dependencies)
+
+    result = app.resolve(
+        _event(
+            "/projects/project-1/accounts",
+            "POST",
+            body=_request_body(),
+            scope="clients/projects/account.write",
+            idempotency_key="aaabcf2e-650c-497d-9974-e80c251f0ad6",
+        ),
+        lambda_context,
+    )
+
+    assert result["statusCode"] == HTTPStatus.CONFLICT
+    assert handled_commands == []
+
+
 def test_account_create_changed_request_with_same_key_conflicts(monkeypatch, lambda_context):
     dependencies, _, handled_commands = _dependencies()
     monkeypatch.setattr(common, "authorize", Mock(return_value="client-1"))
@@ -855,3 +951,26 @@ def test_update_rejects_malformed_onboarding_revision(monkeypatch, lambda_contex
 
     assert result["statusCode"] in (HTTPStatus.BAD_REQUEST, HTTPStatus.UNPROCESSABLE_ENTITY)
     assert project_queries.update_commands == []
+
+
+def test_create_refuses_another_stage_by_default(monkeypatch, lambda_context):
+    """Without "several-stages-per-account" an AWS account holds one record: another stage conflicts."""
+    monkeypatch.setattr(accounts, "SEVERAL_STAGES_PER_ACCOUNT", False)
+    dev_account = _account(accountStatus="Active")
+    dependencies, _, handled_commands = _dependencies(accounts_list=[], global_accounts=[dev_account])
+    monkeypatch.setattr(common, "authorize", Mock(return_value="client-1"))
+    app = _resolver(dependencies)
+
+    result = app.resolve(
+        _event(
+            "/projects/project-1/accounts",
+            "POST",
+            body=_request_body(stage="prod", name="Production"),
+            scope="clients/projects/account.write",
+            idempotency_key="b88cdf3f-761d-4a8e-8a85-f91d362e1b07",
+        ),
+        lambda_context,
+    )
+
+    assert result["statusCode"] == HTTPStatus.CONFLICT
+    assert handled_commands == []

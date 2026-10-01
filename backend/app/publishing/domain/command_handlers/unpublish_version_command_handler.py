@@ -49,6 +49,7 @@ def handle(
                     productId=command.productId.value,
                     versionId=command.versionId.value,
                     awsAccountId=command.awsAccountId.value,
+                    stage=command.stage.value,
                 ),
             )
             if catalog_qry_srv.does_provisioning_artifact_exist_in_sc(
@@ -101,6 +102,7 @@ def handle(
                     productId=command.productId.value,
                     versionId=command.versionId.value,
                     awsAccountId=command.awsAccountId.value,
+                    stage=command.stage.value,
                 ),
                 lastUpdateDate=datetime.now(timezone.utc).isoformat(),
                 status=version.VersionStatus.Retired,
@@ -130,6 +132,7 @@ def handle(
                     productId=command.productId.value,
                     versionId=command.versionId.value,
                     awsAccountId=command.awsAccountId.value,
+                    stage=command.stage.value,
                 ),
                 lastUpdateDate=datetime.now(timezone.utc).isoformat(),
                 status=version.VersionStatus.Failed,

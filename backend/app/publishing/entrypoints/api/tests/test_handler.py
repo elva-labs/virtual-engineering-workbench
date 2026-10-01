@@ -1243,7 +1243,7 @@ def test_get_product_version_distribution_internal(lambda_context, authenticated
         None,
         f"/internal/products/{product_id}/versions/{version_id}",
         "GET",
-        {"awsAccountId": aws_account_id},
+        {"awsAccountId": aws_account_id, "stage": "QA"},
     )
 
     # ACT

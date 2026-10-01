@@ -66,6 +66,7 @@ def handle(
                         productId=version_entity.productId,
                         versionId=version_entity.versionId,
                         awsAccountId=version_entity.awsAccountId,
+                        stage=version_entity.stage,
                     ),
                     status=version.VersionStatus.Retired,
                     lastUpdateDate=datetime.now(timezone.utc).isoformat(),

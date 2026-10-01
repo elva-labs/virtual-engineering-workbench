@@ -59,6 +59,7 @@ def handle_on_board_project_account_command(  # noqa: C901
     web_application_region: str,
     image_service_account_id: str,
     catalog_service_account_id: str,
+    several_stages_per_account: bool = False,
 ):
     project = projects_query_service.get_project_by_id(command.project_id.value)
     if not project:
@@ -176,7 +177,12 @@ def handle_on_board_project_account_command(  # noqa: C901
         onboardingRevision=command.onboarding_revision,
     )
 
-    if projects_query_service.list_project_accounts_by_aws_account(project_acct.awsAccountId):
+    # An AWS account belongs to one project. With several stages per account it may hold one record per
+    # type, stage, technology and region of that project (checked above).
+    existing_records = projects_query_service.list_project_accounts_by_aws_account(project_acct.awsAccountId)
+    if any(acc.projectId != project_acct.projectId for acc in existing_records) or (
+        existing_records and not several_stages_per_account
+    ):
         raise domain_exception.DomainException(f"Account with id: {project_acct.awsAccountId} already onboarded")
 
     with unit_of_work:

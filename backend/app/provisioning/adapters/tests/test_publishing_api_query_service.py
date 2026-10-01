@@ -74,7 +74,9 @@ def test_get_version_returns_version(mock_api, mock_logger, get_sample_version):
     mock_api.call_api.return_value = {"version": get_sample_version().model_dump()}
 
     # ACT
-    version = publishing_api_qry_srv.get_version(product_id="prod-1", version_id="vers-1", account_id="001234567890")
+    version = publishing_api_qry_srv.get_version(
+        product_id="prod-1", version_id="vers-1", account_id="001234567890", stage="PROD"
+    )
 
     # ASSERT
     mock_api.call_api.assert_called_once_with(
@@ -82,6 +84,7 @@ def test_get_version_returns_version(mock_api, mock_logger, get_sample_version):
         http_method="GET",
         query_params={
             "awsAccountId": "001234567890",
+            "stage": "PROD",
         },
     )
     assertpy.assert_that(version).is_not_none()
@@ -109,7 +112,7 @@ def test_get_version_rais_exception_if_response_error(mock_api, error, error_mes
 
     with pytest.raises(adapter_exception.AdapterException) as e:
         version = publishing_api_qry_srv.get_version(
-            product_id="prod-1", version_id="vers-1", account_id="001234567890"
+            product_id="prod-1", version_id="vers-1", account_id="001234567890", stage="PROD"
         )
 
         mock_api.call_api.assert_called_once_with(
@@ -117,6 +120,7 @@ def test_get_version_rais_exception_if_response_error(mock_api, error, error_mes
             http_method="GET",
             query_params={
                 "awsAccountId": "001234567890",
+                "stage": "PROD",
             },
         )
         assertpy.assert_that(version).is_none()

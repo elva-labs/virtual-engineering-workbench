@@ -23,7 +23,10 @@ def handle(
         with uow:
             uow.get_repository(version.VersionPrimaryKey, version.Version).update_attributes(
                 pk=version.VersionPrimaryKey(
-                    productId=cmd.productId.value, versionId=cmd.versionId.value, awsAccountId=cmd.awsAccountId.value
+                    productId=cmd.productId.value,
+                    versionId=cmd.versionId.value,
+                    awsAccountId=cmd.awsAccountId.value,
+                    stage=cmd.stage.value,
                 ),
                 copiedAmiId=cmd.copiedAmiId.value,
                 # Clear any reason left by a previous failed attempt.
@@ -38,6 +41,7 @@ def handle(
             product_id=cmd.productId.value,
             version_id=cmd.versionId.value,
             aws_account_id=cmd.awsAccountId.value,
+            stage=cmd.stage.value,
             previousEventName=cmd.previousEventName.value,
             oldVersionId=cmd.oldVersionId,
         )

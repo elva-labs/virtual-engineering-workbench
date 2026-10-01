@@ -2,17 +2,10 @@ import typing
 from datetime import datetime, timezone
 
 from app.publishing.domain.commands import promote_version_command
-from app.publishing.domain.events import (
-    product_version_name_updated,
-    product_version_promotion_started,
-)
+from app.publishing.domain.events import product_version_name_updated, product_version_promotion_started
 from app.publishing.domain.exceptions import domain_exception
 from app.publishing.domain.model import portfolio, product, version
-from app.publishing.domain.ports import (
-    amis_query_service,
-    portfolios_query_service,
-    versions_query_service,
-)
+from app.publishing.domain.ports import amis_query_service, portfolios_query_service, versions_query_service
 from app.shared.adapters.message_bus import message_bus
 from app.shared.adapters.unit_of_work_v2 import unit_of_work
 from app.shared.middleware.authorization import VirtualWorkbenchRoles
@@ -128,6 +121,7 @@ def handle(
                         productId=command.productId.value,
                         versionId=command.versionId.value,
                         awsAccountId=version_distribution.awsAccountId,
+                        stage=version_distribution.stage,
                     ),
                     versionName=version_name,
                     versionType=version_type,
@@ -144,6 +138,7 @@ def handle(
                         version_id=version_distribution.versionId,
                         version_name=version_name,
                         aws_account_id=version_distribution.awsAccountId,
+                        stage=version_distribution.stage,
                         has_integrations=len(version_distribution.integrations or []) > 0,
                         integrations=version_distribution.integrations,
                     )
@@ -188,6 +183,7 @@ def handle(
                     product_id=version_entity.productId,
                     version_id=version_entity.versionId,
                     aws_account_id=version_entity.awsAccountId,
+                    stage=version_entity.stage,
                     product_type=product_entity.productType,
                 )
             )

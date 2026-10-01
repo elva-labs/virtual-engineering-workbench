@@ -86,3 +86,32 @@ class SharedAMIsDomainQueryService:
             return False
         else:
             raise domain_exception.DomainException(f"Unsupported copied ami status {copied_ami_status}")
+
+    def verify_store(
+        self,
+        region: region_value_object.RegionValueObject,
+        source_ami_id: ami_id_value_object.AmiIdValueObject,
+    ) -> bool:
+        store_status = self._image_svc.get_store_ami_status(region.value, source_ami_id.value)
+        if store_status == "Completed":
+            return True
+        elif store_status == "InProgress":
+            return False
+        else:
+            raise domain_exception.DomainException(f"Unsupported store task status {store_status}")
+
+    def verify_distribution(
+        self,
+        region: region_value_object.RegionValueObject,
+        distributed_ami_id: ami_id_value_object.AmiIdValueObject,
+        aws_account_id: aws_account_id_value_object.AWSAccountIDValueObject,
+    ) -> bool:
+        ami_status = self._image_svc.get_distributed_ami_status(
+            region.value, distributed_ami_id.value, aws_account_id.value
+        )
+        if ami_status == "available":
+            return True
+        elif ami_status == "pending":
+            return False
+        else:
+            raise domain_exception.DomainException(f"Unsupported distributed ami status {ami_status}")

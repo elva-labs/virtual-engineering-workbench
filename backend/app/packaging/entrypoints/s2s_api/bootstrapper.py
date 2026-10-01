@@ -33,10 +33,13 @@ from app.packaging.domain.command_handlers.component import (
     archive_component_command_handler,
     create_component_command_handler,
     create_component_version_command_handler,
+    create_mandatory_components_list_command_handler,
+    delete_mandatory_components_list_command_handler,
     release_component_version_command_handler,
     retire_component_version_command_handler,
     update_component_command_handler,
     update_component_version_command_handler,
+    update_mandatory_components_list_command_handler,
 )
 from app.packaging.domain.command_handlers.image import create_image_command_handler, release_base_image_command_handler
 from app.packaging.domain.command_handlers.pipeline import (
@@ -56,14 +59,15 @@ from app.packaging.domain.commands.component import (
     archive_component_command,
     create_component_command,
     create_component_version_command,
+    create_mandatory_components_list_command,
+    delete_mandatory_components_list_command,
     release_component_version_command,
     retire_component_version_command,
     update_component_command,
     update_component_version_command,
+    update_mandatory_components_list_command,
 )
 from app.packaging.domain.commands.image import create_image_command, release_base_image_command
-from app.packaging.domain.model.recipe import base_image_channels as base_image_channels_model
-from app.packaging.domain.ports.base_image_release_service import BaseImageParameterService
 from app.packaging.domain.commands.pipeline import (
     create_pipeline_command,
     retire_pipeline_command,
@@ -77,6 +81,8 @@ from app.packaging.domain.commands.recipe import (
     retire_recipe_version_command,
     update_recipe_version_command,
 )
+from app.packaging.domain.model.recipe import base_image_channels as base_image_channels_model
+from app.packaging.domain.ports.base_image_release_service import BaseImageParameterService
 from app.packaging.domain.ports.service_client_project_access_service import ServiceClientProjectAccessService
 from app.packaging.domain.query_services import (
     component_domain_query_service,
@@ -146,6 +152,8 @@ class Dependencies(BaseModel):
     # Base image release channels; disabled (no parameters) unless the deployment configures them.
     base_image_channels: base_image_channels_model.BaseImageChannels = base_image_channels_model.BaseImageChannels()
     base_image_parameter_service: BaseImageParameterService | None = None
+    # Mandatory components lists (GET|PUT|DELETE /mandatory-components-lists), global per platform/OS/arch.
+    mandatory_components_list_qry_srv: Any = None
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -446,6 +454,29 @@ def bootstrap(app_config: config.AppConfig, logger: logging.Logger) -> Dependenc
     )
     base_image_parameters = ssm_base_image_parameter_service.SSMBaseImageParameterService(ami_factory_client)
     command_bus.register_handler(
+        create_mandatory_components_list_command.CreateMandatoryComponentsListCommand,
+        partial(
+            create_mandatory_components_list_command_handler.handle,
+            component_version_qry_srv=component_version_query_service,
+            uow=uow,
+        ),
+    ).register_handler(
+        update_mandatory_components_list_command.UpdateMandatoryComponentsListCommand,
+        partial(
+            update_mandatory_components_list_command_handler.handle,
+            component_version_qry_srv=component_version_query_service,
+            mandatory_components_list_qry_srv=mandatory_components_list_query_service,
+            uow=uow,
+        ),
+    ).register_handler(
+        delete_mandatory_components_list_command.DeleteMandatoryComponentsListCommand,
+        partial(
+            delete_mandatory_components_list_command_handler.handle,
+            mandatory_components_list_qry_srv=mandatory_components_list_query_service,
+            uow=uow,
+        ),
+    )
+    command_bus.register_handler(
         release_base_image_command.ReleaseBaseImageCommand,
         partial(
             release_base_image_command_handler.handle,
@@ -469,6 +500,7 @@ def bootstrap(app_config: config.AppConfig, logger: logging.Logger) -> Dependenc
     return Dependencies(
         base_image_channels=channels,
         base_image_parameter_service=base_image_parameters,
+        mandatory_components_list_qry_srv=mandatory_components_list_query_service,
         project_access_service=project_access_service,
         command_bus=command_bus,
         recipe_domain_qry_srv=recipe_domain_query_service.RecipeDomainQueryService(recipe_qry_srv=recipe_query_service),

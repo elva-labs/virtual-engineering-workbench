@@ -100,3 +100,11 @@ def mock_dependencies(
             mock_create_portfolio_command_handler,
         )
     )
+
+
+@pytest.fixture(autouse=True)
+def disable_migrations():
+    with mock.patch(
+        "app.publishing.entrypoints.projects_event_handler.bootstrapper.migrations_config", return_value=[]
+    ):
+        yield

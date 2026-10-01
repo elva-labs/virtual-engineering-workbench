@@ -12,6 +12,7 @@ class ProductVersionNameUpdated(message_bus.Message):
     version_id: str = Field(..., alias="versionId")
     version_name: str = Field(..., alias="versionName")
     aws_account_id: str = Field(..., alias="awsAccountId")
+    stage: str = Field(..., alias="stage")
     has_integrations: bool = Field(False, alias="hasIntegrations")
     integrations: list[str] = Field([], alias="integrations")
     model_config = ConfigDict(populate_by_name=True)

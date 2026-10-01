@@ -56,6 +56,9 @@ class AppConfig(BaseModel):
     def get_catalog_service_account_id(self) -> str:
         return os.environ.get("CATALOG_SERVICE_ACCOUNT_ID", "")
 
+    def get_several_stages_per_account(self) -> bool:
+        return os.environ.get("SEVERAL_STAGES_PER_ACCOUNT", "false").lower() == "true"
+
     def get_custom_dns_name(self) -> str:
         return os.environ.get("CUSTOM_DNS", "")
 

@@ -18,16 +18,18 @@ def handle(
     spoke_account_roles: set[str],
 ) -> None:
     portf = None
-    portfolio_name = f"portfolio-{cmd.technologyId.value}-{cmd.awsAccountId.value}"
+    # One portfolio per account and stage: an account may serve several stages (ADR 0013).
+    portfolio_name = f"portfolio-{cmd.technologyId.value}-{cmd.awsAccountId.value}-{cmd.stage.value.lower()}"
 
     logger.debug(f"Creating portfolio {portfolio_name}.")
     try:
-        # Query repository to see if we created a portfolio for this account before by aws account and technology Id
+        # Query repository to see if we created a portfolio for this account before by aws account, technology Id and stage
         with uow:
             portf = uow.get_repository(portfolio.PortfolioPrimaryKey, portfolio.Portfolio).get(
                 pk=portfolio.PortfolioPrimaryKey(
                     technologyId=cmd.technologyId.value,
                     awsAccountId=cmd.awsAccountId.value,
+                    stage=cmd.stage.value,
                 )
             )
 
@@ -70,6 +72,7 @@ def handle(
                     pk=portfolio.PortfolioPrimaryKey(
                         technologyId=cmd.technologyId.value,
                         awsAccountId=cmd.awsAccountId.value,
+                        stage=cmd.stage.value,
                     ),
                     scPortfolioId=portf.scPortfolioId,
                     lastUpdateDate=datetime.now(timezone.utc).isoformat(),
@@ -104,6 +107,7 @@ def handle(
                 pk=portfolio.PortfolioPrimaryKey(
                     technologyId=cmd.technologyId.value,
                     awsAccountId=cmd.awsAccountId.value,
+                    stage=cmd.stage.value,
                 ),
                 status=portfolio.PortfolioStatus.Created,
                 lastUpdateDate=datetime.now(timezone.utc).isoformat(),
@@ -118,6 +122,7 @@ def handle(
                     pk=portfolio.PortfolioPrimaryKey(
                         technologyId=cmd.technologyId.value,
                         awsAccountId=cmd.awsAccountId.value,
+                        stage=cmd.stage.value,
                     ),
                     status=portfolio.PortfolioStatus.Failed,
                     lastUpdateDate=datetime.now(timezone.utc).isoformat(),

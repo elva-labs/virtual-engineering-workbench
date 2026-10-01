@@ -61,6 +61,7 @@ def handle(  # noqa: C901
                     productId=command.productId.value,
                     versionId=command.versionId.value,
                     awsAccountId=version_distribution.awsAccountId,
+                    stage=version_distribution.stage,
                 ),
                 lastUpdateDate=datetime.now(timezone.utc).isoformat(),
                 lastUpdatedBy=command.retiredBy.value,
@@ -74,5 +75,6 @@ def handle(  # noqa: C901
                     product_id=version_distribution.productId,
                     version_id=version_distribution.versionId,
                     aws_account_id=version_distribution.awsAccountId,
+                    stage=version_distribution.stage,
                 )
             )

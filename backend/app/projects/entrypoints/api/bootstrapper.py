@@ -63,8 +63,8 @@ from app.projects.domain.ports import (
     enrolment_query_service,
     projects_query_service,
     technologies_query_service,
-    user_directory_service as user_directory_port,
 )
+from app.projects.domain.ports import user_directory_service as user_directory_port
 from app.projects.entrypoints.api import config
 from app.shared.adapters.message_bus import (
     command_bus,
@@ -173,6 +173,7 @@ def bootstrap(
                 web_application_region=app_config.get_default_region(),
                 image_service_account_id=app_config.get_image_service_account_id(),
                 catalog_service_account_id=app_config.get_catalog_service_account_id(),
+                several_stages_per_account=app_config.get_several_stages_per_account(),
             ),
         )
         .register_handler(

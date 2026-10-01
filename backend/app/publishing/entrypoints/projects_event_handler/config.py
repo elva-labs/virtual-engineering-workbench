@@ -7,6 +7,10 @@ class AppConfig(BaseModel):
     def get_default_region(self) -> str:
         return os.environ.get("AWS_DEFAULT_REGION")
 
+    def get_platform_program_id(self) -> str:
+        """The releasing program whose PLATFORM products every program receives (docs/platform-products.md)."""
+        return os.environ.get("PLATFORM_PROGRAM_ID", "")
+
     def get_table_name(self) -> str:
         return os.environ.get("TABLE_NAME", "")
 

@@ -1,5 +1,6 @@
 from pydantic import ConfigDict
 
+from app.publishing.domain.model import product
 from app.publishing.domain.value_objects import (
     product_description_value_object,
     product_id_value_object,
@@ -22,4 +23,6 @@ class CreateProductCommand(command_bus.Command):
     technologyId: tech_id_value_object.TechIdValueObject
     technologyName: tech_name_value_object.TechNameValueObject
     userId: user_id_value_object.UserIdValueObject
+    # Only the releasing program creates PLATFORM products; the entrypoints check that (docs/platform-products.md).
+    scope: product.ProductScope = product.ProductScope.Program
     model_config = ConfigDict(arbitrary_types_allowed=True)

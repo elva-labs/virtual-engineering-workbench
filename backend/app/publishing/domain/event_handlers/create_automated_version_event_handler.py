@@ -12,7 +12,7 @@ from app.publishing.domain.ports import (
     template_service,
     versions_query_service,
 )
-from app.publishing.domain.query_services import template_domain_query_service
+from app.publishing.domain.query_services import distribution_portfolios, template_domain_query_service
 from app.publishing.domain.read_models import component_version_detail
 from app.publishing.domain.value_objects import (
     product_id_value_object,
@@ -119,11 +119,11 @@ def _get_and_validate_product(uow: unit_of_work.UnitOfWork, project_id: str, pro
 
 def _get_dev_portfolios(
     portf_qry_srv: portfolios_query_service.PortfoliosQueryService,
-    technology_id: str,
+    product_entity: product.Product,
 ) -> typing.List[portfolio.Portfolio]:
 
-    fetched_dev_portfolios = portf_qry_srv.get_portfolios_by_tech_and_stage(
-        technology_id, portfolio.PortfolioStage.DEV.value
+    fetched_dev_portfolios = distribution_portfolios.target_portfolios(
+        portf_qry_srv, product_entity, portfolio.PortfolioStage.DEV.value
     )
     if not fetched_dev_portfolios:
         raise domain_exception.DomainException("No portfolio found for DEV stage. Account setup might be incomplete.")
@@ -275,7 +275,7 @@ def handle(
         latest_version_name = _get_latest_version_name(version_qry_srv, product_id)
         logger.info(f"Found latest version: {latest_version_name}")
 
-        fetched_dev_portfolios = _get_dev_portfolios(portf_qry_srv, product_entity.technologyId)
+        fetched_dev_portfolios = _get_dev_portfolios(portf_qry_srv, product_entity)
 
         _check_versions_limit(
             param_service,

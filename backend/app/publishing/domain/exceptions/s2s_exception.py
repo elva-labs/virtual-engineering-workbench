@@ -61,6 +61,12 @@ class TechnologyNotFound(S2SException):
     retryable = False
 
 
+class ReleasingProjectOnly(S2SException):
+    code = "RELEASING_PROJECT_ONLY"
+    detail = "Only the releasing program creates platform products."
+    retryable = False
+
+
 class InvalidRequest(S2SException):
     code = "INVALID_REQUEST"
     detail = "The request does not match the API contract."

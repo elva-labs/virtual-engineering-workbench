@@ -6,6 +6,7 @@ from app.publishing.domain.events import product_version_name_updated, product_v
 from app.publishing.domain.exceptions import domain_exception
 from app.publishing.domain.model import portfolio, product, version
 from app.publishing.domain.ports import amis_query_service, portfolios_query_service, versions_query_service
+from app.publishing.domain.query_services import distribution_portfolios
 from app.shared.adapters.message_bus import message_bus
 from app.shared.adapters.unit_of_work_v2 import unit_of_work
 from app.shared.middleware.authorization import VirtualWorkbenchRoles
@@ -93,8 +94,8 @@ def handle(
     version_name = original_version_entity.versionName
     version_type = original_version_entity.versionType
 
-    fetched_portfolios: typing.List[portfolio.Portfolio] = portf_qry_srv.get_portfolios_by_tech_and_stage(
-        product_entity.technologyId, command.stage.value
+    fetched_portfolios: typing.List[portfolio.Portfolio] = distribution_portfolios.target_portfolios(
+        portf_qry_srv, product_entity, command.stage.value
     )
     if not fetched_portfolios:
         raise domain_exception.DomainException(

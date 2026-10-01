@@ -79,6 +79,12 @@ export interface AvailableProduct {
      * @memberof AvailableProduct
      */
     availableOSVersions?: Array<string>;
+    /**
+     * PROGRAM for the program's own products, PLATFORM for products the platform releases to every program.
+     * @type {string}
+     * @memberof AvailableProduct
+     */
+    scope?: string;
 }
 
 /**
@@ -115,6 +121,7 @@ export function AvailableProductFromJSONTyped(json: any, ignoreDiscriminator: bo
         'availableRegions': json['availableRegions'],
         'availableTools': !exists(json, 'availableTools') ? undefined : json['availableTools'],
         'availableOSVersions': !exists(json, 'availableOSVersions') ? undefined : json['availableOSVersions'],
+        'scope': !exists(json, 'scope') ? undefined : json['scope'],
     };
 }
 
@@ -137,5 +144,6 @@ export function AvailableProductToJSON(value?: AvailableProduct | null): any {
         'availableRegions': value.availableRegions,
         'availableTools': value.availableTools,
         'availableOSVersions': value.availableOSVersions,
+        'scope': value.scope,
     };
 }

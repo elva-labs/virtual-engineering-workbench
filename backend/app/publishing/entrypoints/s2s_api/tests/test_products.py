@@ -231,6 +231,7 @@ def test_get_returns_the_product_and_404_when_missing(client_event, lambda_conte
         "status": "CREATED",
         "recommendedVersionId": None,
         "availableStages": ["DEV"],
+        "scope": "PROGRAM",
         "createDate": "2026-09-29T00:00:00+00:00",
         "lastUpdateDate": "2026-09-29T00:00:00+00:00",
     }

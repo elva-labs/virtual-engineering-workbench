@@ -11,18 +11,25 @@ from app.provisioning.domain.read_models import product
 
 
 class DynamoDBProductsQueryService(products_query_service.ProductsQueryService):
-    """DynamoDB Products repository query service"""
+    """DynamoDB Products repository query service.
+
+    Platform products (docs/platform-products.md) live under the releasing program's id; every program lists them next
+    to its own products, and resolves them by id, so every caller (listing, launch, update, versions)
+    treats them as the program's own.
+    """
 
     def __init__(
         self,
         table_name: str,
         dynamodb_client: client.DynamoDBClient,
         default_page_size: int | None = None,
+        platform_program_id: str = "",
     ):
         self._table_name = table_name
         self._dynamodb_client = dynamodb_client
         self._default_page_size = default_page_size
         self._entity_config = dynamo_entity_config.EntityConfigurator(table_name=table_name)
+        self._platform_program_id = platform_program_id
 
     def get_products(
         self,
@@ -30,7 +37,23 @@ class DynamoDBProductsQueryService(products_query_service.ProductsQueryService):
         product_type: Optional[product.ProductType] = None,
         available_stages: Optional[list[product.ProductStage]] = None,
     ) -> list[product.Product]:
-        """Returns the list of all products for the given project."""
+        """Returns the program's own products and, for every other program, the platform products."""
+        products = self._get_project_products(project_id, product_type, available_stages)
+        if self._platform_program_id and project_id != self._platform_program_id:
+            products.extend(
+                prod
+                for prod in self._get_project_products(self._platform_program_id, product_type, available_stages)
+                if prod.scope == product.ProductScope.Platform
+            )
+        return products
+
+    def _get_project_products(
+        self,
+        project_id: str,
+        product_type: Optional[product.ProductType] = None,
+        available_stages: Optional[list[product.ProductStage]] = None,
+    ) -> list[product.Product]:
+        """Returns the list of all products stored under the given project."""
 
         products = []
         query_kwargs = {
@@ -68,6 +91,18 @@ class DynamoDBProductsQueryService(products_query_service.ProductsQueryService):
         return products
 
     def get_product(
+        self,
+        project_id: str,
+        product_id: str,
+    ) -> product.Product | None:
+        found = self._get_project_product(project_id, product_id)
+        if found is None and self._platform_program_id and project_id != self._platform_program_id:
+            platform = self._get_project_product(self._platform_program_id, product_id)
+            if platform is not None and platform.scope == product.ProductScope.Platform:
+                return platform
+        return found
+
+    def _get_project_product(
         self,
         project_id: str,
         product_id: str,

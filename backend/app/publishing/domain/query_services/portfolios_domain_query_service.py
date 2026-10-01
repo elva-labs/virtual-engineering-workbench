@@ -9,3 +9,6 @@ class PortfoliosDomainQueryService:
         return self._portfolio_qry_srv.get_portfolios_by_tech_and_stage(
             technology_id=technology_id, portfolio_stage=portfolio_stage
         )
+
+    def get_portfolios_by_stage(self, portfolio_stage: str):
+        return self._portfolio_qry_srv.get_portfolios_by_stage(portfolio_stage=portfolio_stage)

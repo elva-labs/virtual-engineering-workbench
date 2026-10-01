@@ -87,4 +87,6 @@ class ProductAvailabilityUpdated(message_bus.Message):
     paused_stages: Optional[List[product.ProductStage]] = Field(None, alias="pausedStages")
     paused_regions: Optional[List[str]] = Field(None, alias="pausedRegions")
     last_update_date: str = Field(..., alias="lastUpdateDate")
+    # PLATFORM products are listed in every program (docs/platform-products.md); older consumers ignore the field.
+    scope: str = Field(product.ProductScope.Program.value, alias="scope")
     model_config = ConfigDict(populate_by_name=True)

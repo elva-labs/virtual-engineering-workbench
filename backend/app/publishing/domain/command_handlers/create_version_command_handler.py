@@ -12,7 +12,7 @@ from app.publishing.domain.ports import (
     template_service,
     versions_query_service,
 )
-from app.publishing.domain.query_services import template_domain_query_service
+from app.publishing.domain.query_services import distribution_portfolios, template_domain_query_service
 from app.publishing.domain.value_objects import product_type_value_object
 from app.shared.adapters.message_bus import message_bus
 from app.shared.adapters.unit_of_work_v2 import unit_of_work
@@ -114,8 +114,8 @@ def handle(
         raise domain_exception.DomainException(
             "New product version can be created only from product with status 'Created'"
         )
-    fetched_dev_portfolios: typing.List[portfolio.Portfolio] = portf_qry_srv.get_portfolios_by_tech_and_stage(
-        product_entity.technologyId, portfolio.PortfolioStage.DEV.value
+    fetched_dev_portfolios: typing.List[portfolio.Portfolio] = distribution_portfolios.target_portfolios(
+        portf_qry_srv, product_entity, portfolio.PortfolioStage.DEV.value
     )
     if not fetched_dev_portfolios:
         raise domain_exception.DomainException("No portfolio found for DEV stage. Account setup might be incomplete.")

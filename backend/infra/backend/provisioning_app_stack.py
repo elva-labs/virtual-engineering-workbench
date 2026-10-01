@@ -286,6 +286,8 @@ class ProvisioningAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
         self._pp_configuration_evt_handler_name = app_config.format_resource_name(Entrypoint.PP_CONFIGURATION_EVENTS)
         common_env_vars_ddb = {
             "POWERTOOLS_SERVICE_NAME": VEW_SERVICE,
+            # Platform products (docs/platform-products.md): every project lists the releasing project's.
+            "PLATFORM_PROGRAM_ID": app_config.component_specific.get("platform-program-id", ""),
             "TABLE_NAME": self._storage.table.table_name,
             "GSI_NAME_INVERTED_PK": GSI_NAME_INVERTED_PK,
             "GSI_NAME_CUSTOM_QUERY_BY_ALT_KEY": GSI_NAME_CUSTOM_QUERY_BY_ALT_KEY,

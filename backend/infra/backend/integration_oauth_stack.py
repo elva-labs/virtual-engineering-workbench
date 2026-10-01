@@ -92,6 +92,10 @@ class IntegrationOauthStack(aws_cdk.Stack):
                     "pipeline.execute": "Allows service clients to start image builds",
                     "base_image.read": "Allows service clients to read the released base images",
                     "base_image.write": "Allows service clients to release base images (releasing project only)",
+                    "mandatory_components_list.read": "Allows service clients to read the mandatory components lists",
+                    "mandatory_components_list.write": (
+                        "Allows service clients to manage the mandatory components lists (releasing project only)"
+                    ),
                 },
             ),
         )
@@ -169,6 +173,8 @@ class IntegrationOauthStack(aws_cdk.Stack):
                         "pipeline.execute",
                         "base_image.read",
                         "base_image.write",
+                        "mandatory_components_list.read",
+                        "mandatory_components_list.write",
                     ],
                 ),
                 backend_app_api_oauth_client.AppClientResourceServer(

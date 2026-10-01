@@ -34,6 +34,9 @@ class LaunchProductCommand(command_bus.Command):
     region: region_value_object.RegionValueObject = pydantic.Field(...)
     user_domains: user_domains_value_object.UserDomainsValueObject = pydantic.Field(...)
     user_ip_address: ip_address_value_object.IpV4Address = pydantic.Field(...)
+    # The owner's e-mail as the portal's authorizer knows it; None on S2S/internal launches, which fall
+    # back to the project assignment's userEmail.
+    user_email: str | None = pydantic.Field(None)
     provisioned_compound_product_id: (
         provisioned_compound_product_id_value_object.ProvisionedCompoundProductIdValueObject
     ) = pydantic.Field(provisioned_compound_product_id_value_object.no_id())

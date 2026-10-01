@@ -71,7 +71,8 @@ gateway finds the workbench.
      `{mode, gatewayUrl, sessionId, token}`, plus `expiresAt`.
    - The portal calls the provisioning API, which it is already authorized for, instead of an
      endpoint on the gateway, so the gateway stays a plain DCV Connection Gateway.
-   - `mode: "direct"` when the deployment has no gateway: today's flow.
+   - `mode: "direct"` only when the deployment has no gateway domain configured: today's flow. There
+     is no per-project or per-product switch.
 2. **Gateways per account.** `gatewayUrl` comes from the deployment's gateway naming
    (`dcv-{accountName or accountId}.{gatewayDomain}:{port}`).
    - #4's exact-origin check becomes a check against the configured gateway domain: `https:`, host
@@ -84,8 +85,13 @@ gateway finds the workbench.
    - the workbench verifier (`auth-token-verifier`) and the gateway's session resolver, as a reference
      implementation with an image-building component, since every deployment installs them in its
      own images and accounts.
-4. **Desktop readiness, as one more mode.** The endpoint answers `{mode: "pending", retryAfter: 15}`
-   (HTTP 200) while `desktopReady` is false, so #4's flow needs only one more branch.
+4. **Desktop readiness as a refusal, not a mode.** While `desktopReady` is false the endpoint answers
+   **HTTP 409** with `{"code": "DESKTOP_NOT_READY", "message": "The workbench desktop is still
+   starting", "retryAfter": 15}` and a `Retry-After: 15` header. There is no `pending` mode, so #4's
+   response contract is unchanged.
+   - The portal gates Connect on `desktopReady` from the workbench status ("Starting desktop…"), so the
+     409 is only a safety net, for a stale page or a direct API call. On a 409 the portal shows
+     "Starting desktop…" again.
    - `desktopReady` is on the provisioned product, `null` for workbenches without the tag (older
      templates). The portal then behaves as today.
    - The portal's 5-second status polling (#7) turns Connect on as soon as it flips.
@@ -94,7 +100,8 @@ gateway finds the workbench.
    1. The backend endpoint, signer and claims, with `mode: "direct"` until a gateway domain is
       configured.
    2. #4 rebased onto it: the backend call, and the domain check instead of the origin check.
-   3. Desktop readiness: tag, sync, `desktopReady`, `pending` mode, the portal's "Starting desktop…".
+   3. Desktop readiness: tag, sync, `desktopReady`, the 409 `DESKTOP_NOT_READY`, the portal's "Starting
+      desktop…".
    4. The verifier, resolver and image component as optional reference parts.
 
 ## What stays deployment-specific
@@ -105,9 +112,10 @@ gateway finds the workbench.
 - The KMS key's location.
 - Network paths to the gateways.
 
-## Open questions for review
+## Decisions (review 2026-10-01)
 
-- Should `pending` be HTTP 200 with a mode, as proposed, or HTTP 409? 200 keeps #4's parser simple.
-- Token lifetime: is 180 s with reuse within the window acceptable as the default, or should a token
-  be single use? Single use needs a store, such as DynamoDB, for used `jti`s.
-- Should `direct` mode stay available alongside gateways, per project or per product?
+- **Not ready:** HTTP 409 `DESKTOP_NOT_READY` with `retryAfter` and a `Retry-After` header, not an HTTP
+  200 `pending` mode. The portal's own gate on `desktopReady` makes the 409 a safety net only.
+- **Tokens:** 180 s lifetime, reusable within that window (the DCV web client opens several channels
+  with the same token). No single-use tokens, so no store of used `jti`s.
+- **Direct mode:** only when no gateway domain is configured. No per-project or per-product switch.

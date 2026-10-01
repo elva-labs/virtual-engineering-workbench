@@ -130,3 +130,52 @@ def test_verify_copy_raises_exception_when_status_invalid(image_svc_mock, uow_mo
             region_value_object.RegionValueObject("eu-west-3"),
             ami_id_value_object.AmiIdValueObject("copy-12345"),
         )
+
+
+@pytest.mark.parametrize("response,outcome", [("InProgress", False), ("Completed", True)])
+def test_verify_store_checks_if_store_is_done(response, outcome, image_svc_mock, uow_mock):
+    image_svc_mock.get_store_ami_status.return_value = response
+    domain_service = shared_amis_domain_query_service.SharedAMIsDomainQueryService(
+        unit_of_work=uow_mock, image_svc=image_svc_mock, default_original_ami_region=TEST_ORIGINAL_AMI_REGION
+    )
+
+    is_stored = domain_service.verify_store(
+        region_value_object.RegionValueObject("eu-west-3"), ami_id_value_object.AmiIdValueObject("ami-54321")
+    )
+
+    assertpy.assert_that(is_stored).is_equal_to(outcome)
+
+
+@pytest.mark.parametrize("response,outcome", [("pending", False), ("available", True)])
+def test_verify_distribution_checks_if_restore_is_done(response, outcome, image_svc_mock, uow_mock):
+    image_svc_mock.get_distributed_ami_status.return_value = response
+    domain_service = shared_amis_domain_query_service.SharedAMIsDomainQueryService(
+        unit_of_work=uow_mock, image_svc=image_svc_mock, default_original_ami_region=TEST_ORIGINAL_AMI_REGION
+    )
+
+    is_restored = domain_service.verify_distribution(
+        region_value_object.RegionValueObject("eu-west-3"),
+        ami_id_value_object.AmiIdValueObject("ami-target1"),
+        aws_account_id_value_object.AWSAccountIDValueObject("123456789012"),
+    )
+
+    assertpy.assert_that(is_restored).is_equal_to(outcome)
+
+
+def test_verify_store_and_distribution_raise_on_unknown_states(image_svc_mock, uow_mock):
+    image_svc_mock.get_store_ami_status.return_value = "Failed"
+    image_svc_mock.get_distributed_ami_status.return_value = "failed"
+    domain_service = shared_amis_domain_query_service.SharedAMIsDomainQueryService(
+        unit_of_work=uow_mock, image_svc=image_svc_mock, default_original_ami_region=TEST_ORIGINAL_AMI_REGION
+    )
+
+    with pytest.raises(domain_exception.DomainException):
+        domain_service.verify_store(
+            region_value_object.RegionValueObject("eu-west-3"), ami_id_value_object.AmiIdValueObject("ami-54321")
+        )
+    with pytest.raises(domain_exception.DomainException):
+        domain_service.verify_distribution(
+            region_value_object.RegionValueObject("eu-west-3"),
+            ami_id_value_object.AmiIdValueObject("ami-target1"),
+            aws_account_id_value_object.AWSAccountIDValueObject("123456789012"),
+        )

@@ -6,6 +6,7 @@ from aws_cdk import aws_stepfunctions as sfn
 from aws_cdk import aws_stepfunctions_tasks as sfn_tasks
 
 from infra import config
+from infra.helpers.image_distribution import image_distribution
 
 
 class AmiSharingStateMachine(constructs.Construct):
@@ -38,6 +39,7 @@ class AmiSharingStateMachine(constructs.Construct):
         }
         """
         super().__init__(scope, id)
+        image_distribution_mode = image_distribution(app_config)["mode"]
 
         # Starting state
         start_state: sfn.Pass = sfn.Pass(self, "StartState", output_path="$.detail")
@@ -195,6 +197,14 @@ class AmiSharingStateMachine(constructs.Construct):
         )
         share_ami_lambda.add_catch(fail_ami_sharing_lambda, result_path="$.error")
 
+        # "share" distribution shares the copy with the account; "store-restore" moves the image into
+        # the account first and then only records the account's own copy (env config
+        # "image-distribution").
+        if image_distribution_mode == "store-restore":
+            distribute = self._store_restore_chain(ami_sharing_lambda, fail_ami_sharing_lambda, share_ami_lambda)
+        else:
+            distribute = share_ami_lambda
+
         # Succeed ami sharing lambda
         succeed_ami_sharing_lambda: sfn_tasks.LambdaInvoke = sfn_tasks.LambdaInvoke(
             self,
@@ -229,9 +239,7 @@ class AmiSharingStateMachine(constructs.Construct):
 
         # Verify copy choice
         verify_copy_choice: sfn.Choice = sfn.Choice(self, "VerifyCopyChoice")
-        verify_copy_choice.when(
-            sfn.Condition.boolean_equals("$.verifyCopyResponse.isCopyVerified", True), share_ami_lambda
-        )
+        verify_copy_choice.when(sfn.Condition.boolean_equals("$.verifyCopyResponse.isCopyVerified", True), distribute)
         verify_copy_choice.otherwise(verify_copy_wait)
         verify_copy_wait.next(verify_copy_lambda)
 
@@ -242,7 +250,7 @@ class AmiSharingStateMachine(constructs.Construct):
             .next(verify_copy_lambda)
             .next(verify_copy_choice.afterwards())
         )
-        chain_share = sfn.Chain.start(pass_share).next(share_ami_lambda)
+        chain_share = sfn.Chain.start(pass_share).next(distribute)
         chain_done = sfn.Chain.start(pass_done)
         fail_ami_sharing_lambda.next(fail_state)
 
@@ -328,3 +336,97 @@ class AmiSharingStateMachine(constructs.Construct):
     @property
     def state_machine(self):
         return self._state_machine
+
+    def _store_restore_chain(
+        self,
+        ami_sharing_lambda: aws_lambda.IFunction,
+        fail_ami_sharing_lambda: sfn_tasks.LambdaInvoke,
+        record_ami_lambda: sfn_tasks.LambdaInvoke,
+    ) -> sfn.IChainable:
+        """store -> verify store -> restore -> verify restore -> record; the account's own image then
+        replaces $.copiedAmi for the rest of the flow."""
+
+        def invoke(name: str, payload: dict, result: dict, result_path: str) -> sfn_tasks.LambdaInvoke:
+            task = sfn_tasks.LambdaInvoke(
+                self,
+                name,
+                lambda_function=ami_sharing_lambda,
+                payload=sfn.TaskInput.from_object(payload),
+                result_selector={"eventType.$": "$.Payload.eventType", **result},
+                result_path=result_path,
+            )
+            task.add_catch(fail_ami_sharing_lambda, result_path="$.error")
+            return task
+
+        store = invoke(
+            "StoreAmiLambda",
+            {
+                "eventType": "StoreAmiRequest",
+                "sourceAmiId.$": "$.copiedAmi.copiedAmiId",
+                "region.$": "$.decideActionResponse.region",
+                "awsAccountId.$": "$.awsAccountId",
+            },
+            {"objectKey.$": "$.Payload.objectKey"},
+            "$.storeAmiResponse",
+        )
+        verify_store = invoke(
+            "VerifyStoreLambda",
+            {
+                "eventType": "VerifyStoreRequest",
+                "sourceAmiId.$": "$.copiedAmi.copiedAmiId",
+                "region.$": "$.decideActionResponse.region",
+            },
+            {"isStoreVerified.$": "$.Payload.isStoreVerified"},
+            "$.verifyStoreResponse",
+        )
+        restore = invoke(
+            "RestoreAmiLambda",
+            {
+                "eventType": "RestoreAmiRequest",
+                "originalAmiId.$": "$.decideActionResponse.originalAmiId",
+                "objectKey.$": "$.storeAmiResponse.objectKey",
+                "region.$": "$.decideActionResponse.region",
+                "awsAccountId.$": "$.awsAccountId",
+            },
+            {"distributedAmiId.$": "$.Payload.distributedAmiId"},
+            "$.restoreAmiResponse",
+        )
+        verify_restore = invoke(
+            "VerifyRestoreLambda",
+            {
+                "eventType": "VerifyRestoreRequest",
+                "distributedAmiId.$": "$.restoreAmiResponse.distributedAmiId",
+                "region.$": "$.decideActionResponse.region",
+                "awsAccountId.$": "$.awsAccountId",
+            },
+            {"isRestoreVerified.$": "$.Payload.isRestoreVerified"},
+            "$.verifyRestoreResponse",
+        )
+        # From here on the account's own image is the one recorded and launched.
+        pass_distributed = sfn.Pass(
+            self,
+            "PassDistributed",
+            parameters={"copiedAmiId.$": "$.restoreAmiResponse.distributedAmiId"},
+            result_path="$.copiedAmi",
+        )
+
+        store_wait = sfn.Wait(self, "VerifyStoreWait", time=sfn.WaitTime.duration(aws_cdk.Duration.seconds(60)))
+        restore_wait = sfn.Wait(self, "VerifyRestoreWait", time=sfn.WaitTime.duration(aws_cdk.Duration.seconds(60)))
+
+        verify_restore_choice = sfn.Choice(self, "VerifyRestoreChoice")
+        verify_restore_choice.when(
+            sfn.Condition.boolean_equals("$.verifyRestoreResponse.isRestoreVerified", True),
+            sfn.Chain.start(pass_distributed).next(record_ami_lambda),
+        )
+        verify_restore_choice.otherwise(restore_wait)
+        restore_wait.next(verify_restore)
+
+        verify_store_choice = sfn.Choice(self, "VerifyStoreChoice")
+        verify_store_choice.when(
+            sfn.Condition.boolean_equals("$.verifyStoreResponse.isStoreVerified", True),
+            sfn.Chain.start(restore).next(verify_restore).next(verify_restore_choice),
+        )
+        verify_store_choice.otherwise(store_wait)
+        store_wait.next(verify_store)
+
+        return sfn.Chain.start(store).next(verify_store).next(verify_store_choice)

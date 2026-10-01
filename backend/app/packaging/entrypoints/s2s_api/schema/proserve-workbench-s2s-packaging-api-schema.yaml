@@ -773,6 +773,103 @@ paths:
       security: [{ClientCredentials: [clients/packaging/base_image.write]}]
       x-amazon-apigateway-request-validator: all
       x-amazon-apigateway-integration: *lambdaIntegration
+  # Mandatory components lists: global per platform, OS version and architecture, added to every recipe
+  # version created on that OS. Reads need no project assignment; changes need the client's assignment
+  # to the request's project (the releasing project, when the deployment has one).
+  /mandatory-components-lists:
+    get:
+      operationId: ListMandatoryComponentsLists
+      tags: [ALL]
+      responses:
+        '200': {$ref: '#/components/responses/MandatoryComponentsListPage'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
+        '500': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+      security: [{ClientCredentials: [clients/packaging/mandatory_components_list.read]}]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration: *lambdaIntegration
+  /mandatory-components-lists/{platform}/{osVersion}/{architecture}:
+    get:
+      operationId: GetMandatoryComponentsList
+      tags: [ALL]
+      parameters:
+        - $ref: '#/components/parameters/MandatoryListPlatform'
+        - $ref: '#/components/parameters/MandatoryListOsVersion'
+        - $ref: '#/components/parameters/Architecture'
+      responses:
+        '200': {$ref: '#/components/responses/MandatoryComponentsList'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
+        '500': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+      security: [{ClientCredentials: [clients/packaging/mandatory_components_list.read]}]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration: *lambdaIntegration
+    put:
+      operationId: PutMandatoryComponentsList
+      tags: [ALL]
+      parameters:
+        - $ref: '#/components/parameters/MandatoryListPlatform'
+        - $ref: '#/components/parameters/MandatoryListOsVersion'
+        - $ref: '#/components/parameters/Architecture'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PutMandatoryComponentsListRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/MandatoryComponentsList'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
+        '500': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+        '422': {$ref: '#/components/responses/Problem'}
+      security: [{ClientCredentials: [clients/packaging/mandatory_components_list.write]}]
+      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-integration: *lambdaIntegration
+    delete:
+      operationId: DeleteMandatoryComponentsList
+      tags: [ALL]
+      parameters:
+        - $ref: '#/components/parameters/MandatoryListPlatform'
+        - $ref: '#/components/parameters/MandatoryListOsVersion'
+        - $ref: '#/components/parameters/Architecture'
+        - name: projectId
+          in: query
+          required: false
+          description: The project the change is made for (the releasing project if one is configured).
+          schema: {type: string, minLength: 1}
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DeleteMandatoryComponentsListRequest'}
+      responses:
+        '204': {description: The list is gone (also when there was none).}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
+        '500': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+      security: [{ClientCredentials: [clients/packaging/mandatory_components_list.write]}]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration: *lambdaIntegration
 components:
   parameters:
     Architecture:
@@ -782,6 +879,21 @@ components:
       schema:
         type: string
         enum: [amd64, arm64]
+    MandatoryListPlatform:
+      name: platform
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [Linux, Windows]
+    MandatoryListOsVersion:
+      name: osVersion
+      in: path
+      required: true
+      description: The OS entry as recipes name it, URL-encoded (e.g. "Ubuntu%2024").
+      schema:
+        type: string
+        minLength: 1
     BaseImageChannel:
       name: channel
       in: path
@@ -977,6 +1089,16 @@ components:
       content:
         application/json:
           schema: {$ref: '#/components/schemas/BaseImagePage'}
+    MandatoryComponentsList:
+      description: One mandatory components list.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/MandatoryComponentsList'}
+    MandatoryComponentsListPage:
+      description: Every mandatory components list.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/MandatoryComponentsListPage'}
   schemas:
     ComponentStatus:
       type: string
@@ -1540,6 +1662,64 @@ components:
         baseImages:
           type: array
           items: {$ref: '#/components/schemas/BaseImage'}
+    MandatoryComponentVersionRef:
+      type: object
+      additionalProperties: false
+      required: [componentId, componentVersionId]
+      properties:
+        componentId: {type: string, minLength: 1}
+        componentVersionId: {type: string, minLength: 1, description: A released version.}
+    MandatoryComponentVersion:
+      type: object
+      required: [componentId, componentName, componentVersionId, componentVersionName]
+      properties:
+        componentId: {type: string}
+        componentName: {type: string}
+        componentVersionId: {type: string}
+        componentVersionName: {type: string}
+        order: {type: integer, nullable: true}
+    MandatoryComponentsList:
+      type: object
+      required: [platform, osVersion, architecture, prependedComponentsVersions, appendedComponentsVersions]
+      properties:
+        platform: {type: string}
+        osVersion: {type: string}
+        architecture: {type: string}
+        prependedComponentsVersions:
+          type: array
+          description: Run before a recipe's own components, in this order.
+          items: {$ref: '#/components/schemas/MandatoryComponentVersion'}
+        appendedComponentsVersions:
+          type: array
+          description: Run after a recipe's own components, in this order.
+          items: {$ref: '#/components/schemas/MandatoryComponentVersion'}
+        lastUpdateDate: {type: string, nullable: true}
+        lastUpdatedBy: {type: string, nullable: true}
+    MandatoryComponentsListPage:
+      type: object
+      required: [mandatoryComponentsLists]
+      properties:
+        mandatoryComponentsLists:
+          type: array
+          items: {$ref: '#/components/schemas/MandatoryComponentsList'}
+    DeleteMandatoryComponentsListRequest:
+      type: object
+      additionalProperties: false
+      required: [projectId]
+      properties:
+        projectId: {type: string, minLength: 1}
+    PutMandatoryComponentsListRequest:
+      type: object
+      additionalProperties: false
+      required: [projectId]
+      properties:
+        projectId: {type: string, minLength: 1, description: The project the change is made for (the releasing project if one is configured).}
+        prependedComponentsVersions:
+          type: array
+          items: {$ref: '#/components/schemas/MandatoryComponentVersionRef'}
+        appendedComponentsVersions:
+          type: array
+          items: {$ref: '#/components/schemas/MandatoryComponentVersionRef'}
     ReleaseBaseImageRequest:
       type: object
       additionalProperties: false

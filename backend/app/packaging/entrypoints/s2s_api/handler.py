@@ -15,6 +15,7 @@ from app.packaging.entrypoints.s2s_api.routers import (
     common,
     component_versions,
     components,
+    mandatory_components_lists,
     pipelines,
     recipes,
 )
@@ -40,6 +41,7 @@ app.include_router(component_versions.init(dependencies))
 app.include_router(recipes.init(dependencies))
 app.include_router(pipelines.init(dependencies))
 app.include_router(base_images.init(dependencies))
+app.include_router(mandatory_components_lists.init(dependencies))
 
 
 @app.exception_handler(RequestValidationError)

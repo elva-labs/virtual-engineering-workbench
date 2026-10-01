@@ -471,3 +471,44 @@ class UpdateComponentVersionRequest(BaseModel):
 class ComponentVersionResponse(BaseModel):
     component_version: ComponentVersion
     componentVersionDefinition: ComponentDefinition | None = None
+
+
+class MandatoryComponentVersionRef(BaseModel):
+    """A released component version in a mandatory components list; VEW fills in the names."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    componentId: str = Field(..., min_length=1)
+    componentVersionId: str = Field(..., min_length=1)
+
+
+class MandatoryComponentVersion(BaseModel):
+    componentId: str
+    componentName: str
+    componentVersionId: str
+    componentVersionName: str
+    order: int | None = None
+
+
+class MandatoryComponentsList(BaseModel):
+    platform: str
+    osVersion: str
+    architecture: str
+    # Prepended run before a recipe's own components, appended after them, in this order.
+    prependedComponentsVersions: list[MandatoryComponentVersion]
+    appendedComponentsVersions: list[MandatoryComponentVersion]
+    lastUpdateDate: str | None = None
+    lastUpdatedBy: str | None = None
+
+
+class MandatoryComponentsListPage(BaseModel):
+    mandatoryComponentsLists: list[MandatoryComponentsList]
+
+
+class PutMandatoryComponentsListRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # The project the change is made for (the releasing project, when the deployment has one).
+    projectId: str = Field(..., min_length=1)
+    prependedComponentsVersions: list[MandatoryComponentVersionRef] = Field(default_factory=list)
+    appendedComponentsVersions: list[MandatoryComponentVersionRef] = Field(default_factory=list)

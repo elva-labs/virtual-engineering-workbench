@@ -9,4 +9,5 @@ class CreateProjectCommand(command_bus.Command):
     name: str
     description: Optional[str] = None
     isActive: bool
+    remoteSupportEnabled: bool = True
     model_config = ConfigDict(arbitrary_types_allowed=True)

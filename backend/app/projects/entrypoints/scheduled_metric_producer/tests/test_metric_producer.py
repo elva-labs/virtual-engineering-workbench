@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 from unittest import mock
 
 import assertpy
@@ -33,20 +32,20 @@ def lambda_context():
 
 
 @pytest.fixture(autouse=True)
-def aws_credentials():
-    """Mocked AWS Credentials for moto."""
-    os.environ["AWS_ACCESS_KEY_ID"] = "testing"
-    os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
-    os.environ["AWS_SECURITY_TOKEN"] = "testing"
-    os.environ["AWS_SESSION_TOKEN"] = "testing"
-    os.environ["AWS_REGION"] = TEST_REGION
-    os.environ["AWS_DEFAULT_REGION"] = TEST_REGION
-    os.environ["POWERTOOLS_METRICS_NAMESPACE"] = "Test"
-    os.environ["POWERTOOLS_SERVICE_NAME"] = "Projects"
-    os.environ["TABLE_NAME"] = TEST_TABLE_NAME
-    os.environ["GSI_NAME_INVERTED_PK"] = GSI_NAME_INVERTED_PK
-    os.environ["GSI_NAME_AWS_ACCOUNTS"] = GSI_NAME_AWS_ACCOUNTS
-    os.environ["GSI_NAME_ENTITIES"] = GSI_NAME_ENTITIES
+def aws_credentials(monkeypatch):
+    """Mocked AWS Credentials for moto (monkeypatched, so they do not leak into other test modules)."""
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "testing")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
+    monkeypatch.setenv("AWS_SECURITY_TOKEN", "testing")
+    monkeypatch.setenv("AWS_SESSION_TOKEN", "testing")
+    monkeypatch.setenv("AWS_REGION", TEST_REGION)
+    monkeypatch.setenv("AWS_DEFAULT_REGION", TEST_REGION)
+    monkeypatch.setenv("POWERTOOLS_METRICS_NAMESPACE", "Test")
+    monkeypatch.setenv("POWERTOOLS_SERVICE_NAME", "Projects")
+    monkeypatch.setenv("TABLE_NAME", TEST_TABLE_NAME)
+    monkeypatch.setenv("GSI_NAME_INVERTED_PK", GSI_NAME_INVERTED_PK)
+    monkeypatch.setenv("GSI_NAME_AWS_ACCOUNTS", GSI_NAME_AWS_ACCOUNTS)
+    monkeypatch.setenv("GSI_NAME_ENTITIES", GSI_NAME_ENTITIES)
 
 
 @pytest.fixture

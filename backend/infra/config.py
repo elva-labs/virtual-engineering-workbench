@@ -260,6 +260,9 @@ projects_app_config = {
 }
 
 _dev_publishing_config = {
+    # Platform products (docs/platform-products.md): the project whose PLATFORM products are released
+    # once and distributed to every project's accounts. Off while empty.
+    "platform-program-id": "",
     "api-lambda-reserved-concurrency": 10,
     "api-lambda-provisioned-concurrency": 1,
     "authorizer-reserved-concurrency": 10,
@@ -328,6 +331,8 @@ packaging_app_config = {
 
 
 _dev_provisioning_config = {
+    # Platform products (docs/platform-products.md): the releasing project, as in publishing. Off while empty.
+    "platform-program-id": "",
     # Minute field of the workbench status sync (EventBridge cron); "2/5" = every 5 minutes, off the
     # minutes of the 5-minute metrics job. The sync makes a few calls per spoke account, not per workbench.
     "sync-job-cron-minute": "2/5",

@@ -29,6 +29,17 @@ class ProductStage(str, Enum):
         return str(self.value)
 
 
+class ProductScope(str, Enum):
+    """PROGRAM: the owning program's own product. PLATFORM: released by the releasing program and
+    listed in, and launchable from, every program (docs/platform-products.md)."""
+
+    Program = "PROGRAM"
+    Platform = "PLATFORM"
+
+    def __str__(self):
+        return str(self.value)
+
+
 class ProductPrimaryKey(unit_of_work.PrimaryKey):
     projectId: str = Field(..., title="ProjectId")
     productId: str = Field(..., title="ProductId")
@@ -51,6 +62,7 @@ class Product(unit_of_work.Entity):
     totalReportedTimes: Optional[int] = Field(None, title="TotalReportedTimes")
     availableTools: set[str] | None = Field(None, title="AvailableTools")
     availableOSVersions: set[str] | None = Field(None, title="AvailableOSVersions")
+    scope: ProductScope = Field(ProductScope.Program, title="Scope")
     costForecastDetails: Optional[cost_forecast.CostForecastForProductDetails] = Field(
         None, title="CostForecastDetails"
     )

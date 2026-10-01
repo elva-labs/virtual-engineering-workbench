@@ -40,6 +40,7 @@ def _product_response(entity: product.Product) -> api_model.Product:
         status=entity.status.value,
         recommendedVersionId=entity.recommendedVersionId,
         availableStages=[stage.value for stage in entity.availableStages or []],
+        scope=str(entity.scope),
         createDate=entity.createDate,
         lastUpdateDate=entity.lastUpdateDate,
     )
@@ -77,6 +78,8 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
     @router.post("/projects/<project_id>/products")
     def create_product(project_id: str, request: api_model.CreateProductRequest):
         client = common.authorize(router, dependencies, project_id, WRITE_SCOPE)
+        if request.scope == product.ProductScope.Platform.value and project_id != dependencies.platform_program_id:
+            raise s2s_exception.ReleasingProjectOnly()
         scope = common.idempotency_scope(router, client, project_id, "CREATE_PRODUCT")
 
         def create(product_id: str) -> idempotency.StoredCreateResponse:
@@ -93,6 +96,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
                     technologyId=tech_id_value_object.from_str(technology.technologyId),
                     technologyName=tech_name_value_object.from_str(technology.technologyName),
                     userId=user_id_value_object.from_str(f"service:{client}"),
+                    scope=product.ProductScope(request.scope),
                 )
             )
             return idempotency.StoredCreateResponse(HTTPStatus.CREATED, {"productId": product_id})

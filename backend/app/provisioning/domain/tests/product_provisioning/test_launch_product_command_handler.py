@@ -1297,3 +1297,56 @@ def test_launch_product_records_the_owner_email(
 
     stored = mock_provisioned_product_repo.add.call_args.args[0]
     assertpy.assert_that(stored.ownerEmail).is_equal_to(expected)
+
+
+@freeze_time("2023-12-05")
+def test_launch_of_a_platform_product_uses_the_programs_own_account(
+    mock_logger,
+    mock_publisher,
+    mock_products_query_service,
+    mock_message_bus,
+    mock_unit_of_work,
+    mock_provisioned_product_repo,
+    mock_versions_query_service,
+    mock_provisioned_products_qs,
+    mock_be_feature_toggles_srv,
+    mock_experimental_provisioned_product_per_project_limit,
+    mocked_projects_qs,
+):
+    # ARRANGE: a platform version is distributed to every program's DEV account (docs/platform-products.md); this
+    # program's own account is 001234567890, listed second.
+    mock_versions_query_service.get_product_version_distributions.return_value = [
+        get_mocked_product_version(
+            region="us-east-1",
+            stage=version.VersionStage.DEV,
+            sc_product_id="sc-prod-other",
+            sc_provisioning_artifact_id="sc-pa-other",
+            aws_account_id="999999999999",
+        ),
+        get_mocked_product_version(
+            region="us-east-1",
+            stage=version.VersionStage.DEV,
+            sc_product_id="sc-prod-123",
+            sc_provisioning_artifact_id="sc-pa-123",
+            aws_account_id="001234567890",
+        ),
+    ]
+
+    # ACT
+    launch.handle(
+        command=_launch_command("dev"),
+        publisher=mock_publisher,
+        products_qs=mock_products_query_service,
+        versions_qs=mock_versions_query_service,
+        logger=mock_logger,
+        provisioned_products_qs=mock_provisioned_products_qs,
+        uow=mock_unit_of_work,
+        feature_toggles_srv=mock_be_feature_toggles_srv,
+        experimental_provisioned_product_per_project_limit=mock_experimental_provisioned_product_per_project_limit,
+        projects_qs=mocked_projects_qs,
+    )
+
+    # ASSERT
+    stored = mock_provisioned_product_repo.add.call_args.args[0]
+    assertpy.assert_that(stored.awsAccountId).is_equal_to("001234567890")
+    assertpy.assert_that(stored.scProductId).is_equal_to("sc-prod-123")

@@ -1234,3 +1234,66 @@ def test_launch_product_into_an_inactive_account_should_raise(
     mocked_projects_qs.get_aws_accounts_by_status.assert_called_once_with(project_id="proj-123", statuses=["Active"])
     mock_message_bus.publish.assert_not_called()
     mock_unit_of_work.commit.assert_not_called()
+
+
+@freeze_time("2023-12-05")
+@pytest.mark.parametrize(
+    "command_email, assignment_email, expected",
+    [
+        ("owner@example.com", "stored@example.com", "owner@example.com"),  # portal: authorizer's
+        (None, "stored@example.com", "stored@example.com"),  # S2S/internal: the assignment's
+        (None, None, None),  # neither known: the record stays without one
+    ],
+)
+def test_launch_product_records_the_owner_email(
+    command_email,
+    assignment_email,
+    expected,
+    mock_logger,
+    mock_publisher,
+    mock_products_query_service,
+    mock_message_bus,
+    mock_unit_of_work,
+    mock_provisioned_product_repo,
+    mock_versions_query_service,
+    mock_provisioned_products_qs,
+    mock_be_feature_toggles_srv,
+    mock_experimental_provisioned_product_per_project_limit,
+    mocked_projects_qs,
+):
+    mocked_projects_qs.get_project_assignment.return_value = project_assignment.ProjectAssignment(
+        userId="T0011AA", roles=["PRODUCT_CONTRIBUTOR"], userEmail=assignment_email
+    )
+    command = launch_product_command.LaunchProductCommand(
+        provisioned_product_id=provisioned_product_id_value_object.from_str("pp-123"),
+        project_id=project_id_value_object.from_str("proj-123"),
+        user_id=user_id_value_object.from_str("T0011AA"),
+        user_domains=user_domains_value_object.from_list(["domain"]),
+        product_id=product_id_value_object.from_str("prod-123"),
+        version_id=product_version_id_value_object.from_str("vers-123"),
+        provisioning_parameters=provisioning_parameters_value_object.from_list(
+            [{"key": "SomeParam", "value": "v"}, {"key": "Experimental", "value": "False"}]
+        ),
+        additional_configurations=additional_configurations_value_object.from_list([]),
+        stage=provisioned_product_stage_value_object.from_str("dev"),
+        region=region_value_object.from_str("us-east-1"),
+        user_ip_address=ip_address_value_object.from_str("127.0.0.1"),
+        deployment_option=deployment_option_value_object.from_str("MULTI_AZ"),
+        user_email=command_email,
+    )
+
+    launch.handle(
+        command=command,
+        publisher=mock_publisher,
+        products_qs=mock_products_query_service,
+        versions_qs=mock_versions_query_service,
+        logger=mock_logger,
+        provisioned_products_qs=mock_provisioned_products_qs,
+        uow=mock_unit_of_work,
+        feature_toggles_srv=mock_be_feature_toggles_srv,
+        experimental_provisioned_product_per_project_limit=mock_experimental_provisioned_product_per_project_limit,
+        projects_qs=mocked_projects_qs,
+    )
+
+    stored = mock_provisioned_product_repo.add.call_args.args[0]
+    assertpy.assert_that(stored.ownerEmail).is_equal_to(expected)

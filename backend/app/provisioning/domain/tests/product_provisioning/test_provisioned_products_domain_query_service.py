@@ -222,6 +222,7 @@ def test_get_provisioned_virtual_target_should_return_virtual_target(
             "awsAccountId": "12345678912",
             "createDate": "2023-09-01T00:00:00+00:00",
             "createdBy": "user-1",
+            "ownerEmail": None,
             "instanceId": None,
             "lastUpdateDate": "2023-09-01T00:00:00+00:00",
             "lastUpdatedBy": "user-1",

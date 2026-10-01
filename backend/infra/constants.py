@@ -47,6 +47,10 @@ PRODUCT_PUBLISHING_ADMIN_ROLE = "ProductPublishingAdminRoleV2"
 PRODUCT_PUBLISHING_CONFIGURATION_ROLE = "ProductPublishingConfigurationRole"
 PRODUCT_PUBLISHING_IMAGE_SERVICE_ROLE = "ProductPublishingImageServiceRole"
 PRODUCT_PUBLISHING_USE_CASE_ROLE = "ProductPublishingUseCaseRoleV2"
+# "store-restore" image distribution (env config "image-distribution"): the role and the bucket name
+# prefix (<prefix>-<account>-<region>) in each target account.
+PRODUCT_PUBLISHING_IMAGE_IMPORT_ROLE = "ProductPublishingImageImportRole"
+PRODUCT_PUBLISHING_IMAGE_IMPORT_BUCKET_PREFIX = "vew-image-import"
 
 IMAGE_SHARING_KEY_NAME = "key-image"
 PACKAGING_IMAGE_SERVICE_ROLE = "PackagingImageServiceRole"

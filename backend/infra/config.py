@@ -27,6 +27,9 @@ class VEWRole(StrEnum):
     PLATFORM_USER = "PLATFORM_USER"
     BETA_USER = "BETA_USER"
     PRODUCT_CONTRIBUTOR = "PRODUCT_CONTRIBUTOR"
+    # Remote support on a project's workbenches. Outside the ADMIN > ... > PLATFORM_USER chain, so
+    # support staff get no user rights of their own; ADMIN includes it.
+    SUPPORT = "SUPPORT"
 
 
 class CedarResourceAttribute(StrEnum):
@@ -36,6 +39,7 @@ class CedarResourceAttribute(StrEnum):
     POWER_USERS = "resource.powerUsers"
     PLATFORM_USERS = "resource.platformUsers"
     BETA_USERS = "resource.betaUsers"
+    SUPPORTERS = "resource.supporters"
 
 
 CEDAR_RESOURCE_TO_ROLE_MAPPING = {
@@ -45,7 +49,12 @@ CEDAR_RESOURCE_TO_ROLE_MAPPING = {
     CedarResourceAttribute.POWER_USERS: VEWRole.POWER_USER,
     CedarResourceAttribute.PLATFORM_USERS: VEWRole.PLATFORM_USER,
     CedarResourceAttribute.BETA_USERS: VEWRole.BETA_USER,
+    CedarResourceAttribute.SUPPORTERS: VEWRole.SUPPORT,
 }
+
+# Project setting that switches remote support off (for example for sensitive work): while it is false,
+# no support action is allowed, whoever holds the SUPPORT role.
+CEDAR_REMOTE_SUPPORT_ENABLED = "resource.remoteSupportEnabled"
 
 
 class BaseConfig(BaseModel):
@@ -151,6 +160,7 @@ _dev_env_config = {
         "POWER_USER": ["dev"],
         "PROGRAM_OWNER": ["dev"],
         "ADMIN": ["dev"],
+        "SUPPORT": ["dev"],
     },
     "vpc-name": f"vpc-{ORGANIZATION_PREFIX}-{APPLICATION_PREFIX}-dev",
     "allowed-cidrs-for-private-api-endpoint": [

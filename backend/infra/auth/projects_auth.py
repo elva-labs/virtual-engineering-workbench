@@ -74,6 +74,20 @@ projects_bc_auth_policies: list[backend_app_api_auth.CedarPolicy] = [
     """,
     ),
     backend_app_api_auth.CedarPolicy(
+        description="Allows support staff to see the project they support, only while it allows remote support.",
+        statement=f"""
+            permit (
+                principal,
+                action in {projects_auth_schema.get_full_action_names([
+                    projects_auth_schema.ProjectsBCActions.GetProject,
+                    projects_auth_schema.ProjectsBCActions.GetProjectAccounts,
+                ])},
+                resource
+            )
+            when {{ principal in {config.CedarResourceAttribute.SUPPORTERS} && {config.CEDAR_REMOTE_SUPPORT_ENABLED} }};
+    """,
+    ),
+    backend_app_api_auth.CedarPolicy(
         description="Allows all authenticated principals to enrol, get available projects and get Swagger API spec.",
         statement=f"""
             permit (

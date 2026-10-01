@@ -15,6 +15,8 @@ class VirtualWorkbenchRoles(StrEnum):
     PlatformUser = "PLATFORM_USER"
     BetaUser = "BETA_USER"
     ProductContributor = "PRODUCT_CONTRIBUTOR"
+    # Remote support staff; must parse here or principals holding it would be rejected.
+    Support = "SUPPORT"
 
     @staticmethod
     def list():

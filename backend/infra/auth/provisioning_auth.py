@@ -64,6 +64,20 @@ provisioning_bc_auth_policies: list[backend_app_api_auth.CedarPolicy] = [
     """,
     ),
     backend_app_api_auth.CedarPolicy(
+        description="Allows SUPPORT (and ADMIN) to list a project's provisioned products, if the project allows remote support.",
+        statement=f"""
+            permit (
+                principal,
+                action in {provisioning_auth_schema.get_full_action_names([
+                    provisioning_auth_schema.ProvisioningBCActions.GetProjectPaginatedProvisionedProducts,
+                    provisioning_auth_schema.ProvisioningBCActions.GetProjectProvisionedProducts,
+                ])},
+                resource
+            )
+            when {{ principal in {config.CedarResourceAttribute.SUPPORTERS} && {config.CEDAR_REMOTE_SUPPORT_ENABLED} }};
+    """,
+    ),
+    backend_app_api_auth.CedarPolicy(
         description="Allows all authenticated principals to get Swagger API spec.",
         statement=f"""
             permit (

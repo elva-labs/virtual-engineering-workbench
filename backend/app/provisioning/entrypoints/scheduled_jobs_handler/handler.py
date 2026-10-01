@@ -177,7 +177,25 @@ def workbench_lifecycle_handler(event: workbench_lifecycle_job.WorkbenchLifecycl
     # The nightly workbench stop and delivering the inactivity timeout to the instances.
     if event.action == "nightly-stop":
         return dependencies.workbench_lifecycle_srv.nightly_stop(dry_run=event.dryRun)
+    if event.action == "idle-stop":
+        return _idle_stop(dry_run=event.dryRun)
     return dependencies.workbench_lifecycle_srv.reconcile_tags(dry_run=event.dryRun)
+
+
+def _idle_stop(dry_run: bool) -> dict:
+    """The counts feed the IdleSignalMissing alarm and the dashboards (type IdleStop)."""
+    result = dependencies.workbench_lifecycle_srv.idle_stop(dry_run=dry_run)
+    if result.get("disabled"):
+        return result
+    for name, value in (
+        ("IdleStopStopped", 0 if result["dryRun"] else len(result["stopped"])),
+        ("IdleStopWouldStop", len(result["stopped"]) if result["dryRun"] else 0),
+        ("IdleSignalMissing", len(result["missing"])),
+        ("IdleSignalReadFailed", len(result["failed"])),
+    ):
+        with single_metric(name=name, unit=MetricUnit.Count, value=value) as metric:
+            metric.add_dimension(name="type", value="IdleStop")
+    return result
 
 
 @tracer.capture_lambda_handler  # type: ignore

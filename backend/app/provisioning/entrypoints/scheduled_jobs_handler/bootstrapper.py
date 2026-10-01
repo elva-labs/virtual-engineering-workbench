@@ -6,9 +6,6 @@ from mypy_boto3_servicecatalog import client
 from mypy_boto3_ssm import client as ssm_client
 from pydantic import BaseModel, ConfigDict
 
-from app.provisioning.domain.command_handlers.provisioned_product_state import workbench_lifecycle
-from app.provisioning.domain.model import idle_signals
-from app.provisioning.domain.model import workbench_lifecycle as workbench_lifecycle_model
 from app.provisioning.adapters.query_services import (
     aws_networking_query_service,
     dynamodb_provisioned_products_query_service,
@@ -33,6 +30,7 @@ from app.provisioning.domain.command_handlers.product_provisioning import (
 from app.provisioning.domain.command_handlers.provisioned_product_state import (
     initiate_batch_stop,
     sync,
+    workbench_lifecycle,
 )
 from app.provisioning.domain.commands.product_provisioning import (
     cleanup_provisioned_products_command,
@@ -41,6 +39,8 @@ from app.provisioning.domain.commands.provisioned_product_state import (
     initiate_provisioned_product_batch_stop_command,
     sync_provisioned_product_state_command,
 )
+from app.provisioning.domain.model import idle_signals
+from app.provisioning.domain.model import workbench_lifecycle as workbench_lifecycle_model
 from app.provisioning.domain.query_services import (
     projects_domain_query_service,
     provisioned_products_domain_query_service,

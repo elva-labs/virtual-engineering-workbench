@@ -849,9 +849,14 @@ paths:
         - $ref: '#/components/parameters/Architecture'
         - name: projectId
           in: query
-          required: true
+          required: false
           description: The project the change is made for (the releasing project if one is configured).
           schema: {type: string, minLength: 1}
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DeleteMandatoryComponentsListRequest'}
       responses:
         '204': {description: The list is gone (also when there was none).}
         '400': {$ref: '#/components/responses/Problem'}
@@ -1697,6 +1702,12 @@ components:
         mandatoryComponentsLists:
           type: array
           items: {$ref: '#/components/schemas/MandatoryComponentsList'}
+    DeleteMandatoryComponentsListRequest:
+      type: object
+      additionalProperties: false
+      required: [projectId]
+      properties:
+        projectId: {type: string, minLength: 1}
     PutMandatoryComponentsListRequest:
       type: object
       additionalProperties: false

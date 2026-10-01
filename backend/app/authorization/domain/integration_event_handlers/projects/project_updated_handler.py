@@ -4,9 +4,11 @@ from app.shared.adapters.unit_of_work_v2 import unit_of_work
 
 
 def handle(event: project_updated.ProjectUpdated, uow: unit_of_work.UnitOfWork):
-    """Keeps the authorizer's copy of whether an external tool manages the project. Events without the
-    field (from before it existed) keep the stored value."""
-    if "managedBy" not in event.model_fields_set:
+    """Keeps the authorizer's copy of the project's remote-support setting and of whether an external
+    tool manages the project. Fields absent from the event (from before they existed) keep the stored
+    value."""
+    has_management = "managedBy" in event.model_fields_set
+    if event.remoteSupportEnabled is None and not has_management:
         return
 
     with uow:
@@ -15,8 +17,11 @@ def handle(event: project_updated.ProjectUpdated, uow: unit_of_work.UnitOfWork):
 
         stored = settings_repo.get(settings_id)
         settings = stored or project_settings.ProjectSettings(projectId=event.projectId)
-        settings.managedBy = event.managedBy or None
-        settings.managedSource = event.managedSource if event.managedBy else None
+        if event.remoteSupportEnabled is not None:
+            settings.remoteSupportEnabled = event.remoteSupportEnabled
+        if has_management:
+            settings.managedBy = event.managedBy or None
+            settings.managedSource = event.managedSource if event.managedBy else None
         if stored:
             settings_repo.update_entity(settings_id, settings)
         else:

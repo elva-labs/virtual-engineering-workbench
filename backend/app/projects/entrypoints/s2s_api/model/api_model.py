@@ -29,6 +29,11 @@ class Project(BaseModel):
         description="Point in time where project is last updated.",
         title="LastUpdateDate",
     )
+    remoteSupportEnabled: Optional[bool] = Field(
+        None,
+        description="Whether SUPPORT staff may support the project's workbenches.",
+        title="RemoteSupportEnabled",
+    )
     managedBy: Optional[str] = Field(
         None, description="The external tool that manages the project, if any.", title="ManagedBy"
     )
@@ -60,6 +65,8 @@ class ProjectMutationRequest(BaseModel):
     name: str
     description: Optional[str] = None
     isActive: bool
+    # Omitted keeps the current value; a new project has remote support on.
+    remoteSupportEnabled: Optional[bool] = None
 
 
 class CreateProjectResponse(BaseModel):

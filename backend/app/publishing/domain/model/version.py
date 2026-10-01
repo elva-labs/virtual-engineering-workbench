@@ -124,6 +124,8 @@ class VersionPrimaryKey(unit_of_work.PrimaryKey):
     productId: str = Field(..., title="ProductId")
     versionId: str = Field(..., title="versionId")
     awsAccountId: str = Field(..., title="AwsAccountId")
+    # One AWS account may serve several stages (ADR 0013): a distribution is per account and stage.
+    stage: str = Field(..., title="Stage")
 
 
 class Version(unit_of_work.Entity):

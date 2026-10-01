@@ -38,6 +38,7 @@ class PublishingApiQueryService(publishing_query_service.PublishingQueryService)
         product_id: str,
         version_id: str,
         account_id: str,
+        stage: str,
     ) -> version.Version | None:
         try:
             # Call publishing bounded context's internal API gateway to get product version
@@ -46,6 +47,7 @@ class PublishingApiQueryService(publishing_query_service.PublishingQueryService)
                 http_method="GET",
                 query_params={
                     "awsAccountId": account_id,
+                    "stage": stage,
                 },
             )
 

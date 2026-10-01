@@ -99,3 +99,12 @@ class ReleasingProjectOnly(S2SException):
 class BaseImageNotReleasedToRequiredChannel(S2SException):
     def __init__(self, detail: str) -> None:
         super().__init__(detail, code="BASE_IMAGE_NOT_RELEASED_TO_REQUIRED_CHANNEL", retryable=False)
+
+
+class MandatoryComponentsListReleasingProjectOnly(S2SException):
+    def __init__(self) -> None:
+        super().__init__(
+            "Mandatory components lists apply to every project; only the releasing project changes them.",
+            code="RELEASING_PROJECT_ONLY",
+            retryable=False,
+        )

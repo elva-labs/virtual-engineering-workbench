@@ -17,6 +17,10 @@ class AppConfig(config.VEWBaseConfig):
 
         return [f"/{p.strip()}" for p in prefixes.split(",") if p.strip()]
 
+    def get_platform_program_id(self) -> str:
+        """The releasing program whose PLATFORM products every program lists (docs/platform-products.md)."""
+        return os.environ.get("PLATFORM_PROGRAM_ID", "")
+
     def get_table_name(self) -> str:
         return os.environ.get("TABLE_NAME", "")
 

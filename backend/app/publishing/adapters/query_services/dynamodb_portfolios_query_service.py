@@ -45,3 +45,18 @@ class DynamoDBPortfoliosQueryService(portfolios_query_service.PortfoliosQuerySer
                 portfolios.extend([portfolio.Portfolio.model_validate(item) for item in result["Items"]])
 
         return portfolios
+
+    def get_portfolios_by_stage(self, portfolio_stage: str) -> typing.List[portfolio.Portfolio]:
+        portfolios = []
+        query_kwargs = {
+            "TableName": self._table_name,
+            "IndexName": self._gsi_name_entities,
+            "KeyConditionExpression": Key("entity").eq(DBPrefix.PORTFOLIO.value),
+            "FilterExpression": Attr("stage").eq(str(portfolio_stage)),
+        }
+        while True:
+            result = self._dynamodb_client.query(**query_kwargs)
+            portfolios.extend([portfolio.Portfolio.model_validate(item) for item in result.get("Items", [])])
+            if "LastEvaluatedKey" not in result:
+                return portfolios
+            query_kwargs["ExclusiveStartKey"] = result["LastEvaluatedKey"]

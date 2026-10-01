@@ -18,3 +18,4 @@ class ProductAvailabilityUpdated(BaseModel):
     paused_stages: Optional[list[product.ProductStage]] = Field(None, alias="pausedStages")
     paused_regions: Optional[list[str]] = Field(None, alias="pausedRegions")
     last_update_date: str = Field(..., alias="lastUpdateDate")
+    scope: product.ProductScope = Field(product.ProductScope.Program, alias="scope")

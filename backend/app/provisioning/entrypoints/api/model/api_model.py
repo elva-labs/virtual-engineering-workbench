@@ -45,6 +45,11 @@ class AvailableProduct(BaseModel):
         description="Operating System versions available for the product.",
         title="AvailableOSVersions",
     )
+    scope: Optional[str] = Field(
+        "PROGRAM",
+        description="PROGRAM for the program's own products, PLATFORM for products the platform releases to every program.",
+        title="Scope",
+    )
 
 
 class GetAvailableProductsResponse(BaseModel):

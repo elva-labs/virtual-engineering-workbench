@@ -18,6 +18,7 @@ import {
   Table,
   TextFilter,
   NonCancelableCustomEvent,
+  Badge,
 } from '@cloudscape-design/components';
 import { BreadcrumbItem } from '../../../layout';
 import { AvailableProduct } from '../../../../services/API/proserve-wb-provisioning-api';
@@ -277,6 +278,8 @@ export const AvailableProductsNew: FC<AvailableProductsProps> = ({
     return (
       <div className={styles['card-header']}>
         {item.productName}
+        {/* Released by the platform to every program (docs/platform-products.md). */}
+        {item.scope === 'PLATFORM' && <Badge color="blue">Platform</Badge>}
         <div className={styles['card-header-os-icons']}>
           <FeatureToggle feature={Feature.ProductMetadata}>
             {getOSImages(item.availableOSVersions || [])}

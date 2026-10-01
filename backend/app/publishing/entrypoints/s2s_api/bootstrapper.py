@@ -75,6 +75,7 @@ class Dependencies(BaseModel):
     project_access_service: ServiceClientProjectAccessService
     technologies_query_service: TechnologiesQueryService
     idempotency_service: IdempotencyService
+    platform_program_id: str = ""
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -164,4 +165,5 @@ def bootstrap(app_config: config.AppConfig, logger: logging.Logger) -> Dependenc
         ),
         # Records live in the Publishing table (TTL on ExpireDate).
         idempotency_service=dynamodb_idempotency_service.DynamoDBIdempotencyService(table_name, dynamodb_client),
+        platform_program_id=app_config.get_platform_program_id(),
     )

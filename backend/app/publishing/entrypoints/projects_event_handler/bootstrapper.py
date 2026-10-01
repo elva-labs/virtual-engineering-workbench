@@ -2,15 +2,29 @@ import boto3
 from aws_lambda_powertools import logging
 from pydantic import BaseModel, ConfigDict
 
-from app.publishing.adapters.query_services import service_catalog_query_service
+from app.publishing.adapters.query_services import (
+    dynamodb_products_query_service,
+    dynamodb_versions_query_service,
+    service_catalog_query_service,
+)
 from app.publishing.adapters.repository import dynamo_entity_config
 from app.publishing.adapters.repository.dynamo_entity_migrations import migrations_config
 from app.publishing.adapters.services import service_catalog_service
-from app.publishing.domain.command_handlers import create_portfolio_command_handler
-from app.publishing.domain.commands import create_portfolio_command
+from app.publishing.domain.command_handlers import (
+    create_portfolio_command_handler,
+    distribute_platform_versions_command_handler,
+)
+from app.publishing.domain.commands import create_portfolio_command, distribute_platform_versions_command
 from app.publishing.entrypoints.projects_event_handler import config
-from app.shared.adapters.message_bus import command_bus, command_bus_metrics, in_memory_command_bus
+from app.shared.adapters.message_bus import (
+    command_bus,
+    command_bus_metrics,
+    event_bridge_message_bus,
+    in_memory_command_bus,
+    message_bus_metrics,
+)
 from app.shared.adapters.unit_of_work_v2 import dynamodb_migrations, dynamodb_unit_of_work
+from app.shared.api import aws_events_api
 from app.shared.instrumentation import power_tools_metrics
 from app.shared.logging import boto_logger
 
@@ -77,13 +91,55 @@ def bootstrap(
         return _handle_command
 
     metrics_client = power_tools_metrics.PowerToolsMetrics()
-
-    command_bus = command_bus_metrics.CommandBusMetrics(
-        inner=in_memory_command_bus.InMemoryCommandBus(logger=logger),
+    domain_message_bus = message_bus_metrics.MessageBusMetrics(
+        inner=event_bridge_message_bus.EventBridgeMessageBus(
+            events_api=aws_events_api.AWSEventsApi(
+                client=session.client("events", region_name=app_config.get_default_region())
+            ),
+            event_bus_name=app_config.get_domain_event_bus_name(),
+            bounded_context_name=app_config.get_bounded_context_name(),
+            logger=logger,
+        ),
         metrics_client=metrics_client,
-    ).register_handler(
-        create_portfolio_command.CreatePortfolioCommand,
-        _create_portfolio_handler_factory(),
+        logger=logger,
+    )
+    products_qry_srv = dynamodb_products_query_service.DynamoDBProductsQueryService(
+        table_name=app_config.get_table_name(),
+        dynamodb_client=dynamodb.meta.client,
+        gsi_name_entities=app_config.get_gsi_name_entities(),
+    )
+    versions_qry_srv = dynamodb_versions_query_service.DynamoDBVersionsQueryService(
+        table_name=app_config.get_table_name(),
+        dynamodb_client=dynamodb.meta.client,
+        gsi_name_entities=app_config.get_gsi_name_entities(),
+    )
+
+    def _distribute_platform_versions_handler(
+        command: distribute_platform_versions_command.DistributePlatformVersionsCommand,
+    ):
+        return distribute_platform_versions_command_handler.handle(
+            cmd=command,
+            uow=shared_uow,
+            message_bus=domain_message_bus,
+            products_qry_srv=products_qry_srv,
+            versions_qry_srv=versions_qry_srv,
+            platform_program_id=app_config.get_platform_program_id(),
+            logger=logger,
+        )
+
+    command_bus = (
+        command_bus_metrics.CommandBusMetrics(
+            inner=in_memory_command_bus.InMemoryCommandBus(logger=logger),
+            metrics_client=metrics_client,
+        )
+        .register_handler(
+            create_portfolio_command.CreatePortfolioCommand,
+            _create_portfolio_handler_factory(),
+        )
+        .register_handler(
+            distribute_platform_versions_command.DistributePlatformVersionsCommand,
+            _distribute_platform_versions_handler,
+        )
     )
 
     return Dependencies(

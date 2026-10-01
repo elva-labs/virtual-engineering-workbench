@@ -26,6 +26,10 @@ class AppConfig(VEWBaseConfig):
     def get_gsi_name_entities(self) -> str:
         return os.environ.get("GSI_NAME_ENTITIES", "")
 
+    def get_platform_program_id(self) -> str:
+        """The releasing program, the only one that creates PLATFORM products (docs/platform-products.md)."""
+        return os.environ.get("PLATFORM_PROGRAM_ID", "")
+
 
 config = {
     "cors_config": {

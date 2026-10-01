@@ -31,6 +31,21 @@ class ProductStage(StrEnum):
     PROD = "PROD"
 
 
+class ProductScope(str, Enum):
+    """Who sees a product (docs/platform-products.md).
+
+    PROGRAM: the owning program only (upstream VEW). PLATFORM: built, tested and promoted once by the
+    releasing (Platform) program; every version is distributed to every program's accounts at the
+    stage it reaches, and every program lists it.
+    """
+
+    Program = "PROGRAM"
+    Platform = "PLATFORM"
+
+    def __str__(self):
+        return str(self.value)
+
+
 class ProductPrimaryKey(unit_of_work.PrimaryKey):
     projectId: str = Field(..., title="ProjectId")
     productId: str = Field(..., title="ProductId")
@@ -54,6 +69,8 @@ class Product(unit_of_work.Entity):
     lastUpdateDate: str = Field(..., title="LastUpdateDate")
     createdBy: str = Field(..., title="CreatedBy")
     lastUpdatedBy: str = Field(..., title="LastUpdatedBy")
+    # Records written before docs/platform-products.md carry no scope: they are program products.
+    scope: ProductScope = Field(ProductScope.Program, title="Scope")
 
 
 PRODUCT_CONTAINER_TYPES = [ProductType.Container]

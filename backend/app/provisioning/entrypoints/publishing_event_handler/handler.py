@@ -49,6 +49,7 @@ def handle_product_availability_updated(
         pausedStages=event.paused_stages,
         pausedRegions=event.paused_regions,
         lastUpdateDate=event.last_update_date,
+        scope=event.scope,
     )
     # Execute event handler
     dependencies.update_product_read_model_event_handler(product_obj)

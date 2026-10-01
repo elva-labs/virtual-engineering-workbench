@@ -224,10 +224,11 @@ export const ProvisionedProductsList = (
     {
       id: 'owner',
       header: translations.columnOwner,
+      // The e-mail when VEW knows it (launches since it was recorded), the opaque id otherwise.
       cell: (e) => <> {
-        !!e.userId &&
+        !!(e.ownerEmail || e.userId) &&
           <CopyText
-            copyText={e.userId ?? ''}
+            copyText={e.ownerEmail || e.userId || ''}
             copyButtonLabel={translations.copyButtonLabel}
             successText={translations.copySuccess}
             errorText={translations.copyError} />
@@ -452,7 +453,7 @@ export const ProvisionedProductsListActions = (
           {
             id: 'owner',
             header: translations.columnOwner,
-            cell: (e) => e.userId,
+            cell: (e) => e.ownerEmail || e.userId,
           },
           {
             id: 'lastUpdateDate',

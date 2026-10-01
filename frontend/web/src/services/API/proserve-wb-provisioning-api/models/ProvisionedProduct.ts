@@ -75,6 +75,12 @@ export interface ProvisionedProduct {
      */
     userId: string;
     /**
+     * The owner's e-mail address.
+     * @type {string}
+     * @memberof ProvisionedProduct
+     */
+    ownerEmail?: string;
+    /**
      * Status.
      * @type {string}
      * @memberof ProvisionedProduct
@@ -318,6 +324,7 @@ export function ProvisionedProductFromJSONTyped(json: any, ignoreDiscriminator: 
         'provisionedProductName': json['provisionedProductName'],
         'provisionedProductType': !exists(json, 'provisionedProductType') ? undefined : json['provisionedProductType'],
         'userId': json['userId'],
+        'ownerEmail': !exists(json, 'ownerEmail') ? undefined : json['ownerEmail'],
         'status': json['status'],
         'statusReason': !exists(json, 'statusReason') ? undefined : json['statusReason'],
         'productId': json['productId'],
@@ -369,6 +376,7 @@ export function ProvisionedProductToJSON(value?: ProvisionedProduct | null): any
         'provisionedProductName': value.provisionedProductName,
         'provisionedProductType': value.provisionedProductType,
         'userId': value.userId,
+        'ownerEmail': value.ownerEmail,
         'status': value.status,
         'statusReason': value.statusReason,
         'productId': value.productId,

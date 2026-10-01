@@ -2248,6 +2248,10 @@ components:
           title: UserId
           type: string
           description: User Id.
+        ownerEmail:
+          title: OwnerEmail
+          type: string
+          description: The owner's e-mail address.
         status:
           title: Status
           type: string

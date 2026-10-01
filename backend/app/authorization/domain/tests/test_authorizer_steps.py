@@ -140,13 +140,23 @@ def test_amazon_verified_permissions_when_project_scoped_and_has_assignments(
                                 "entityType": "VEW::ProjectAssignment",
                             }
                         },
+                        "supporters": {
+                            "entityIdentifier": {
+                                "entityId": "project456#SUPPORT",
+                                "entityType": "VEW::ProjectAssignment",
+                            }
+                        },
+                        "remoteSupportEnabled": {"boolean": True},
                     },
                     "parents": [],
                 },
                 {
                     "identifier": {"entityId": "project456#ADMIN", "entityType": "VEW::ProjectAssignment"},
                     "attributes": {},
-                    "parents": [{"entityId": "project456#PROGRAM_OWNER", "entityType": "VEW::ProjectAssignment"}],
+                    "parents": [
+                        {"entityId": "project456#PROGRAM_OWNER", "entityType": "VEW::ProjectAssignment"},
+                        {"entityId": "project456#SUPPORT", "entityType": "VEW::ProjectAssignment"},
+                    ],
                 },
                 {
                     "identifier": {"entityId": "project456#PROGRAM_OWNER", "entityType": "VEW::ProjectAssignment"},
@@ -173,6 +183,11 @@ def test_amazon_verified_permissions_when_project_scoped_and_has_assignments(
                 },
                 {
                     "identifier": {"entityId": "project456#PLATFORM_USER", "entityType": "VEW::ProjectAssignment"},
+                    "attributes": {},
+                    "parents": [],
+                },
+                {
+                    "identifier": {"entityId": "project456#SUPPORT", "entityType": "VEW::ProjectAssignment"},
                     "attributes": {},
                     "parents": [],
                 },
@@ -301,13 +316,23 @@ def test_amazon_verified_permissions_when_project_assignment_feature_enabled_and
                                 "entityType": "VEW::ProjectAssignment",
                             }
                         },
+                        "supporters": {
+                            "entityIdentifier": {
+                                "entityId": "project456#SUPPORT",
+                                "entityType": "VEW::ProjectAssignment",
+                            }
+                        },
+                        "remoteSupportEnabled": {"boolean": True},
                     },
                     "parents": [],
                 },
                 {
                     "identifier": {"entityId": "project456#ADMIN", "entityType": "VEW::ProjectAssignment"},
                     "attributes": {},
-                    "parents": [{"entityId": "project456#PROGRAM_OWNER", "entityType": "VEW::ProjectAssignment"}],
+                    "parents": [
+                        {"entityId": "project456#PROGRAM_OWNER", "entityType": "VEW::ProjectAssignment"},
+                        {"entityId": "project456#SUPPORT", "entityType": "VEW::ProjectAssignment"},
+                    ],
                 },
                 {
                     "identifier": {"entityId": "project456#PROGRAM_OWNER", "entityType": "VEW::ProjectAssignment"},
@@ -334,6 +359,11 @@ def test_amazon_verified_permissions_when_project_assignment_feature_enabled_and
                 },
                 {
                     "identifier": {"entityId": "project456#PLATFORM_USER", "entityType": "VEW::ProjectAssignment"},
+                    "attributes": {},
+                    "parents": [],
+                },
+                {
+                    "identifier": {"entityId": "project456#SUPPORT", "entityType": "VEW::ProjectAssignment"},
                     "attributes": {},
                     "parents": [],
                 },
@@ -519,13 +549,23 @@ def test_amazon_verified_permissions_when_project_id_but_no_assignments(
                                 "entityType": "VEW::ProjectAssignment",
                             }
                         },
+                        "supporters": {
+                            "entityIdentifier": {
+                                "entityId": "project456#SUPPORT",
+                                "entityType": "VEW::ProjectAssignment",
+                            }
+                        },
+                        "remoteSupportEnabled": {"boolean": True},
                     },
                     "parents": [],
                 },
                 {
                     "identifier": {"entityId": "project456#ADMIN", "entityType": "VEW::ProjectAssignment"},
                     "attributes": {},
-                    "parents": [{"entityId": "project456#PROGRAM_OWNER", "entityType": "VEW::ProjectAssignment"}],
+                    "parents": [
+                        {"entityId": "project456#PROGRAM_OWNER", "entityType": "VEW::ProjectAssignment"},
+                        {"entityId": "project456#SUPPORT", "entityType": "VEW::ProjectAssignment"},
+                    ],
                 },
                 {
                     "identifier": {"entityId": "project456#PROGRAM_OWNER", "entityType": "VEW::ProjectAssignment"},
@@ -552,6 +592,11 @@ def test_amazon_verified_permissions_when_project_id_but_no_assignments(
                 },
                 {
                     "identifier": {"entityId": "project456#PLATFORM_USER", "entityType": "VEW::ProjectAssignment"},
+                    "attributes": {},
+                    "parents": [],
+                },
+                {
+                    "identifier": {"entityId": "project456#SUPPORT", "entityType": "VEW::ProjectAssignment"},
                     "attributes": {},
                     "parents": [],
                 },

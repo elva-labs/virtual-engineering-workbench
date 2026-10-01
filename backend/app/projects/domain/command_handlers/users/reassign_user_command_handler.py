@@ -19,6 +19,8 @@ PROGRAM_OWNER_ALLOWED_ROLES = {
 
 PROGRAM_ADMIN_ALLOWED_ROLES = {
     project_assignment.Role.ADMIN,
+    # Support staff are granted by admins only, not by program owners.
+    project_assignment.Role.SUPPORT,
     *PROGRAM_OWNER_ALLOWED_ROLES,
 }
 

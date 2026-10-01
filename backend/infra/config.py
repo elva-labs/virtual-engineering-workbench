@@ -437,4 +437,9 @@ authorization_app_config = {
 
 product_publishing_enablement_app_config = {"dev": {}, "qa": {}, "prod": {}}
 
-provisioning_enablement_app_config = {"dev": {}, "qa": {}, "prod": {}}
+# workbench-agents-enabled: install the idle agent on workbenches by SSM association (docs/idle-stop.md).
+provisioning_enablement_app_config = {
+    "dev": {"workbench-agents-enabled": False},
+    "qa": {"workbench-agents-enabled": False},
+    "prod": {"workbench-agents-enabled": False},
+}

@@ -17,6 +17,7 @@ def status_for(error: s2s_exception.S2SException) -> HTTPStatus:  # noqa: C901
             s2s_exception.IdempotencyKeyReused,
             s2s_exception.IdempotencyRequestInProgress,
             s2s_exception.ResourceConflict,
+            s2s_exception.ReleasingProjectOnly,
         ),
     ):
         return HTTPStatus.CONFLICT

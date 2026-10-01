@@ -2,7 +2,7 @@ from aws_lambda_powertools import logging, metrics, tracing
 from aws_lambda_powertools.utilities import typing
 from aws_lambda_powertools.utilities.data_classes import EventBridgeEvent, event_source
 
-from app.publishing.domain.commands import create_portfolio_command
+from app.publishing.domain.commands import create_portfolio_command, distribute_platform_versions_command
 from app.publishing.domain.value_objects import (
     account_id_value_object,
     aws_account_id_value_object,
@@ -45,6 +45,15 @@ def handle_project_account_on_boarded(
 
     # Execute command handler
     dependencies.command_bus.handle(create_portfolio_cmd)
+
+    # The new portfolio also receives the platform versions already live at its stage (docs/platform-products.md).
+    dependencies.command_bus.handle(
+        distribute_platform_versions_command.DistributePlatformVersionsCommand(
+            technologyId=tech_id_value_object.from_str(event.technology_id),
+            awsAccountId=aws_account_id_value_object.from_str(event.aws_account_id),
+            stage=stage_value_object.from_str(event.stage),
+        )
+    )
 
 
 @tracer.capture_lambda_handler  # type: ignore

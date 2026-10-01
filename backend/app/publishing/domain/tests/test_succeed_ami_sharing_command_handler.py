@@ -14,6 +14,7 @@ from app.publishing.domain.value_objects import (
     event_name_value_object,
     product_id_value_object,
     product_type_value_object,
+    stage_value_object,
     version_id_value_object,
 )
 from app.shared.adapters.message_bus import message_bus
@@ -25,6 +26,7 @@ def command_mock() -> succeed_ami_sharing_command.SucceedAmiSharingCommand:
         productId=product_id_value_object.from_str("prod-12345abc"),
         versionId=version_id_value_object.from_str("vers-12345abc"),
         awsAccountId=aws_account_id_value_object.from_str("123456789012"),
+        stage=stage_value_object.from_str("DEV"),
         copiedAmiId=ami_id_value_object.from_str("ami-54321"),
         previousEventName=event_name_value_object.from_str("ProductVersionCreationStarted"),
         productType=product_type_value_object.from_str("WORKBENCH"),
@@ -37,6 +39,7 @@ def command_mock_container_type() -> succeed_ami_sharing_command.SucceedAmiShari
         productId=product_id_value_object.from_str("prod-12345abc"),
         versionId=version_id_value_object.from_str("vers-12345abc"),
         awsAccountId=aws_account_id_value_object.from_str("123456789012"),
+        stage=stage_value_object.from_str("DEV"),
         copiedAmiId=None,
         previousEventName=event_name_value_object.from_str("ProductVersionCreationStarted"),
         productType=product_type_value_object.from_str("CONTAINER"),
@@ -68,7 +71,9 @@ def test_succeed_ami_sharing_command_handler_updates_version_and_publishes_event
 
     # ASSERT
     mock_version_repo.update_attributes.assert_called_once_with(
-        version.VersionPrimaryKey(productId="prod-12345abc", versionId="vers-12345abc", awsAccountId="123456789012"),
+        version.VersionPrimaryKey(
+            productId="prod-12345abc", versionId="vers-12345abc", awsAccountId="123456789012", stage="DEV"
+        ),
         copiedAmiId="ami-54321",
         lastUpdateDate="2023-07-31T00:00:00+00:00",
     )
@@ -78,6 +83,7 @@ def test_succeed_ami_sharing_command_handler_updates_version_and_publishes_event
             product_id="prod-12345abc",
             version_id="vers-12345abc",
             aws_account_id="123456789012",
+            stage="DEV",
             previousEventName="ProductVersionCreationStarted",
         )
     )
@@ -102,6 +108,7 @@ def test_succeed_ami_sharing_command_handler_doesnt_update_version_and_publishes
             product_id="prod-12345abc",
             version_id="vers-12345abc",
             aws_account_id="123456789012",
+            stage="DEV",
             previousEventName="ProductVersionCreationStarted",
         )
     )

@@ -63,6 +63,7 @@ def handle(
     file_srv: template_service.TemplateService,
     shared_amis_qry_srv: shared_amis_query_service.SharedAMIsQueryService,
     template_qry_srv: template_domain_query_service.TemplateDomainQueryService,
+    stage_in_sc_product_name: bool = False,
 ) -> None:
     """
     This command handler publishes product version to aws account and stage.
@@ -79,7 +80,7 @@ def handle(
         )
 
         sc_product_id, sc_provisioning_artifact_id = _ensure_product_and_version(
-            catalog_qry_srv, catalog_srv, vers, prod, template_path
+            catalog_qry_srv, catalog_srv, vers, prod, template_path, stage_in_sc_product_name
         )
 
         # Associate product with portfolio
@@ -150,6 +151,7 @@ def handle(
                     productId=cmd.productId.value,
                     versionId=cmd.versionId.value,
                     awsAccountId=cmd.awsAccountId.value,
+                    stage=cmd.stage.value,
                 ),
                 scProductId=sc_product_id,
                 scProvisioningArtifactId=sc_provisioning_artifact_id,
@@ -197,6 +199,7 @@ def handle(
                     productId=cmd.productId.value,
                     versionId=cmd.versionId.value,
                     awsAccountId=cmd.awsAccountId.value,
+                    stage=cmd.stage.value,
                 ),
                 status=version.VersionStatus.Failed,
                 lastUpdateDate=datetime.now(timezone.utc).isoformat(),
@@ -213,6 +216,7 @@ def _get_version_and_product(cmd, uow):
                 productId=cmd.productId.value,
                 versionId=cmd.versionId.value,
                 awsAccountId=cmd.awsAccountId.value,
+                stage=cmd.stage.value,
             )
         )
         prod = uow.get_repository(product.ProductPrimaryKey, product.Product).get(
@@ -221,8 +225,15 @@ def _get_version_and_product(cmd, uow):
     return vers, prod
 
 
-def _ensure_product_and_version(catalog_qry_srv, catalog_srv, vers, prod, template_path):
-    sc_product_name = f"{prod.productId}-{vers.awsAccountId}"
+def build_sc_product_name(product_id: str, aws_account_id: str, stage: str, stage_in_name: bool) -> str:
+    """One SC product per account, or per account and stage where several stages share an account
+    ("several-stages-per-account"), so a stage's renames, retirements and unpublishing never touch
+    another stage's artifacts."""
+    return f"{product_id}-{aws_account_id}-{stage.lower()}" if stage_in_name else f"{product_id}-{aws_account_id}"
+
+
+def _ensure_product_and_version(catalog_qry_srv, catalog_srv, vers, prod, template_path, stage_in_name=False):
+    sc_product_name = build_sc_product_name(prod.productId, vers.awsAccountId, str(vers.stage), stage_in_name)
     sc_product_id = catalog_qry_srv.get_sc_product_id(region=vers.region, sc_product_name=sc_product_name)
     if sc_product_id:
         sc_provisioning_artifact_id = catalog_qry_srv.get_sc_provisioning_artifact_id(

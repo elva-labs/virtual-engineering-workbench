@@ -268,6 +268,10 @@ class PublishingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                     lambda_root="app/publishing",
                     entry="app/publishing/entrypoints/domain_event_handler",
                     environment={
+                        # One SC product per account and stage where several stages share an account.
+                        "SEVERAL_STAGES_PER_ACCOUNT": str(
+                            app_config.environment_config.get("several-stages-per-account", False)
+                        ).lower(),
                         "TABLE_NAME": self._storage.table.table_name,
                         "GSI_NAME_ENTITIES": GSI_NAME_ENTITIES,
                         "DOMAIN_EVENT_BUS_ARN": self._event_bus.event_bus_arn,

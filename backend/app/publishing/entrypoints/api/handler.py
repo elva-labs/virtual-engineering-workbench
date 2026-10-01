@@ -367,13 +367,15 @@ def get_product_version_distribution_internal(
     product_id: str,
     version_id: str,
     account_param: Annotated[list[str], Query(alias="awsAccountId")],
+    stage_param: Annotated[list[str], Query(alias="stage")],
 ) -> api_gateway.Response[api_model.GetProductVersionInternalResponse]:
-    """Get a single product version distribution."""
+    """Get a single product version distribution (one per account and stage, ADR 0013)."""
 
     version_enriched = dependencies.versions_domain_qry_srv.get_version_distribution(
         product_id=product_id_value_object.from_str(product_id),
         version_id=version_id_value_object.from_str(version_id),
         aws_account_id=aws_account_id_value_object.from_str(account_param.pop()),
+        stage=stage_value_object.from_str(stage_param.pop()),
     )
 
     return api_gateway.Response(

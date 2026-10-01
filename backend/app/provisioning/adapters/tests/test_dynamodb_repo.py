@@ -27,6 +27,7 @@ def test_add_version_should_store_version(
                 productId="prod-1",
                 versionId="vers-1",
                 awsAccountId="001234567890",
+                stage="DEV",
             )
         )
     assertpy.assert_that(ent).is_equal_to(v)

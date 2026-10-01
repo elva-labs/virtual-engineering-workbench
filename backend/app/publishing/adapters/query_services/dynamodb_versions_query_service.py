@@ -4,6 +4,7 @@ import natsort
 from boto3.dynamodb.conditions import Attr, AttributeBase, ConditionBase, Key
 from mypy_boto3_dynamodb import client
 
+from app.publishing.adapters.repository import dynamo_entity_config
 from app.publishing.adapters.services import dynamo_db_repositories
 from app.publishing.domain.model import version
 from app.publishing.domain.ports import versions_query_service
@@ -121,13 +122,14 @@ class DynamoDBVersionsQueryService(versions_query_service.VersionsQueryService):
         product_id: str,
         version_id: str,
         aws_account_id: str,
+        stage: str,
     ) -> version.Version | None:
         """Return version distribution"""
         result = self._dynamodb_client.get_item(
             TableName=self._table_name,
             Key={
                 "PK": f"{dynamo_db_repositories.DBPrefix.PRODUCT}#{product_id}",
-                "SK": f"{dynamo_db_repositories.DBPrefix.VERSION}#{version_id}#{dynamo_db_repositories.DBPrefix.AWS_ACCOUNT}#{aws_account_id}",
+                "SK": dynamo_entity_config.version_sort_key(version_id, aws_account_id, stage),
             },
         )
 

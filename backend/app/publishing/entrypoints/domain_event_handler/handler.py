@@ -15,6 +15,7 @@ from app.publishing.domain.value_objects import (
     event_name_value_object,
     product_id_value_object,
     project_id_value_object,
+    stage_value_object,
     version_id_value_object,
 )
 from app.publishing.entrypoints.domain_event_handler import bootstrapper, config
@@ -55,6 +56,7 @@ def product_version_ami_shared_handler(
         productId=product_id_value_object.from_str(event.product_id),
         versionId=version_id_value_object.from_str(event.version_id),
         awsAccountId=aws_account_id_value_object.from_str(event.aws_account_id),
+        stage=stage_value_object.from_str(event.stage),
         previousEventName=event_name_value_object.from_str(event.previous_event_name),
         oldVersionId=event.old_version_id,
     )
@@ -70,6 +72,7 @@ def product_version_name_updated_handler(
         productId=product_id_value_object.from_str(event.product_id),
         versionId=version_id_value_object.from_str(event.version_id),
         awsAccountId=aws_account_id_value_object.from_str(event.aws_account_id),
+        stage=stage_value_object.from_str(event.stage),
     )
     dependencies.command_bus.handle(command)
 
@@ -93,6 +96,7 @@ def product_version_retirement_started_handler(
         productId=product_id_value_object.from_str(event.product_id),
         versionId=version_id_value_object.from_str(event.version_id),
         awsAccountId=aws_account_id_value_object.from_str(event.aws_account_id),
+        stage=stage_value_object.from_str(event.stage),
     )
     dependencies.command_bus.handle(command)
 

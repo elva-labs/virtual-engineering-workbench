@@ -10,12 +10,7 @@ from app.publishing.domain.commands import update_version_command
 from app.publishing.domain.events import product_version_update_started
 from app.publishing.domain.exceptions import domain_exception
 from app.publishing.domain.model import product, version
-from app.publishing.domain.ports import (
-    amis_query_service,
-    iac_service,
-    template_service,
-    versions_query_service,
-)
+from app.publishing.domain.ports import amis_query_service, iac_service, template_service, versions_query_service
 from app.publishing.domain.query_services import template_domain_query_service
 from app.publishing.domain.read_models import ami, component_version_detail
 from app.publishing.domain.value_objects import (
@@ -256,6 +251,7 @@ def test_handle_should_update_version_if_version_in_repository(
             productId="prod-11111111",
             versionId="version-123",
             awsAccountId="3",
+            stage="DEV",
         ),
         copiedAmiId=None,
         originalAmiId="ami-023c04780e65e723c",
@@ -284,6 +280,7 @@ def test_handle_should_update_version_if_version_in_repository(
             product_id="prod-11111111",
             version_id="version-123",
             aws_account_id="3",
+            stage="DEV",
             product_type="WORKBENCH",
         )
     )
@@ -341,6 +338,7 @@ def test_handle_should_update_version_if_version_in_repository_for_container_pro
             productId="prod-11111111",
             versionId="version-123",
             awsAccountId="3",
+            stage="DEV",
         ),
         copiedAmiId=None,
         imageTag="nginx",
@@ -366,6 +364,7 @@ def test_handle_should_update_version_if_version_in_repository_for_container_pro
             product_id="prod-11111111",
             version_id="version-123",
             aws_account_id="3",
+            stage="DEV",
             product_type="CONTAINER",
         )
     )
@@ -476,6 +475,7 @@ def test_handle_should_update_version_if_ami_has_no_components_details(
             productId="prod-11111111",
             versionId="version-123",
             awsAccountId="3",
+            stage="DEV",
         ),
         copiedAmiId=None,
         originalAmiId="ami-023c04780e65e723c",
@@ -504,6 +504,7 @@ def test_handle_should_update_version_if_ami_has_no_components_details(
             product_id="prod-11111111",
             version_id="version-123",
             aws_account_id="3",
+            stage="DEV",
             product_type="WORKBENCH",
         )
     )

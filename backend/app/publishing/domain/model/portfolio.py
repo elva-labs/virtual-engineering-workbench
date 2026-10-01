@@ -33,6 +33,8 @@ def generate_portfolio_id() -> str:
 class PortfolioPrimaryKey(unit_of_work.PrimaryKey):
     technologyId: str = Field(..., title="TechnologyId")
     awsAccountId: str = Field(..., title="AwsAccountId")
+    # One AWS account may serve several stages (ADR 0013): one portfolio per account and stage.
+    stage: str = Field(..., title="Stage")
 
 
 class Portfolio(unit_of_work.Entity):

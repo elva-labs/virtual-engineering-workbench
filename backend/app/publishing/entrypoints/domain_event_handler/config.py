@@ -69,3 +69,7 @@ class AppConfig(config.VEWBaseConfig):
 
     def get_image_service_account_id(self) -> str:
         return os.environ.get("IMAGE_SERVICE_AWS_ACCOUNT_ID", "")
+
+    def get_several_stages_per_account(self) -> bool:
+        """Several stages share an account ("several-stages-per-account"): one SC product per stage."""
+        return os.environ.get("SEVERAL_STAGES_PER_ACCOUNT", "false").lower() == "true"

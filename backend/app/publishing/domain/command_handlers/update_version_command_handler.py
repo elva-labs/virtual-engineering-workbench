@@ -139,6 +139,7 @@ def __update_version(
                     productId=command.productId.value,
                     versionId=command.versionId.value,
                     awsAccountId=version_distribution.awsAccountId,
+                    stage=version_distribution.stage,
                 ),
                 copiedAmiId=None,
                 lastUpdateDate=current_time,
@@ -160,6 +161,7 @@ def __publish_version_update_started(message_bus, fetched_version_distributions,
                 product_id=command.productId.value,
                 version_id=command.versionId.value,
                 aws_account_id=version_distribution.awsAccountId,
+                stage=version_distribution.stage,
                 product_type=product_entity.productType,
             )
         )

@@ -43,6 +43,7 @@ def handle(
                     productId=cmd.productId.value,
                     versionId=cmd.versionId.value,
                     awsAccountId=version_distribution.awsAccountId,
+                    stage=version_distribution.stage,
                 ),
                 lastUpdateDate=datetime.now(timezone.utc).isoformat(),
                 lastUpdatedBy=cmd.lastUpdatedBy.value,
@@ -55,6 +56,7 @@ def handle(
                     product_id=cmd.productId.value,
                     version_id=cmd.versionId.value,
                     aws_account_id=version_distribution.awsAccountId,
+                    stage=version_distribution.stage,
                     product_type=product_entity.productType,
                 )
             )

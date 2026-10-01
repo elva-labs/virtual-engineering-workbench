@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import boto3
+import botocore.exceptions
 from mypy_boto3_ec2 import client
 
 from app.publishing.adapters.exceptions import adapter_exception
@@ -22,12 +23,22 @@ class EC2ImageService(image_service.ImageService):
         image_srv_aws_account_id: str,
         image_srv_key_name: str,
         image_srv_region: str,
+        image_import_role: str = "",
+        image_import_bucket_prefix: str = "",
+        store_with_own_credentials: bool = False,
         boto_session: Any = None,
     ):
         self._image_srv_role = image_srv_role
         self._image_srv_aws_account_id = image_srv_aws_account_id
         self._image_srv_key_name = image_srv_key_name
         self._image_srv_region = image_srv_region
+        # "store-restore" distribution: the role that restores images in each target account and
+        # the prefix of the target accounts' import buckets (<prefix>-<account>-<region>).
+        self._image_import_role = image_import_role
+        self._image_import_bucket_prefix = image_import_bucket_prefix
+        # When the image service account is this Lambda's own account, the store task runs with the
+        # Lambda's own role (useful where only that role may write into target accounts).
+        self._store_with_own_credentials = store_with_own_credentials
         self._boto_session = boto_session
 
     def _create_ec2_client(
@@ -135,3 +146,92 @@ class EC2ImageService(image_service.ImageService):
                 raise adapter_exception.AdapterException(f"More than 1 image returned. ({response['Images']})")
 
         return response["Images"][0]["State"]
+
+    # "store-restore" distribution: the image is moved into the target account instead of shared.
+    # The store task runs in the image service account (no image key leaves it); the restore runs in
+    # the target account as its image import role.
+
+    def _store_ec2_client(self, region: str) -> client.EC2Client:
+        if self._store_with_own_credentials:
+            session = self._boto_session or boto3
+            return session.client("ec2", region_name=region)
+        sts = sts_api.STSAPI(
+            self._image_srv_aws_account_id, region, self._image_srv_role, SESSION_USER, self._boto_session
+        )
+        with sts:
+            return self._create_ec2_client(region, *sts.get_temp_creds())
+
+    def import_bucket(self, aws_account_id: str, region: str) -> str:
+        return f"{self._image_import_bucket_prefix}-{aws_account_id}-{region}"
+
+    def store_ami(self, region: str, source_ami_id: str, aws_account_id: str) -> str:
+        ec2 = self._store_ec2_client(region)
+        bucket = self.import_bucket(aws_account_id, region)
+        try:
+            return ec2.create_store_image_task(ImageId=source_ami_id, Bucket=bucket)["ObjectKey"]
+        except botocore.exceptions.ClientError:
+            # A retry after a started or finished store: the bucket holds one copy per image.
+            existing = self._store_task(ec2, source_ami_id, bucket)
+            if existing and existing.get("StoreTaskState") in ("InProgress", "Completed"):
+                return existing.get("S3objectKey") or f"{source_ami_id}.bin"
+            raise
+
+    @staticmethod
+    def _store_task(ec2: client.EC2Client, source_ami_id: str, bucket: str | None = None) -> dict | None:
+        tasks = ec2.describe_store_image_tasks(ImageIds=[source_ami_id]).get("StoreImageTaskResults", [])
+        tasks = [t for t in tasks if bucket is None or t.get("Bucket") == bucket]
+        return tasks[0] if tasks else None  # newest first
+
+    def get_store_ami_status(self, region: str, source_ami_id: str) -> str:
+        task = self._store_task(self._store_ec2_client(region), source_ami_id)
+        if not task:
+            raise adapter_exception.AdapterException(f"No store task found for image {source_ami_id}.")
+        if task.get("StoreTaskState") == "Failed":
+            raise adapter_exception.AdapterException(
+                f"Storing image {source_ami_id} failed: {task.get('StoreTaskFailureReason', 'unknown')}"
+            )
+        return task["StoreTaskState"]
+
+    def _target_ec2(self, region: str, aws_account_id: str):
+        return sts_api.STSAPI(aws_account_id, region, self._image_import_role, SESSION_USER, self._boto_session)
+
+    def restore_ami(self, region: str, object_key: str, aws_account_id: str, ami_name: str) -> str:
+        """Idempotent by name: names are unique per account and region."""
+        with self._target_ec2(region, aws_account_id) as sts:
+            ec2 = self._create_ec2_client(region, *sts.get_temp_creds())
+            existing = ec2.describe_images(Owners=["self"], Filters=[{"Name": "name", "Values": [ami_name]}])
+            if existing.get("Images"):
+                return existing["Images"][0]["ImageId"]
+            tags = [{"Key": "vew:distributedFrom", "Value": object_key}]
+            response = ec2.create_restore_image_task(
+                Bucket=self.import_bucket(aws_account_id, region),
+                ObjectKey=object_key,
+                Name=ami_name,
+                TagSpecifications=[
+                    {"ResourceType": "image", "Tags": tags},
+                    {"ResourceType": "snapshot", "Tags": tags},
+                ],
+            )
+            return response["ImageId"]
+
+    def get_distributed_ami_status(self, region: str, ami_id: str, aws_account_id: str) -> str:
+        with self._target_ec2(region, aws_account_id) as sts:
+            ec2 = self._create_ec2_client(region, *sts.get_temp_creds())
+            images = ec2.describe_images(ImageIds=[ami_id], Owners=["self"]).get("Images", [])
+        if not images:
+            raise adapter_exception.AdapterException(f"Image {ami_id} not found in account {aws_account_id}.")
+        image = images[0]
+        if image["State"] == "available":
+            # Restored snapshots take the target account's EBS default encryption; an unencrypted image
+            # usually means that setting is off there, which many landing zones forbid launching.
+            unencrypted = [
+                bdm.get("DeviceName")
+                for bdm in image.get("BlockDeviceMappings", [])
+                if "Ebs" in bdm and not bdm["Ebs"].get("Encrypted")
+            ]
+            if unencrypted:
+                raise adapter_exception.AdapterException(
+                    f"Image {ami_id} in {aws_account_id} has unencrypted snapshots ({unencrypted}); "
+                    "enable EBS encryption by default in that account."
+                )
+        return image["State"]

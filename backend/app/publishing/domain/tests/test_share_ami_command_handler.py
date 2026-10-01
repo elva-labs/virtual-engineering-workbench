@@ -68,3 +68,23 @@ def test_copy_ami_command_handler_copies_ami(
         )
     )
     mock_unit_of_work.commit.assert_called_once()
+
+
+@freeze_time("2023-07-28")
+def test_share_ami_command_handler_only_records_with_store_restore(
+    command_mock, mock_unit_of_work, image_service_mock, logger_mock, mock_shared_ami_repo
+):
+    # ACT: "store-restore" distribution - the image is already the account's own restored copy
+    share_ami_command_handler.handle(
+        cmd=command_mock,
+        uow=mock_unit_of_work,
+        img_srv=image_service_mock,
+        logger=logger_mock,
+        share_with_account=False,
+    )
+
+    # ASSERT
+    image_service_mock.grant_kms_access.assert_not_called()
+    image_service_mock.share_ami.assert_not_called()
+    mock_shared_ami_repo.add.assert_called_once()
+    mock_unit_of_work.commit.assert_called_once()

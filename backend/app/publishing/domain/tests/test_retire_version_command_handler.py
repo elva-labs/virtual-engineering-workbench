@@ -162,6 +162,7 @@ def test_retire_version_retires_version(
             productId=retire_version_command_mock.productId.value,
             versionId=retire_version_command_mock.versionId.value,
             awsAccountId="1",
+            stage="DEV",
         ),
         lastUpdateDate="2023-07-24T00:00:00+00:00",
         lastUpdatedBy=retire_version_command_mock.retiredBy.value,
@@ -175,7 +176,7 @@ def test_retire_version_retires_version(
     assertpy.assert_that(mock_unit_of_work.commit.call_count).is_equal_to(3)
     message_bus_mock.publish.assert_any_call(
         product_version_retirement_started.ProductVersionRetirementStarted(
-            product_id="prod-12345abc", version_id="version-123", aws_account_id="1"
+            product_id="prod-12345abc", version_id="version-123", aws_account_id="1", stage="DEV"
         )
     )
 

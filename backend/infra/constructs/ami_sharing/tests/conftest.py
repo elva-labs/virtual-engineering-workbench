@@ -57,6 +57,7 @@ def mocked_test_event():
                 "productId": "prod-dt3ycosm",
                 "versionId": "vers-1vbc9box",
                 "awsAccountId": "105249321508",
+                "stage": "DEV",
                 "productType": product_type,
             },
         }

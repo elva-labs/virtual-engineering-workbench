@@ -24,4 +24,5 @@ class VersionsQueryService(ABC):
         product_id: str,
         version_id: str,
         aws_account_id: str,
+        stage: str,
     ) -> version.Version | None: ...

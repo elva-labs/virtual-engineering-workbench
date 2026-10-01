@@ -20,4 +20,5 @@ def test_projects_s2s_account_onboarding_environment_is_configured():
         "WEB_APPLICATION_ENVIRONMENT": "dev",
         "IMAGE_SERVICE_ACCOUNT_ID": "222222222222",
         "CATALOG_SERVICE_ACCOUNT_ID": "333333333333",
+        "SEVERAL_STAGES_PER_ACCOUNT": "false",
     }

@@ -267,9 +267,13 @@ def test_get_version_distribution_should_return_version(get_test_version, file_s
         product_id=product_id_value_object.from_str("prod-123"),
         version_id=version_id_value_object.from_str(TEST_VERSION_ID),
         aws_account_id=aws_account_id_value_object.from_str("001234567890"),
+        stage=stage_value_object.from_str("QA"),
     )
 
     # ASSERT
+    mock_qs.get_product_version_distribution.assert_called_once_with(
+        product_id="prod-123", version_id=TEST_VERSION_ID, aws_account_id="001234567890", stage="QA"
+    )
     assertpy.assert_that(distribution).is_not_none()
     assertpy.assert_that(distribution).is_equal_to(expected_enriched_version)
 

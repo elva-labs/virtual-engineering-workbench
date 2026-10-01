@@ -34,6 +34,7 @@ def handle(
                     productId=v.productId,
                     versionId=v.versionId,
                     awsAccountId=v.awsAccountId,
+                    stage=v.stage,
                 ),
                 entity=v,
             )
@@ -45,6 +46,7 @@ def handle(
                     productId=v.productId,
                     versionId=v.versionId,
                     awsAccountId=v.awsAccountId,
+                    stage=v.stage,
                 ),
                 entity=v,
             )

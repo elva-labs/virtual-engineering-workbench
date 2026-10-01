@@ -4,11 +4,7 @@ from typing import List, Optional, Tuple
 from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 
 from app.provisioning.domain.exceptions import domain_exception
-from app.provisioning.domain.model import (
-    product_status,
-    provisioned_product,
-    user_credential,
-)
+from app.provisioning.domain.model import product_status, provisioned_product, user_credential
 from app.provisioning.domain.ports import (
     networking_query_service,
     parameter_service,
@@ -136,6 +132,7 @@ class ProvisionedProductsDomainQueryService:
             product_id=provisioned_product_entity.productId,
             version_id=provisioned_product_entity.versionId,
             aws_account_ids=[provisioned_product_entity.awsAccountId],
+            stage=provisioned_product_entity.stage,
         )
 
         if not return_technical_params:

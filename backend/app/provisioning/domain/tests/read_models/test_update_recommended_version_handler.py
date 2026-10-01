@@ -5,9 +5,7 @@ from freezegun import freeze_time
 from app.provisioning.domain.event_handlers import update_recommended_version_handler
 from app.provisioning.domain.read_models import version
 from app.provisioning.domain.tests.product_provisioning.conftest import TEST_OS_VERSION
-from app.provisioning.domain.tests.read_models.conftest import (
-    TEST_COMPONENT_VERSION_DETAILS_DUMPED,
-)
+from app.provisioning.domain.tests.read_models.conftest import TEST_COMPONENT_VERSION_DETAILS_DUMPED
 
 
 @freeze_time("2023-10-25")
@@ -38,7 +36,9 @@ def test_update_recommended_version_updates_recommended_version(
     # ASSERT
     calls = [
         mock.call(
-            pk=version.VersionPrimaryKey(productId="prod-123", versionId="vers-1", awsAccountId="105249321508"),
+            pk=version.VersionPrimaryKey(
+                productId="prod-123", versionId="vers-1", awsAccountId="105249321508", stage="DEV"
+            ),
             entity=version.Version.model_validate(
                 {
                     "projectId": "proj-123",
@@ -86,7 +86,9 @@ def test_update_recommended_version_updates_recommended_version(
             ),
         ),
         mock.call(
-            pk=version.VersionPrimaryKey(productId="prod-123", versionId="vers-2", awsAccountId="105249321508"),
+            pk=version.VersionPrimaryKey(
+                productId="prod-123", versionId="vers-2", awsAccountId="105249321508", stage="DEV"
+            ),
             entity=version.Version.model_validate(
                 {
                     "projectId": "proj-123",

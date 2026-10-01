@@ -188,14 +188,18 @@ class ProductProvisioningAggregate(aggregate.Aggregate):
 
         assignment = self.__get_launching_assignment(projects_qs, command)
 
+        active_accounts = projects_qs.get_aws_accounts_by_status(
+            project_id=command.project_id.value, statuses=[project_account.ProjectAccountStatusEnum.Active.value]
+        )
         version_distribution = self.__get_version_distribution(
             versions_qs=versions_qs,
             product_id=command.product_id.value,
             version_id=command.version_id.value,
             region=command.region.value,
             stage=command.stage.value,
+            aws_account_ids=self.__aws_account_ids_at(active_accounts, command.stage.value),
         )
-        self.__raise_if_account_not_active(projects_qs, command.project_id.value, version_distribution)
+        self.__raise_if_account_not_active(active_accounts, version_distribution)
 
         mapped_params = self.__validate_and_map_input_parameters(
             provisioning_parameters=command.provisioning_parameters.value,
@@ -385,6 +389,7 @@ class ProductProvisioningAggregate(aggregate.Aggregate):
             version_id=command.version_id.value,
             region=self._provisioned_product.region,
             stage=self._provisioned_product.stage,
+            aws_account_ids={self._provisioned_product.awsAccountId},
         )
 
         self._provisioned_product.newProvisioningParameters = self.__validate_and_map_input_parameters(
@@ -814,6 +819,7 @@ class ProductProvisioningAggregate(aggregate.Aggregate):
                 version_id=self._provisioned_product.newVersionId,
                 stage=self._provisioned_product.stage,
                 region=self._provisioned_product.region,
+                aws_account_ids={self._provisioned_product.awsAccountId},
             )
             if self._provisioned_product.provisionedProductType != provisioned_product.ProvisionedProductType.Container:
                 # update block device mappings before update if version changed
@@ -996,6 +1002,7 @@ class ProductProvisioningAggregate(aggregate.Aggregate):
                 version_id=self._provisioned_product.versionId,
                 region=self._provisioned_product.region,
                 stage=self._provisioned_product.stage,
+                aws_account_ids={self._provisioned_product.awsAccountId},
             )
 
             new_version_distribution = self.__get_new_version_distribution(
@@ -1149,6 +1156,7 @@ class ProductProvisioningAggregate(aggregate.Aggregate):
                 version_id=self._provisioned_product.newVersionId,
                 stage=self._provisioned_product.stage,
                 region=self._provisioned_product.region,
+                aws_account_ids={self._provisioned_product.awsAccountId},
             )
 
             actual_upgraded_version = versions_qs.get_by_provisioning_artifact_id(
@@ -1512,11 +1520,16 @@ class ProductProvisioningAggregate(aggregate.Aggregate):
         region: str,
         stage: str,
     ):
-        version_distributions = versions_qs.get_product_version_distributions(
-            product_id=product_id,
-            region=region,
-            stage=version.VersionStage[stage],
-        )
+        version_distributions = [
+            vers
+            for vers in versions_qs.get_product_version_distributions(
+                product_id=product_id,
+                region=region,
+                stage=version.VersionStage[stage],
+            )
+            # The workbench's own account only (docs/platform-products.md: platform versions exist in every program's).
+            if not self._provisioned_product or vers.awsAccountId == self._provisioned_product.awsAccountId
+        ]
 
         newest_version_name = None
         newest_version = None
@@ -2498,16 +2511,17 @@ class ProductProvisioningAggregate(aggregate.Aggregate):
             )
         return assignment
 
+    @staticmethod
+    def __aws_account_ids_at(active_accounts: list, stage: str) -> set[str]:
+        """The project's active AWS accounts at a stage: where it launches shared products."""
+        return {account.awsAccountId for account in active_accounts if str(account.stage).upper() == str(stage).upper()}
+
     def __raise_if_account_not_active(
         self,
-        projects_qs: projects_query_service.ProjectsQueryService,
-        project_id: str,
+        active_accounts: list,
         version_distribution: version.Version,
     ):
         """A deactivated project account keeps its version records; nothing may launch into it."""
-        active_accounts = projects_qs.get_aws_accounts_by_status(
-            project_id=project_id, statuses=[project_account.ProjectAccountStatusEnum.Active.value]
-        )
         if not any(
             (
                 account.id == version_distribution.accountId
@@ -2528,18 +2542,19 @@ class ProductProvisioningAggregate(aggregate.Aggregate):
         version_id: str,
         region: str,
         stage: str,
+        aws_account_ids: set[str] | None = None,
     ):
-        version_distribution = next(
-            iter(
-                versions_qs.get_product_version_distributions(
-                    product_id=product_id,
-                    version_id=version_id,
-                    region=region,
-                    stage=version.VersionStage[stage],
-                )
-            ),
-            None,
+        # A platform product version has one distribution per program account at the stage (ADR
+        # 0025): pick the one in the program's (or the workbench's) own account.
+        distributions = versions_qs.get_product_version_distributions(
+            product_id=product_id,
+            version_id=version_id,
+            region=region,
+            stage=version.VersionStage[stage],
         )
+        if aws_account_ids:
+            distributions = [dist for dist in distributions if dist.awsAccountId in aws_account_ids]
+        version_distribution = next(iter(distributions), None)
 
         if not version_distribution:
             raise domain_exception.DomainException(

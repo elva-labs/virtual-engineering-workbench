@@ -420,6 +420,7 @@ def test_update_product_if_product_already_exists(
             "totalReportedTimes": None,
             "availableTools": set(["VS Code", "Pied Piper"]),
             "availableOSVersions": set(["Ubuntu 24"]),
+            "scope": product.ProductScope.Program,
             "costForecastDetails": None,
         },
     )
@@ -520,6 +521,7 @@ def test_do_not_set_product_available_tools_if_component_version_details_is_none
             "totalReportedTimes": None,
             "availableTools": None,
             "availableOSVersions": None,
+            "scope": product.ProductScope.Program,
             "costForecastDetails": None,
         },
     )

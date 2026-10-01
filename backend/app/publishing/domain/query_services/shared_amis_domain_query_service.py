@@ -10,6 +10,7 @@ from app.publishing.domain.value_objects import (
     product_id_value_object,
     product_type_value_object,
     region_value_object,
+    stage_value_object,
     version_id_value_object,
 )
 from app.shared.adapters.unit_of_work_v2 import unit_of_work
@@ -41,6 +42,7 @@ class SharedAMIsDomainQueryService:
         product_id: product_id_value_object.ProductIdValueObject,
         version_id: version_id_value_object.VersionIdValueObject,
         aws_account_id: aws_account_id_value_object.AWSAccountIDValueObject,
+        stage: stage_value_object.StageValueObject,
         product_type: product_type_value_object.ProductTypeValueObject,
     ) -> typing.Tuple[ShareAmiDecision, str, str, str]:
         # Get the version entity & shared ami entity
@@ -48,7 +50,10 @@ class SharedAMIsDomainQueryService:
         with self._uow:
             version_entity: version.Version = self._uow.get_repository(version.VersionPrimaryKey, version.Version).get(
                 pk=version.VersionPrimaryKey(
-                    productId=product_id.value, versionId=version_id.value, awsAccountId=aws_account_id.value
+                    productId=product_id.value,
+                    versionId=version_id.value,
+                    awsAccountId=aws_account_id.value,
+                    stage=stage.value,
                 )
             )
             # lets add a skip decision is its a container product type

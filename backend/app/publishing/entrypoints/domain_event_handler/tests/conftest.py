@@ -79,6 +79,7 @@ def product_version_name_updated_event_payload():
         "productId": "prod-123",
         "versionId": "vers-123",
         "awsAccountId": "123456789012",
+        "stage": "QA",
     }
 
 
@@ -88,6 +89,7 @@ def product_version_retire_started_event_payload():
         "productId": "prod-123",
         "versionId": "vers-123",
         "awsAccountId": "123456789012",
+        "stage": "QA",
         "region": "us-east-1",
     }
 
@@ -98,6 +100,7 @@ def product_version_ami_shared_event_payload():
         "productId": "prod-123",
         "versionId": "vers-123",
         "awsAccountId": "123456789012",
+        "stage": "QA",
         "previousEventName": "ProductVersionCreationStarted",
     }
 

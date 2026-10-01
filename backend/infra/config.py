@@ -186,6 +186,11 @@ _dev_env_config = {
     #            or the use of another account's KMS key. The account launches its own copy, encrypted
     #            with its default EBS key (which must be on). Needs the import bucket and role that the
     #            account's product publishing enablement stack creates in this mode.
+    # One AWS account may serve several stages (dev, qa, prod) of one project: one account record per
+    # type, stage, technology and region, and one Service Catalog product per account and stage.
+    # Portfolios and versions are kept per account and stage either way. An account still belongs to
+    # one project only. Read by projects (onboarding) and publishing (Service Catalog product names).
+    "several-stages-per-account": False,
     "image-distribution": {
         "mode": "share",
         # Store with the ami-sharing function's own role instead of the image service role; only

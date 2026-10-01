@@ -19,7 +19,10 @@ def handle(
     with uow:
         uow.get_repository(version.VersionPrimaryKey, version.Version).update_attributes(
             pk=version.VersionPrimaryKey(
-                productId=cmd.productId.value, versionId=cmd.versionId.value, awsAccountId=cmd.awsAccountId.value
+                productId=cmd.productId.value,
+                versionId=cmd.versionId.value,
+                awsAccountId=cmd.awsAccountId.value,
+                stage=cmd.stage.value,
             ),
             status=version.VersionStatus.Failed,
             lastUpdateDate=datetime.now(timezone.utc).isoformat(),

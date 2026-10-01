@@ -1,3 +1,4 @@
+import os
 import re
 from datetime import datetime, timezone
 from http import HTTPStatus
@@ -32,6 +33,11 @@ tracer = Tracer()
 READ_SCOPE = "clients/projects/account.read"
 WRITE_SCOPE = "clients/projects/account.write"
 _AWS_REGION_FORMAT = re.compile(r"^[a-z]{2}(?:-[a-z0-9]+)+-\d$")
+
+
+# One AWS account may serve several stages of one project ("several-stages-per-account" in the
+# projects config, off by default). Publishing keeps portfolios and versions per account and stage.
+SEVERAL_STAGES_PER_ACCOUNT = os.environ.get("SEVERAL_STAGES_PER_ACCOUNT", "false").lower() == "true"
 
 
 def _account_response(
@@ -115,16 +121,12 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             )
         except Exception as error:
             raise s2s_exception.ResourceReadNotReady() from error
-        retained_inactive_accounts = [
-            account
-            for account in assigned_accounts
-            if account.projectId == project_id
-            and account.accountStatus == project_account.ProjectAccountStatusEnum.Inactive
-        ]
+        # With several stages per account, one AWS account may hold several records of this project, one
+        # per type, stage, technology and region; a retained inactive record is reused only for the same one.
+        retained_inactive_accounts = _retained_inactive_accounts(assigned_accounts, project_id, request)
+        single_record = SEVERAL_STAGES_PER_ACCOUNT or len(assigned_accounts) == 1
         reserved_account_id = (
-            retained_inactive_accounts[0].id
-            if len(assigned_accounts) == 1 and len(retained_inactive_accounts) == 1
-            else str(uuid4())
+            retained_inactive_accounts[0].id if single_record and len(retained_inactive_accounts) == 1 else str(uuid4())
         )
 
         def make_command(resource_id: str):
@@ -164,16 +166,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             except Exception as error:
                 raise s2s_exception.ResourceReadNotReady() from error
 
-            if assignments:
-                if (
-                    len(assignments) == 1
-                    and assignments[0].projectId == project_id
-                    and assignments[0].accountStatus == project_account.ProjectAccountStatusEnum.Inactive
-                ):
-                    if assignments[0].id != resource_id:
-                        raise s2s_exception.ResourceReadNotReady()
-                else:
-                    raise s2s_exception.ResourceConflict()
+            _check_account_is_free(assignments, project_id, request, resource_id)
 
             duplicate_configuration = any(
                 item.region == request.region
@@ -293,6 +286,47 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
         )
 
     return router
+
+
+def _check_account_is_free(assignments, project_id: str, request, resource_id: str) -> None:
+    """An AWS account belongs to one project. Without several stages per account it holds one record,
+    which may only be this project's retained inactive one; with it, other stages of the same project
+    may share the account."""
+    if SEVERAL_STAGES_PER_ACCOUNT:
+        if any(item.projectId != project_id for item in assignments):
+            raise s2s_exception.ResourceConflict()
+        retained = _retained_inactive_accounts(assignments, project_id, request)
+        if len(retained) == 1 and retained[0].id != resource_id:
+            raise s2s_exception.ResourceReadNotReady()
+        return
+    if not assignments:
+        return
+    if (
+        len(assignments) == 1
+        and assignments[0].projectId == project_id
+        and assignments[0].accountStatus == project_account.ProjectAccountStatusEnum.Inactive
+    ):
+        if assignments[0].id != resource_id:
+            raise s2s_exception.ResourceReadNotReady()
+        return
+    raise s2s_exception.ResourceConflict()
+
+
+def _retained_inactive_accounts(
+    accounts: list[project_account.ProjectAccount],
+    project_id: str,
+    request: api_model.CreateProjectAccountRequest,
+) -> list[project_account.ProjectAccount]:
+    return [
+        account
+        for account in accounts
+        if account.projectId == project_id
+        and account.accountStatus == project_account.ProjectAccountStatusEnum.Inactive
+        and account.accountType == request.accountType
+        and account.stage == request.stage
+        and account.technologyId == request.technologyId
+        and account.region == request.region
+    ]
 
 
 def _read_account(dependencies, project_id: str, account_id: str):

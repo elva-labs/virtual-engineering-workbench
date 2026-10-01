@@ -15,4 +15,5 @@ class PublishingQueryService(ABC):
         product_id: str,
         version_id: str,
         account_id: str,
+        stage: str,
     ) -> version.Version | None: ...

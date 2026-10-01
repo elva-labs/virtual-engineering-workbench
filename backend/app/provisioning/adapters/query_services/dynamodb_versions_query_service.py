@@ -75,13 +75,14 @@ class DynamoDBVersionsQueryService(versions_query_service.VersionsQueryService):
         product_id: str,
         version_id: str,
         aws_account_id: str,
+        stage: str,
     ) -> version.Version | None:
         """Return version distribution"""
         result = self._dynamodb_client.get_item(
             TableName=self._table_name,
             Key={
                 "PK": f"{dynamo_entity_config.DBPrefix.PRODUCT}#{product_id}",
-                "SK": f"{dynamo_entity_config.DBPrefix.VERSION}#{version_id}#{dynamo_entity_config.DBPrefix.AWS_ACCOUNT}#{aws_account_id}",
+                "SK": dynamo_entity_config.version_sort_key(version_id, aws_account_id, stage),
             },
         )
 

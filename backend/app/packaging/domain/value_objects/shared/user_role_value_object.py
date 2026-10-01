@@ -18,7 +18,7 @@ def from_str(value: typing.Optional[str]) -> UserRoleValueObject:
 
     if value not in VirtualWorkbenchRoles.list():
         raise domain_exception.DomainException(
-            "Not a valid user role. Should be ADMIN, PROGRAM_OWNER, POWER_USER, PRODUCT_CONTRIBUTOR, BETA_USER, PLATFORM_USER"
+            "Not a valid user role. Should be ADMIN, PROGRAM_OWNER, POWER_USER, PRODUCT_CONTRIBUTOR, BETA_USER, PLATFORM_USER, SUPPORT"
         )
 
     return UserRoleValueObject(value=value)

@@ -14,6 +14,9 @@ class Role(enum.StrEnum):
     POWER_USER = "POWER_USER"
     PROGRAM_OWNER = "PROGRAM_OWNER"
     PRODUCT_CONTRIBUTOR = "PRODUCT_CONTRIBUTOR"
+    # Remote support on the project's workbenches, if the project allows it; outside the ADMIN > ... >
+    # PLATFORM_USER chain (no user rights of its own). Granted by admins, not by program owners.
+    SUPPORT = "SUPPORT"
 
 
 class AssignmentPrimaryKey(unit_of_work.PrimaryKey):

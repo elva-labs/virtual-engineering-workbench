@@ -2081,6 +2081,10 @@ components:
           title: LastUpdateDate
           type: string
           description: Point in time where project is last updated.
+        remoteSupportEnabled:
+          title: RemoteSupportEnabled
+          type: boolean
+          description: Whether remote support by SUPPORT staff is allowed on the project's workbenches.
         workbenchLifecycle:
           title: WorkbenchLifecycle
           type: object
@@ -2729,6 +2733,10 @@ components:
           title: IsActive
           type: boolean
           description: Project active flag
+        remoteSupportEnabled:
+          title: RemoteSupportEnabled
+          type: boolean
+          description: Allow remote support by SUPPORT staff on the project's workbenches; omitted keeps the current value
     UpdateProjectResponse:
       title: UpdateProjectResponse
       type: object

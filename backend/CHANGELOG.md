@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A `SUPPORT` project role and a per-project `remoteSupportEnabled` setting (projects API and S2S create/update; omitted keeps the value, new projects default to enabled). While a project allows it, support staff may see the project and list its workbenches; they get no user rights of their own, and `ADMIN` includes `SUPPORT`. Only admins grant `SUPPORT`. The Authorization BC keeps the setting from `ProjectUpdated` and passes it to Cedar as `remoteSupportEnabled`.
 - Platform-admin groups: members of the Entra groups in the `platform-admin-groups` config are `ADMIN` on every project without a grant per project (authorizer, project list, server-side role checks). The group list is returned with a project's groups.
 - `self-enrolment-enabled` (default `true`): when `false`, users see only the projects they hold a role on; platform admins see all.
 - Added a project-scoped OAuth S2S API for declarative component and component-version publishing.
@@ -20,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Portal project updates publish the project's full state in `ProjectUpdated`, so they no longer reset the management mode the Authorization BC keeps.
 - The workbench status sync runs every 5 minutes (`sync-job-cron-minute`, default `2/5`) instead of hourly, and the portal polls every 5 seconds while a workbench changes.
 - Server-side role checks (the internal user-assignment route that launch reads, and `GET /projects/{projectId}/users/{userId}`) include the roles Entra group grants give, read from the user's Cognito record; a user reached only through a group could not launch.
 - The authorizer passes the sign-in's trusted Entra groups on as `userGroups`, so the Projects API needs no second UserInfo call.

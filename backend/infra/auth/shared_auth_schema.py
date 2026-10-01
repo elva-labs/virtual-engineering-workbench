@@ -26,6 +26,9 @@ cross_cutting_auth_entities = {
                 "powerUsers": {"type": "Entity", "required": True, "name": SharedEntities.ProjectAssignment},
                 "programOwners": {"type": "Entity", "required": True, "name": SharedEntities.ProjectAssignment},
                 "admins": {"type": "Entity", "required": True, "name": SharedEntities.ProjectAssignment},
+                # SUPPORT assignments and the project's remote-support switch.
+                "supporters": {"type": "Entity", "required": True, "name": SharedEntities.ProjectAssignment},
+                "remoteSupportEnabled": {"type": "Boolean", "required": True},
                 "vewUsers": {"type": "Entity", "required": True, "name": SharedEntities.ProjectAssignment},
                 "hilUsers": {"type": "Entity", "required": True, "name": SharedEntities.ProjectAssignment},
                 "vvplUsers": {"type": "Entity", "required": True, "name": SharedEntities.ProjectAssignment},

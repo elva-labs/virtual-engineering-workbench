@@ -26,6 +26,9 @@ class Project(unit_of_work.Entity):
     isActive: bool = Field(..., title="IsActive")
     createDate: Optional[str] = Field(None, title="CreateDate")
     lastUpdateDate: Optional[str] = Field(None, title="LastUpdateDate")
+    # Remote support by SUPPORT staff on this project's workbenches; projects with sensitive work switch
+    # it off. Absent on older items, which means enabled.
+    remoteSupportEnabled: bool = Field(True, title="RemoteSupportEnabled")
     # Set when an external tool (for example a Terraform configuration) owns the project's
     # configuration: the user APIs then refuse configuration changes. None = managed in the portal.
     managedBy: Optional[str] = Field(None, title="ManagedBy", pattern=MANAGED_BY_PATTERN)

@@ -157,6 +157,7 @@ def test_project_repo_should_add_entity(mock_ddb_repo, get_project_entity_mock, 
             "projectDescription": "test-description",
             "projectId": "proj-123",
             "projectName": "test-name",
+            "remoteSupportEnabled": True,
             "sequenceNo": 0,
         }
     )
@@ -202,6 +203,7 @@ def test_project_repo_should_update_entity(mock_ddb_repo, get_project_entity_moc
             "projectDescription": "test-description",
             "projectId": "proj-123",
             "projectName": "XXXX-updated",
+            "remoteSupportEnabled": True,
             "sequenceNo": 1,
         }
     )

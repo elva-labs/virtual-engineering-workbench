@@ -1007,6 +1007,11 @@ paths:
           required: true
           schema:
             type: string
+        - name: stage
+          in: query
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: "200 response"

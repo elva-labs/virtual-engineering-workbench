@@ -11,6 +11,7 @@ from app.publishing.domain.ports import catalog_service
 from app.publishing.domain.value_objects import (
     aws_account_id_value_object,
     product_id_value_object,
+    stage_value_object,
     version_id_value_object,
 )
 
@@ -56,6 +57,7 @@ def mock_command():
         productId=product_id_value_object.from_str("prod-12345abc"),
         versionId=version_id_value_object.from_str("vers-12345abc"),
         awsAccountId=aws_account_id_value_object.from_str("123456789012"),
+        stage=stage_value_object.from_str("QA"),
     )
     return mock_command
 
@@ -87,6 +89,7 @@ def test_rename_version_command_handler_renames_provisioning_artifact_names(
             productId="prod-12345abc",
             versionId="vers-12345abc",
             awsAccountId="123456789012",
+            stage="QA",
         ),
         status=version.VersionStatus.Created.value,
         lastUpdateDate="2023-07-13T00:00:00+00:00",

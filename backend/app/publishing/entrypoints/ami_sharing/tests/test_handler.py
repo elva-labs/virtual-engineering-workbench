@@ -13,7 +13,7 @@ def test_handle_decide_action(mock_dependencies, lambda_context):
 
     handler.dependencies = mock_dependencies
     request = step_function_model.DecideActionRequest(
-        productId="prod-123", versionId="vers-123", awsAccountId="123456789012", productType="WORKBENCH"
+        productId="prod-123", versionId="vers-123", awsAccountId="123456789012", stage="DEV", productType="WORKBENCH"
     )
 
     # ACT
@@ -45,7 +45,7 @@ def test_handle_decide_action_for_container_product(mock_dependencies, lambda_co
 
     handler.dependencies = mock_dependencies
     request = step_function_model.DecideActionRequest(
-        productId="prod-123", versionId="vers-123", awsAccountId="123456789012", productType="CONTAINER"
+        productId="prod-123", versionId="vers-123", awsAccountId="123456789012", stage="DEV", productType="CONTAINER"
     )
 
     # ACT
@@ -139,6 +139,7 @@ def test_handle_succeed_ami_sharing_handle_various_inputs(
         productId="prod-12345abc",
         versionId="vers-12345abc",
         awsAccountId="123456789012",
+        stage="DEV",
         copiedAmiId=copied_ami_id,
         previousEventName="ProductVersionCreationStarted",
         productType=product_type,
@@ -160,7 +161,7 @@ def test_handle_fail_ami_sharing(mock_dependencies, lambda_context):
 
     handler.dependencies = mock_dependencies
     request = step_function_model.FailAmiSharingRequest(
-        productId="prod-12345abc", versionId="vers-12345abc", awsAccountId="123456789012"
+        productId="prod-12345abc", versionId="vers-12345abc", awsAccountId="123456789012", stage="DEV"
     )
 
     # ACT

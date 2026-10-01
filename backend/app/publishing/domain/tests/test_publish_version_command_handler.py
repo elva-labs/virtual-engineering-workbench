@@ -24,6 +24,7 @@ from app.publishing.domain.value_objects import (
     aws_account_id_value_object,
     event_name_value_object,
     product_id_value_object,
+    stage_value_object,
     version_id_value_object,
 )
 from app.shared.adapters.message_bus import message_bus
@@ -40,6 +41,7 @@ def command_mock() -> publish_version_command.PublishVersionCommand:
         productId=product_id_value_object.from_str(TEST_PRODUCT_ID),
         versionId=version_id_value_object.from_str(TEST_VERSION_ID),
         awsAccountId=aws_account_id_value_object.from_str(TEST_AWS_ACCOUNT_ID),
+        stage=stage_value_object.from_str("DEV"),
         previousEventName=event_name_value_object.from_str("ProductVersionCreationStarted"),
     )
 
@@ -310,6 +312,7 @@ def test_publish_version_publishes_version_when_product_does_not_exist(
             productId=product_entity.productId,
             versionId=version_entity.versionId,
             awsAccountId=version_entity.awsAccountId,
+            stage=version_entity.stage,
         ),
         scProductId=product_entity.productId,
         scProvisioningArtifactId="pa-12345",
@@ -419,6 +422,7 @@ def test_publish_version_publishes_version_when_product_exists_version_does_not_
             productId=product_entity.productId,
             versionId=version_entity.versionId,
             awsAccountId=version_entity.awsAccountId,
+            stage=version_entity.stage,
         ),
         scProductId=product_entity.productId,
         scProvisioningArtifactId="pa-12345",
@@ -522,6 +526,7 @@ def test_publish_version_publishes_version_when_product_and_version_exist(
             productId=product_entity.productId,
             versionId=version_entity.versionId,
             awsAccountId=version_entity.awsAccountId,
+            stage=version_entity.stage,
         ),
         scProductId=product_entity.productId,
         scProvisioningArtifactId="pa-12345",
@@ -629,6 +634,7 @@ def test_publish_version_publishes_version_when_product_and_version_exist_for(
             productId=product_entity.productId,
             versionId=version_entity.versionId,
             awsAccountId=version_entity.awsAccountId,
+            stage=version_entity.stage,
         ),
         scProductId=product_entity.productId,
         scProvisioningArtifactId="pa-12345",
@@ -739,6 +745,7 @@ def test_publish_version_when_contains_metadata_should_store_metadata_in_db(
             productId=product_entity.productId,
             versionId=version_entity.versionId,
             awsAccountId=version_entity.awsAccountId,
+            stage=version_entity.stage,
         ),
         scProductId=product_entity.productId,
         scProvisioningArtifactId="pa-12345",
@@ -829,6 +836,7 @@ def test_publish_version_publishes_version_when_promoted(
             productId=product_entity.productId,
             versionId=version_entity.versionId,
             awsAccountId=version_entity.awsAccountId,
+            stage=version_entity.stage,
         ),
         scProductId=product_entity.productId,
         scProvisioningArtifactId="pa-12345",
@@ -1100,3 +1108,12 @@ def test_handle_ami_product_without_an_image_in_the_distributions_account_should
         publish_version_command_handler._handle_ami_product(
             b"{{ ami_ids }}", shared_amis_query_service_mock, get_version(), get_product()
         )
+
+
+def test_sc_product_name_is_per_account_unless_stages_share_the_account():
+    assertpy.assert_that(
+        publish_version_command_handler.build_sc_product_name("prod-1", "123456789012", "PROD", False)
+    ).is_equal_to("prod-1-123456789012")
+    assertpy.assert_that(
+        publish_version_command_handler.build_sc_product_name("prod-1", "123456789012", "PROD", True)
+    ).is_equal_to("prod-1-123456789012-prod")

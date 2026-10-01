@@ -229,6 +229,9 @@ class ProjectsAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                         "SELF_ENROLMENT_ENABLED": str(
                             app_config.component_specific.get("self-enrolment-enabled", True)
                         ).lower(),
+                        "SEVERAL_STAGES_PER_ACCOUNT": str(
+                            app_config.environment_config.get("several-stages-per-account", False)
+                        ).lower(),
                         "AUDIT_LOGGING_KEY_NAME": audit_logging_key_name,
                         "API_BASE_PATH": constants.CUSTOM_DNS_API_PATH_PROJECTS,
                         "STRIP_PREFIXES": f"{constants.CUSTOM_DNS_API_PATH_PROJECTS},{constants.CUSTOM_DNS_IAM_API_PATH_PROJECTS}",

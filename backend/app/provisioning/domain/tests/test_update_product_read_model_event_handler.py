@@ -3,18 +3,9 @@ from unittest import mock
 import pytest
 from freezegun import freeze_time
 
-from app.provisioning.domain.event_handlers import (
-    update_product_read_model_event_handler,
-)
-from app.provisioning.domain.ports import (
-    publishing_query_service,
-    versions_query_service,
-)
-from app.provisioning.domain.read_models import (
-    component_version_detail,
-    product,
-    version,
-)
+from app.provisioning.domain.event_handlers import update_product_read_model_event_handler
+from app.provisioning.domain.ports import publishing_query_service, versions_query_service
+from app.provisioning.domain.read_models import component_version_detail, product, version
 from app.shared.adapters.unit_of_work_v2 import unit_of_work
 
 TEST_OS_VERSION = "Ubuntu 24"
@@ -182,7 +173,7 @@ def test_updates_versions_when_version_id_is_in_event_and_repo(
 ):
     # ARRANGE
     versions_qry_svc_mock.get_product_version_distributions.return_value = get_sample_versions()
-    publishing_qry_svc_mock.get_available_product_versions.return_value = get_sample_versions(version.VersionStage.PROD)
+    publishing_qry_svc_mock.get_available_product_versions.return_value = get_sample_versions()
     # ACT
     update_product_read_model_event_handler.handle(
         product_obj=get_sample_product,
@@ -193,7 +184,9 @@ def test_updates_versions_when_version_id_is_in_event_and_repo(
     # ASSERT
     calls = [
         mock.call(
-            version.VersionPrimaryKey(productId="prod-123", versionId=f"vers-{i}", awsAccountId="105249321508"),
+            version.VersionPrimaryKey(
+                productId="prod-123", versionId=f"vers-{i}", awsAccountId="105249321508", stage="DEV"
+            ),
             **{
                 "projectId": "proj-123",
                 "productId": "prod-123",
@@ -203,7 +196,7 @@ def test_updates_versions_when_version_id_is_in_event_and_repo(
                 "versionDescription": "version description",
                 "awsAccountId": "105249321508",
                 "accountId": "acct-12345",
-                "stage": version.VersionStage.PROD,
+                "stage": version.VersionStage.DEV,
                 "region": "us-east-1",
                 "amiId": "ami-12345",
                 "scProductId": "prod-12345",
@@ -253,9 +246,7 @@ def test_removes_version_when_only_in_db(
 ):
     # ARRANGE
     versions_qry_svc_mock.get_product_version_distributions.return_value = get_sample_versions()
-    publishing_qry_svc_mock.get_available_product_versions.return_value = get_sample_versions(
-        version.VersionStage.PROD, start_index=2
-    )
+    publishing_qry_svc_mock.get_available_product_versions.return_value = get_sample_versions(start_index=2)
 
     # ACT
     update_product_read_model_event_handler.handle(
@@ -266,7 +257,11 @@ def test_removes_version_when_only_in_db(
     )
     # ASSERT
     calls = [
-        mock.call(version.VersionPrimaryKey(productId="prod-123", versionId=f"vers-{i}", awsAccountId="105249321508"))
+        mock.call(
+            version.VersionPrimaryKey(
+                productId="prod-123", versionId=f"vers-{i}", awsAccountId="105249321508", stage="DEV"
+            )
+        )
         for i in range(2)
     ]
     versions_repo_mock.remove.assert_has_calls(calls=calls, any_order=True)
@@ -334,6 +329,7 @@ def test_removes_product_if_no_versions(
                     "productId": "prod-123",
                     "versionId": f"vers-{i}",
                     "awsAccountId": "105249321508",
+                    "stage": "DEV",
                 }
             )
         )
@@ -442,7 +438,6 @@ def test_do_not_set_product_available_tools_if_component_version_details_is_none
     # ARRANGE
     versions_qry_svc_mock.get_product_version_distributions.return_value = get_sample_versions()
     publishing_qry_svc_mock.get_available_product_versions.return_value = get_sample_versions(
-        version.VersionStage.PROD,
         set_default_component_version_details=False,
         os_version=None,
     )
@@ -457,7 +452,9 @@ def test_do_not_set_product_available_tools_if_component_version_details_is_none
     # ASSERT
     calls = [
         mock.call(
-            version.VersionPrimaryKey(productId="prod-123", versionId=f"vers-{i}", awsAccountId="105249321508"),
+            version.VersionPrimaryKey(
+                productId="prod-123", versionId=f"vers-{i}", awsAccountId="105249321508", stage="DEV"
+            ),
             **{
                 "projectId": "proj-123",
                 "productId": "prod-123",
@@ -467,7 +464,7 @@ def test_do_not_set_product_available_tools_if_component_version_details_is_none
                 "versionDescription": "version description",
                 "awsAccountId": "105249321508",
                 "accountId": "acct-12345",
-                "stage": version.VersionStage.PROD,
+                "stage": version.VersionStage.DEV,
                 "region": "us-east-1",
                 "amiId": "ami-12345",
                 "scProductId": "prod-12345",
@@ -527,3 +524,32 @@ def test_do_not_set_product_available_tools_if_component_version_details_is_none
         },
     )
     uow_mock.commit.assert_called_once()
+
+
+def test_keeps_stages_sharing_an_account_apart(
+    uow_mock,
+    versions_qry_svc_mock,
+    get_sample_versions,
+    versions_repo_mock,
+    get_sample_product,
+    publishing_qry_svc_mock,
+):
+    # ARRANGE: DEV and PROD of the same versions in the same account (ADR 0013)
+    versions_qry_svc_mock.get_product_version_distributions.return_value = get_sample_versions()
+    publishing_qry_svc_mock.get_available_product_versions.return_value = get_sample_versions() + get_sample_versions(
+        version.VersionStage.PROD
+    )
+
+    # ACT
+    update_product_read_model_event_handler.handle(
+        product_obj=get_sample_product,
+        uow=uow_mock,
+        versions_qry_srv=versions_qry_svc_mock,
+        publishing_qry_srv=publishing_qry_svc_mock,
+    )
+
+    # ASSERT: the PROD distributions are added next to the DEV ones, nothing is removed
+    added = [call.args[0] for call in versions_repo_mock.add.call_args_list]
+    assert sorted((v.versionId, v.stage) for v in added) == [(f"vers-{i}", version.VersionStage.PROD) for i in range(5)]
+    versions_repo_mock.remove.assert_not_called()
+    assert versions_repo_mock.update_attributes.call_count == 5

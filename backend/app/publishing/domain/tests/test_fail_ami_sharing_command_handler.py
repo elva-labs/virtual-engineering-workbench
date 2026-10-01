@@ -10,6 +10,7 @@ from app.publishing.domain.model import version
 from app.publishing.domain.value_objects import (
     aws_account_id_value_object,
     product_id_value_object,
+    stage_value_object,
     version_id_value_object,
 )
 
@@ -20,6 +21,7 @@ def command_mock() -> fail_ami_sharing_command.FailAmiSharingCommand:
         productId=product_id_value_object.from_str("prod-12345abc"),
         versionId=version_id_value_object.from_str("vers-12345abc"),
         awsAccountId=aws_account_id_value_object.from_str("123456789012"),
+        stage=stage_value_object.from_str("DEV"),
     )
 
 
@@ -40,7 +42,9 @@ def test_fail_ami_sharing_command_handler_updates_version_as_failed(
 
     # ASSERT
     mock_version_repo.update_attributes.assert_called_once_with(
-        version.VersionPrimaryKey(productId="prod-12345abc", versionId="vers-12345abc", awsAccountId="123456789012"),
+        version.VersionPrimaryKey(
+            productId="prod-12345abc", versionId="vers-12345abc", awsAccountId="123456789012", stage="DEV"
+        ),
         status=version.VersionStatus.Failed,
         lastUpdateDate="2023-07-31T00:00:00+00:00",
     )

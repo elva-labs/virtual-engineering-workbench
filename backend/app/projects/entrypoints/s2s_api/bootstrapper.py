@@ -48,10 +48,10 @@ from app.projects.domain.commands.technologies import (
 )
 from app.projects.domain.commands.users import assign_user_command, reassign_user_command, unassign_user_command
 from app.projects.domain.ports import enrolment_query_service, projects_query_service, technologies_query_service
-from app.projects.entrypoints.s2s_api import common, config
-from app.shared.adapters.idempotency import dynamodb_idempotency_service
 from app.projects.domain.project_group_assignment_service import ProjectGroupAssignmentService
 from app.projects.domain.project_lifecycle_service import ProjectLifecycleService
+from app.projects.entrypoints.s2s_api import common, config
+from app.shared.adapters.idempotency import dynamodb_idempotency_service
 from app.shared.adapters.message_bus import (
     command_bus,
     command_bus_metrics,
@@ -185,6 +185,7 @@ def bootstrap(
                 web_application_region=app_config.get_default_region(),
                 image_service_account_id=app_config.get_image_service_account_id(),
                 catalog_service_account_id=app_config.get_catalog_service_account_id(),
+                several_stages_per_account=app_config.get_several_stages_per_account(),
             ),
         )
         .register_handler(

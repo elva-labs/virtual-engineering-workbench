@@ -584,13 +584,37 @@ def test_get_product_version_distribution_returns_version_distribution(get_test_
 
     # ACT
     version_from_db = service.get_product_version_distribution(
-        product_id=TEST_PRODUCT_ID, version_id=TEST_VERSION_ID, aws_account_id="123456789012"
+        product_id=TEST_PRODUCT_ID, version_id=TEST_VERSION_ID, aws_account_id="123456789012", stage="DEV"
     )
 
     # ASSERT
     assertpy.assert_that(version_from_db).is_equal_to(
         get_test_version(aws_account_id="123456789012", status=version.VersionStatus.Created)
     )
+
+
+def test_distributions_of_one_account_in_several_stages_are_kept_apart(get_test_version, mock_ddb_repo, mock_dynamodb):
+    # ARRANGE: DEV and PROD of the same version in the same account (ADR 0013)
+    dev = get_test_version(aws_account_id="123456789012", status=version.VersionStatus.Created)
+    prod = get_test_version(
+        aws_account_id="123456789012", status=version.VersionStatus.Creating, stage=version.VersionStage.PROD
+    )
+    fill_db_with_versions(mock_ddb_repo, [dev, prod])
+    service = dynamodb_versions_query_service.DynamoDBVersionsQueryService(
+        table_name=TEST_TABLE_NAME,
+        dynamodb_client=mock_dynamodb.meta.client,
+        gsi_name_entities=GSI_NAME_ENTITIES,
+    )
+
+    # ACT
+    distributions = service.get_product_version_distributions(product_id=TEST_PRODUCT_ID, version_id=TEST_VERSION_ID)
+    prod_from_db = service.get_product_version_distribution(
+        product_id=TEST_PRODUCT_ID, version_id=TEST_VERSION_ID, aws_account_id="123456789012", stage="PROD"
+    )
+
+    # ASSERT
+    assertpy.assert_that(distributions).contains_only(dev, prod)
+    assertpy.assert_that(prod_from_db).is_equal_to(prod)
 
 
 def test_get_all_versions_returns_correct_versions(sample_versions, get_test_version, mock_ddb_repo, mock_dynamodb):

@@ -23,7 +23,6 @@ from app.provisioning.adapters.services import (
     ec2_instance_management_service,
 )
 from app.provisioning.domain.aggregates.internal import networking_helpers
-from app.provisioning.domain.model import workbench_lifecycle as workbench_lifecycle_model
 from app.provisioning.domain.command_handlers.product_provisioning import (
     authorize_user_ip_address,
     launch,
@@ -51,6 +50,7 @@ from app.provisioning.domain.commands.provisioned_product_state import (
     initiate_provisioned_products_stop_command,
 )
 from app.provisioning.domain.commands.user_profile import update_user_profile_command
+from app.provisioning.domain.model import workbench_lifecycle as workbench_lifecycle_model
 from app.provisioning.domain.query_services import (
     products_domain_query_service,
     provisioned_products_domain_query_service,
@@ -58,6 +58,7 @@ from app.provisioning.domain.query_services import (
     user_profile_domain_query_service,
     versions_domain_query_service,
 )
+from app.provisioning.domain.read_models import project_account
 from app.provisioning.entrypoints.api import config
 from app.shared.adapters.auth import temporary_credential_provider
 from app.shared.adapters.feature_toggling import (
@@ -153,6 +154,7 @@ def bootstrap(  # noqa: C901
     products_qry_srv = dynamodb_products_query_service.DynamoDBProductsQueryService(
         table_name=app_config.get_table_name(),
         dynamodb_client=dynamodb.meta.client,
+        platform_program_id=app_config.get_platform_program_id(),
     )
 
     networking_qry_srv = aws_networking_query_service.AWSNetworkingService(
@@ -173,7 +175,21 @@ def bootstrap(  # noqa: C901
         gsi_name_query_by_sc_pa_id=app_config.get_gsi_name_query_by_alt_key(),
     )
 
-    versions_domain_qry_srv = versions_domain_query_service.VersionsDomainQueryService(version_qry_srv=versions_qry_srv)
+    def _program_aws_account_ids(project_id: str) -> set[str]:
+        """The program's active AWS accounts: where it sees platform versions (docs/platform-products.md)."""
+        return {
+            account.awsAccountId
+            for account in projects_api_qs.get_aws_accounts_by_status(
+                project_id=project_id,
+                statuses=[project_account.ProjectAccountStatusEnum.Active.value],
+            )
+        }
+
+    versions_domain_qry_srv = versions_domain_query_service.VersionsDomainQueryService(
+        version_qry_srv=versions_qry_srv,
+        products_qry_srv=products_qry_srv,
+        program_aws_account_ids=_program_aws_account_ids,
+    )
 
     provisioned_products_qry_srv = dynamodb_provisioned_products_query_service.DynamoDBProvisionedProductsQueryService(
         table_name=app_config.get_table_name(),

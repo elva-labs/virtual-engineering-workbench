@@ -27,6 +27,7 @@ def handle(
         createdBy=command.userId.value,
         lastUpdatedBy=command.userId.value,
         status=product.ProductStatus.Created,
+        scope=command.scope,
     )
 
     with unit_of_work:

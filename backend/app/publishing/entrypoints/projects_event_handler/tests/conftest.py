@@ -4,7 +4,7 @@ from unittest import mock
 import pytest
 from attr import dataclass
 
-from app.publishing.domain.commands import create_portfolio_command
+from app.publishing.domain.commands import create_portfolio_command, distribute_platform_versions_command
 from app.publishing.entrypoints.projects_event_handler import bootstrapper
 from app.shared.adapters.message_bus import in_memory_command_bus
 
@@ -88,16 +88,27 @@ def mock_create_portfolio_command_handler():
 
 
 @pytest.fixture
+def mock_distribute_platform_versions_command_handler():
+    return mock.Mock()
+
+
+@pytest.fixture
 def mock_dependencies(
     mock_create_portfolio_command_handler,
+    mock_distribute_platform_versions_command_handler,
     mock_logger,
 ):
     return bootstrapper.Dependencies(
         command_bus=in_memory_command_bus.InMemoryCommandBus(
             logger=mock_logger,
-        ).register_handler(
+        )
+        .register_handler(
             create_portfolio_command.CreatePortfolioCommand,
             mock_create_portfolio_command_handler,
+        )
+        .register_handler(
+            distribute_platform_versions_command.DistributePlatformVersionsCommand,
+            mock_distribute_platform_versions_command_handler,
         )
     )
 

@@ -171,6 +171,7 @@ def bootstrap(  # noqa: C901
     product_qry_srv = dynamodb_products_query_service.DynamoDBProductsQueryService(
         table_name=app_config.get_table_name(),
         dynamodb_client=dynamodb.meta.client,
+        platform_program_id=app_config.get_platform_program_id(),
     )
 
     def _get_boto_client_for(client_name: str, aws_account_id: str, region: str, user_id: str):

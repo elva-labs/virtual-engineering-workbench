@@ -12,6 +12,9 @@ export const i18n = {
   step1VolumeSize: 'Volume size (GB)',
   step1VolumeSizePlaceholder: '(8 - 500)',
   step1Integrations: 'Integrations',
+  step1BaseImageChannel: 'Base image channel',
+  step1BaseImageChannelDescription:
+    'The release channel of the base image this version builds on: prod, or test to try the next base.',
   step2Title: 'Define components and order of execution',
   step2Header: 'Version components and order of execution',
   step3Title: 'Review and create',

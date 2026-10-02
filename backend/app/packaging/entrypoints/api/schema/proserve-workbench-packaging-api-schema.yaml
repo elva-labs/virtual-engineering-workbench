@@ -3150,6 +3150,14 @@ components:
           items:
             type: string
           description: List of the selected integrations for the recipe version
+        baseImageChannel:
+          title: BaseImageChannel
+          type: string
+          enum:
+          - prod
+          - test
+          nullable: true
+          description: For recipes on a base image entry, the release channel (prod or test) of the parent image
         status:
           title: Status
           type: string
@@ -3203,6 +3211,14 @@ components:
           type: array
           items:
             type: string
+        baseImageChannel:
+          title: BaseImageChannel
+          type: string
+          enum:
+          - prod
+          - test
+          nullable: true
+          description: For recipes on a base image entry, the release channel (prod or test) of the parent image
     CreateRecipeVersionResponse:
       title: CreateRecipeVersionResponse
       type: object
@@ -3998,6 +4014,14 @@ components:
           type: array
           items:
             type: string
+        baseImageChannel:
+          title: BaseImageChannel
+          type: string
+          enum:
+          - prod
+          - test
+          nullable: true
+          description: For recipes on a base image entry, the release channel (prod or test) of the parent image
     UpdateRecipeVersionResponse:
       title: CreateRecipeVersionResponse
       type: object

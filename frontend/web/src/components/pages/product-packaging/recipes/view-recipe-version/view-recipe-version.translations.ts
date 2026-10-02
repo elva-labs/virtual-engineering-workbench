@@ -7,6 +7,7 @@ export const i18n = {
   detailsRecipeId: 'Recipe ID',
   detailsVersionId: 'Version ID',
   detailsVolumeSize: 'Volume size',
+  detailsBaseImageChannel: 'Base image channel',
   detailsStatus: 'Status',
   detailsAuthor: 'Author',
   detailsLastContributor: 'Last contributor',

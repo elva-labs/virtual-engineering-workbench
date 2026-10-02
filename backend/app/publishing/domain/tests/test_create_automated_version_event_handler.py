@@ -625,3 +625,125 @@ def test_handle_calculates_correct_patch_version_name(
     # ASSERT
     added_version = mock_repo.add.call_args[0][0]
     assert added_version.versionName == expected_new_version
+
+
+# --- release candidate limit: superseded candidates make room (opt-in) ---------------------------
+
+
+def _distribution(
+    version_id, name, stage="DEV", create_date="2026-10-01T00:00:00+00:00", recommended=False, account="111111111111"
+):
+    return version.Version(
+        projectId="project-123",
+        productId="product-456",
+        technologyId="tech-789",
+        versionId=version_id,
+        versionName=name,
+        versionType="RELEASE_CANDIDATE",
+        awsAccountId=account,
+        stage=stage,
+        region="eu-north-1",
+        status=version.VersionStatus.Created,
+        scPortfolioId="port-12345",
+        isRecommendedVersion=recommended,
+        createDate=create_date,
+        lastUpdateDate=create_date,
+        createdBy="T123456",
+        lastUpdatedBy="T123456",
+    )
+
+
+def test_superseded_rc_versions_are_dev_only_unrecommended_candidates_oldest_first(mock_product_entity):
+    # ARRANGE
+    versions_qry_srv = Mock()
+    versions_qry_srv.get_product_version_distributions.return_value = [
+        _distribution("vers-new", "1.0.1-rc.1", create_date="2026-10-01T08:00:00+00:00"),
+        _distribution("vers-old", "1.0.0-rc.1", create_date="2026-10-01T06:00:00+00:00"),
+        _distribution("vers-old", "1.0.0-rc.1", create_date="2026-10-01T06:00:00+00:00", account="222222222222"),
+        _distribution("vers-prod", "0.9.0", stage="PROD", create_date="2026-09-01T00:00:00+00:00"),
+        _distribution("vers-qa", "0.9.1-rc.1", create_date="2026-09-02T00:00:00+00:00"),
+        _distribution("vers-qa", "0.9.1-rc.1", stage="QA", create_date="2026-09-02T00:00:00+00:00"),
+        _distribution("vers-rec", "0.9.2-rc.1", create_date="2026-09-03T00:00:00+00:00", recommended=True),
+    ]
+
+    # ACT
+    candidates = create_automated_version_event_handler._superseded_rc_versions(versions_qry_srv, mock_product_entity)
+
+    # ASSERT
+    assert [c.versionId for c in candidates] == ["vers-old", "vers-new"]
+
+
+@pytest.mark.parametrize("retire, expect_retired", [(True, ["vers-old"]), (False, [])])
+@patch("app.publishing.domain.event_handlers.create_automated_version_event_handler.retire_version_command_handler")
+@patch("app.publishing.domain.model.version.generate_version_id", return_value="vers-11111111")
+def test_handle_at_the_rc_limit_retires_the_oldest_candidate_when_enabled(
+    _mock_generate_version_id,
+    mock_retire_handler,
+    retire,
+    expect_retired,
+    mock_unit_of_work,
+    mock_message_bus,
+    mock_portfolios_qry_srv,
+    mock_versions_qry_srv,
+    mock_template_domain_qry_srv,
+    mock_param_service,
+    mock_stack_srv,
+    mock_file_service,
+    mock_product_entity,
+    mock_logger,
+):
+    # ARRANGE: two active candidates, limit two
+    mock_unit_of_work.get_repository.side_effect = lambda pk, entity: (
+        Mock(get=Mock(return_value=mock_product_entity)) if entity == product.Product else Mock()
+    )
+    mock_versions_qry_srv.get_latest_version_name_and_id.return_value = ("1.0.1-rc.1", "vers-new")
+    mock_versions_qry_srv.get_distinct_number_of_versions.side_effect = (
+        lambda product_id, status=None, version_name_filter=None: 2
+    )
+    mock_versions_qry_srv.get_product_version_distributions.return_value = [
+        _distribution("vers-new", "1.0.1-rc.1", create_date="2026-10-01T08:00:00+00:00"),
+        _distribution("vers-old", "1.0.0-rc.1", create_date="2026-10-01T06:00:00+00:00"),
+    ]
+    mock_param_service.get_parameter_value.side_effect = lambda parameter_name: (
+        "2" if "rc-limit" in parameter_name else "5"
+    )
+    mock_template_domain_qry_srv.get_latest_draft_template.return_value = "template"
+    mock_stack_srv.validate_template.return_value = (True, [], None)
+    mock_template_domain_qry_srv.get_default_template_file_name.return_value = "workbench-template.yml"
+
+    # ACT
+    def act():
+        create_automated_version_event_handler.handle(
+            ami_id="ami-12345678",
+            product_id="product-456",
+            project_id="project-123",
+            release_type="MINOR",
+            user_id="T123456",
+            component_version_details=get_default_component_details(),
+            os_version="Ubuntu 24.04",
+            platform="Linux",
+            architecture="x86_64",
+            integrations=[],
+            template_domain_qry_srv=mock_template_domain_qry_srv,
+            logger=mock_logger,
+            uow=mock_unit_of_work,
+            message_bus=mock_message_bus,
+            portf_qry_srv=mock_portfolios_qry_srv,
+            version_qry_srv=mock_versions_qry_srv,
+            param_service=mock_param_service,
+            product_version_limit_param_name="version-limit",
+            product_rc_version_limit_param_name="rc-limit",
+            stack_srv=mock_stack_srv,
+            file_service=mock_file_service,
+            retire_superseded_rc_versions=retire,
+        )
+
+    # ASSERT
+    if retire:
+        act()
+        mock_message_bus.publish.assert_called()
+    else:
+        with pytest.raises(domain_exception.DomainException, match="maximum number of active RC versions"):
+            act()
+    retired = [c.kwargs["command"].versionId.value for c in mock_retire_handler.handle.call_args_list]
+    assert retired == expect_retired

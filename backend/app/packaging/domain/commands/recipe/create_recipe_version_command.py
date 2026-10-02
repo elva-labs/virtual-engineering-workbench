@@ -23,3 +23,5 @@ class CreateRecipeVersionCommand(command_bus.Command):
     recipeVersionIntegrations: list[recipe_version_integration_value_object.RecipeVersionIntegrationValueObject]
     createdBy: user_id_value_object.UserIdValueObject
     recipeVersionId: Optional[recipe_version_id_value_object.RecipeVersionIdValueObject] = None
+    # "prod" (default) or "test" for recipes on a base image entry (base_image_channels).
+    baseImageChannel: Optional[str] = None

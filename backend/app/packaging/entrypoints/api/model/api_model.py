@@ -462,6 +462,11 @@ class UpdateRecipeVersionRequest(BaseModel):
         description="A list of enabled integrations",
         title="RecipeVersionIntegrations",
     )
+    baseImageChannel: Optional[str] = Field(
+        None,
+        description="For recipes on a base image entry: the release channel (prod or test) of the parent image",
+        title="BaseImageChannel",
+    )
 
 
 class UpdateRecipeVersionResponse(BaseModel):
@@ -741,6 +746,11 @@ class RecipeVersion(BaseModel):
         description="List of the selected integrations for the recipe version",
         title="RecipeVersionIntegrations",
     )
+    baseImageChannel: Optional[str] = Field(
+        None,
+        description="For recipes on a base image entry: the release channel (prod or test) of the parent image",
+        title="BaseImageChannel",
+    )
     status: str = Field(
         ...,
         description="Status of the Recipe Version (CREATING/CREATED/TESTING/VALIDATED/UPDATING/RELEASED/RETIRED/FAILED)",
@@ -775,6 +785,11 @@ class CreateRecipeVersionRequest(BaseModel):
         None,
         description="A list of enabled integrations",
         title="RecipeVersionIntegrations",
+    )
+    baseImageChannel: Optional[str] = Field(
+        None,
+        description="For recipes on a base image entry: the release channel (prod or test) of the parent image",
+        title="BaseImageChannel",
     )
 
 

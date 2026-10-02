@@ -11,7 +11,7 @@ from app.packaging.domain.exceptions import domain_exception
 from app.packaging.domain.exceptions.s2s_exception import ProjectAccessDenied
 from app.packaging.domain.model.component import component, component_version
 from app.packaging.domain.model.pipeline import pipeline
-from app.packaging.domain.model.recipe import recipe, recipe_version
+from app.packaging.domain.model.recipe import base_image_channels, recipe, recipe_version
 from app.packaging.domain.ports.idempotency_service import Reservation, ReservationOutcome
 from app.packaging.entrypoints.s2s_api import idempotency
 from app.packaging.entrypoints.s2s_api.model import api_model
@@ -572,6 +572,38 @@ def test_recipe_version_model_omits_unavailable_legacy_configured_list():
     result = recipes.recipe_version_model(version).model_dump(exclude_none=True)
     assert "configuredComponentsVersions" not in result
     assert result["effectiveComponentsVersions"]
+
+
+@pytest.mark.parametrize(
+    "os_version,stored,expected",
+    [
+        ("Golden Ubuntu", None, "prod"),  # created before the field: built on prod
+        ("Golden Ubuntu", "test", "test"),
+        ("Golden Ubuntu (test)", None, "test"),  # the deprecated per-channel entry
+        ("Ubuntu 24", None, None),
+    ],
+)
+def test_recipe_version_model_reports_the_channel_the_version_builds_on(os_version, stored, expected):
+    from app.packaging.entrypoints.s2s_api.routers import recipes
+
+    version = mock.Mock()
+    version.model_dump.return_value = {
+        "recipeId": "reci-1",
+        "recipeVersionId": "vers-1",
+        "recipeComponentsVersions": [],
+        "baseImageChannel": stored,
+        "recipeVersionDescription": "build",
+        "recipeVersionName": "1.0.0-rc.1",
+        "recipeVersionVolumeSize": "8",
+        "status": "CREATED",
+        "createDate": "2025-01-01",
+        "createdBy": "T1",
+        "lastUpdateDate": "2025-01-01",
+        "lastUpdatedBy": "T1",
+    }
+
+    channels = base_image_channels.BaseImageChannels(releasing_project_id="proj-base", os_version="Golden Ubuntu")
+    assert recipes.recipe_version_model(version, os_version, channels).baseImageChannel == expected
 
 
 def test_create_component_version_returns_the_handler_generated_id(
@@ -1147,6 +1179,51 @@ def test_create_recipe_version_injects_reserved_id(monkeypatch, mocked_dependenc
     assert json.loads(response["body"]) == {"recipeVersionId": "vers-fixed"}
     command = mocked_dependencies.command_bus.handle.call_args.args[0]
     assert command.recipeVersionId.value == "vers-fixed"
+
+
+@pytest.mark.parametrize("channel,expected", [("test", "test"), ("prod", "prod"), (None, None)])
+def test_create_recipe_version_passes_the_base_image_channel(
+    monkeypatch, mocked_dependencies, lambda_context, client_event, recipe_version_body, channel, expected
+):
+    # The version picks the channel of its base image; omitted means the domain default (prod).
+    mocked_dependencies.idempotency_service.reserve.side_effect = None
+    mocked_dependencies.idempotency_service.reserve.return_value = Reservation(
+        ReservationOutcome.ACQUIRED, "vers-fixed"
+    )
+    mocked_dependencies.command_bus.handle.return_value = {"recipeVersionId": "vers-fixed"}
+    body = recipe_version_body | ({"baseImageChannel": channel} if channel else {})
+
+    response = load_handler(monkeypatch, mocked_dependencies).handler(
+        client_event(
+            "POST",
+            "/projects/proj-1/recipes/reci-1/versions",
+            body,
+            headers={"Idempotency-Key": IDEMPOTENCY_KEY},
+            scopes=["clients/packaging/recipe.write"],
+        ),
+        lambda_context,
+    )
+
+    assert response["statusCode"] == 202
+    assert mocked_dependencies.command_bus.handle.call_args.args[0].baseImageChannel == expected
+
+
+def test_create_recipe_version_rejects_an_unknown_base_image_channel(
+    monkeypatch, mocked_dependencies, lambda_context, client_event, recipe_version_body
+):
+    response = load_handler(monkeypatch, mocked_dependencies).handler(
+        client_event(
+            "POST",
+            "/projects/proj-1/recipes/reci-1/versions",
+            recipe_version_body | {"baseImageChannel": "beta"},
+            headers={"Idempotency-Key": IDEMPOTENCY_KEY},
+            scopes=["clients/packaging/recipe.write"],
+        ),
+        lambda_context,
+    )
+
+    assert response["statusCode"] in (400, 422)
+    mocked_dependencies.command_bus.handle.assert_not_called()
 
 
 def test_create_pipeline_injects_reserved_id(

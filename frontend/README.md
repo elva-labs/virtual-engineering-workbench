@@ -104,7 +104,9 @@ For example, with default naming:
 ./configure_auth.sh proserve-wb-ui proserve-wb dev us-east-1 us-east-1
 ```
 
-This reads Cognito and API Gateway outputs from CloudFormation and writes `aws-exports.js`.
+This reads Cognito and API Gateway outputs from CloudFormation and writes `public/aws-exports.json`,
+which the app loads when it starts (`src/runtime-config.ts`): the bundle itself is the same for every
+environment.
 
 Then start the dev server:
 

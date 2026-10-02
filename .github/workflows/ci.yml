@@ -3,7 +3,7 @@ name: CI
 # No-secrets PR validation. Backend and frontend run on GitHub-hosted runners by default; set the
 # repository variable CI_RUNNER=codebuild to use the CodeBuild-hosted runner (project: vew-ci).
 # Backend: install + static checks (black/isort/flake8/mypy/secret scans) + pytest.
-# Frontend: install + lint + unit tests + build (with a placeholder aws-exports).
+# Frontend: install + lint + unit tests + build (the runtime configuration is loaded at runtime).
 # IaC scan: checkov over CFN product templates, Dockerfiles, and workflows
 #   (config: .checkov.yaml) — runs on a GitHub-hosted runner, no toolchain needed.
 # Supply-chain hardening: minimal token permissions; actions pinned by commit SHA.
@@ -98,10 +98,6 @@ jobs:
         continue-on-error: true
         working-directory: frontend/web
         run: yarn npm audit --severity high
-
-      - name: Generate placeholder aws-exports (offline build)
-        working-directory: frontend/web
-        run: node scripts/gen-stub-aws-exports.mjs
 
       - name: Lint
         working-directory: frontend/web

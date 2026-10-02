@@ -168,6 +168,7 @@ def bootstrap(
                 product_rc_version_limit_param_name=app_config.get_product_rc_version_limit_param_name(),
                 stack_srv=stack_service,
                 file_service=file_service,
+                retire_superseded_rc_versions=app_config.get_retire_superseded_rc_versions(),
             )
 
         return _handle_event

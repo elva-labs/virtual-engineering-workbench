@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from aws_lambda_powertools import logging, metrics, tracing
+from aws_lambda_powertools.metrics import MetricUnit, single_metric
 from aws_lambda_powertools.utilities import typing
 from aws_lambda_powertools.utilities.data_classes import EventBridgeEvent, event_source
 
@@ -22,6 +23,30 @@ metrics_handler = metrics.Metrics()
 app_config = config.AppConfig()
 dependencies = bootstrapper.bootstrap(app_config, logger)
 app = event_handler.EventBridgeEventResolver(logger=logger)
+
+# A finished build that becomes no product version is otherwise only a log line: the metric feeds the
+# publishing stack's version-not-created alarm (type AutomatedVersion), per reason for the dashboards.
+VERSION_NOT_CREATED_METRIC = "AutomatedVersionNotCreated"
+VERSION_NOT_CREATED_REASONS = (
+    ("RcVersionLimit", "maximum number of active RC versions"),
+    ("VersionLimit", "maximum number of active versions"),
+    ("ProductNotCreated", "only from product with status"),
+    ("NoDevPortfolio", "No portfolio found for DEV stage"),
+    ("InvalidTemplate", "The template is invalid"),
+)
+
+
+def version_not_created_reason(error: Exception) -> str:
+    message = str(error)
+    return next((reason for reason, text in VERSION_NOT_CREATED_REASONS if text in message), "Error")
+
+
+def report_version_not_created(reason: str) -> None:
+    for dimensions in ({}, {"reason": reason}):
+        with single_metric(name=VERSION_NOT_CREATED_METRIC, unit=MetricUnit.Count, value=1) as metric:
+            metric.add_dimension(name="type", value="AutomatedVersion")
+            for name, value in dimensions.items():
+                metric.add_dimension(name=name, value=value)
 
 
 @app.handle(image_registration_completed.ImageRegistrationCompleted)
@@ -90,9 +115,17 @@ def handle_automated_image_registration_completed_event(
             integrations=event.integrations,
         )
     except Exception as e:
+        reason = version_not_created_reason(e)
         logger.error(
-            f"Failed to create automated product version for AMI {event.ami_id} and product {event.product_id}: {str(e)}"
+            f"Failed to create automated product version for AMI {event.ami_id} and product {event.product_id}: {str(e)}",
+            extra={
+                "reason": reason,
+                "amiId": event.ami_id,
+                "productId": event.product_id,
+                "projectId": event.project_id,
+            },
         )
+        report_version_not_created(reason)
 
 
 @tracer.capture_lambda_handler  # type: ignore

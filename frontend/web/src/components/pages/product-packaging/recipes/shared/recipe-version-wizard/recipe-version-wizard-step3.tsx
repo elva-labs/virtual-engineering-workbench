@@ -20,6 +20,7 @@ export interface RecipeVersionWizardStep3Props {
   integrationComponentsVersions: ComponentVersionEntry[],
   availableIntegrations: Integration[],
   selectedIntegrations: string[],
+  baseImageChannel?: string,
 }
 
 
@@ -37,6 +38,7 @@ export const RecipeVersionWizardStep3: FC<RecipeVersionWizardStep3Props> = ({
   integrationComponentsVersions,
   selectedIntegrations,
   availableIntegrations,
+  baseImageChannel,
 }) => {
   return <SpaceBetween direction='vertical' size='l'>
     <SpaceBetween direction='vertical' size='xs'>
@@ -66,6 +68,10 @@ export const RecipeVersionWizardStep3: FC<RecipeVersionWizardStep3Props> = ({
           <ValueWithLabel label={i18n.step1InputReleaseType} data-test="recipe-release-type">
             {versionReleaseType}
           </ValueWithLabel>
+          {baseImageChannel &&
+            <ValueWithLabel label={i18n.step1BaseImageChannel} data-test="recipe-base-image-channel">
+              {baseImageChannel}
+            </ValueWithLabel>}
           {getIntegrationsReviewColumn()}
         </ColumnLayout>
       </Container>

@@ -1,3 +1,5 @@
+from typing import Optional
+
 from app.packaging.domain.value_objects.recipe import recipe_id_value_object
 from app.packaging.domain.value_objects.recipe_version import (
     recipe_version_components_versions_value_object,
@@ -19,3 +21,5 @@ class UpdateRecipeVersionCommand(command_bus.Command):
     recipeVersionVolumeSize: recipe_version_volume_size_value_object.RecipeVersionVolumeSizeValueObject
     recipeVersionIntegrations: list[recipe_version_integration_value_object.RecipeVersionIntegrationValueObject]
     lastUpdatedBy: user_id_value_object.UserIdValueObject
+    # "prod" (default) or "test" for recipes on a base image entry (base_image_channels).
+    baseImageChannel: Optional[str] = None

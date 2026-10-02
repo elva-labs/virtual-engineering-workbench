@@ -131,3 +131,49 @@ def test_automated_image_registration_completed_event_with_exception(
 
     # ASSERT
     mock_create_automated_version_event_handler.assert_called_once()
+
+
+def test_automated_version_not_created_emits_the_metric_with_its_reason(
+    mock_dependencies,
+    generate_event,
+    lambda_context,
+    automated_image_registration_completed_event_payload,
+    mock_create_automated_version_event_handler,
+    monkeypatch,
+):
+    # ARRANGE: the release candidate limit (2026-10-02: a build became no version, only a log line)
+    from unittest import mock
+
+    from app.publishing.entrypoints.packaging_event_handler import handler
+
+    handler.dependencies = mock_dependencies
+    mock_create_automated_version_event_handler.side_effect = Exception(
+        "You have reached the maximum number of active RC versions for this product."
+    )
+    single_metric = mock.MagicMock()
+    monkeypatch.setattr(handler, "single_metric", single_metric)
+
+    # ACT
+    handler.handler(
+        generate_event(
+            detail_type="AutomatedImageRegistrationCompleted",
+            detail=automated_image_registration_completed_event_payload,
+        ),
+        lambda_context,
+    )
+
+    # ASSERT: one metric for the alarm (type only), one per reason
+    assert [c.kwargs["name"] for c in single_metric.call_args_list] == [handler.VERSION_NOT_CREATED_METRIC] * 2
+    metric = single_metric.return_value.__enter__.return_value
+    assert metric.add_dimension.call_args_list == [
+        mock.call(name="type", value="AutomatedVersion"),
+        mock.call(name="type", value="AutomatedVersion"),
+        mock.call(name="reason", value="RcVersionLimit"),
+    ]
+
+
+def test_version_not_created_reason():
+    from app.publishing.entrypoints.packaging_event_handler import handler
+
+    assert handler.version_not_created_reason(Exception("The template is invalid: x")) == "InvalidTemplate"
+    assert handler.version_not_created_reason(Exception("boom")) == "Error"

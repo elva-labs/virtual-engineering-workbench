@@ -6,11 +6,13 @@ import {
   Header,
   Input,
   RadioGroup,
+  Select,
   SpaceBetween,
 } from '@cloudscape-design/components';
 import { FC } from 'react';
 import { i18n } from './recipe-version-wizard.translations';
 import { RECIPE_VERSION_RELEASE_TYPE_MAP } from '../recipe-version-release-type-map';
+import { BASE_IMAGE_CHANNELS } from './recipe-version-wizard.logic';
 
 type Integration = { integrationId: string, name: string, type?: string, details?: string };
 
@@ -35,6 +37,9 @@ export type RecipeVersionWizardStep1Props = {
   versionReleaseType: string,
   setVersionReleaseType: (versionReleaseType: string) => void,
   isVersionReleaseTypeValid: boolean,
+  hasBaseImageChannel?: boolean,
+  baseImageChannel?: string,
+  setBaseImageChannel?: (baseImageChannel: string) => void,
 } & RecipeVersionIntegrationsProps;
 
 const RecipeVersionIntegrations: FC<RecipeVersionIntegrationsProps> = () => {
@@ -59,6 +64,9 @@ export const RecipeVersionWizardStep1: FC<RecipeVersionWizardStep1Props> = ({
   isIntegrationsLoading,
   selectedIntegrations,
   setSelectedIntegrations,
+  hasBaseImageChannel,
+  baseImageChannel,
+  setBaseImageChannel,
 }) => {
   function getReleaseTypeOption(prodType: string) {
     return {
@@ -121,6 +129,18 @@ export const RecipeVersionWizardStep1: FC<RecipeVersionWizardStep1Props> = ({
               value={versionReleaseType ? versionReleaseType : ''}
               items={versionReleaseTypes.map(getReleaseTypeOption)}
               data-test="recipe-version-release-type"
+            />
+          </FormField>}
+        {hasBaseImageChannel &&
+          <FormField
+            label={i18n.step1BaseImageChannel}
+            description={i18n.step1BaseImageChannelDescription}
+          >
+            <Select
+              selectedOption={{ label: baseImageChannel, value: baseImageChannel }}
+              onChange={({ detail }) => setBaseImageChannel?.(detail.selectedOption.value || '')}
+              options={BASE_IMAGE_CHANNELS.map(channel => ({ label: channel, value: channel }))}
+              data-test="recipe-version-base-image-channel"
             />
           </FormField>}
         <RecipeVersionIntegrations

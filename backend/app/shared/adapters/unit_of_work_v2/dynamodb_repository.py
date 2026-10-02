@@ -6,11 +6,7 @@ from abc import ABC
 from botocore.exceptions import ClientError
 from mypy_boto3_dynamodb import client
 
-from app.shared.adapters.unit_of_work_v2 import (
-    dynamodb_repo_config,
-    repository_exception,
-    unit_of_work,
-)
+from app.shared.adapters.unit_of_work_v2 import dynamodb_repo_config, repository_exception, unit_of_work
 
 
 class DynamoDBContext:
@@ -34,6 +30,11 @@ class DynamoDBContext:
                 self._logger.error("Transaction failed due to cancellation reasons:")
                 for idx, reason in enumerate(cancellation_reasons):
                     self._logger.error(f"Item {idx + 1}: {reason.get('Code')} - {reason.get('Message')}")
+                if any(reason.get("Code") == "ConditionalCheckFailed" for reason in cancellation_reasons):
+                    self._db_items = []
+                    raise repository_exception.ConditionalCheckFailedException(
+                        "A condition of the DynamoDB transaction did not hold."
+                    ) from e
             else:
                 self._logger.exception("An error occurred during the transaction.")
             raise repository_exception.RepositoryException("Failed to commit a transaction to DynamoDB.") from e
@@ -52,6 +53,21 @@ class DynamoDBContext:
         item = self._dynamodb_client.get_item(**request)
 
         return item["Item"] if "Item" in item else None
+
+
+def _expected_conditions(
+    expected: dict[str, typing.Any] | None, attribute_names: dict[str, str], values: dict[str, typing.Any]
+) -> list[str]:
+    """Optimistic writes: the stored attributes must still have the values that were read (None: absent)."""
+    conditions = []
+    for idx, (key, value) in enumerate((expected or {}).items()):
+        attribute_names[f"#{key}"] = key
+        if value is None:
+            conditions.append(f"attribute_not_exists(#{key})")
+        else:
+            conditions.append(f"#{key} = :e{idx}")
+            values[f":e{idx}"] = value
+    return conditions
 
 
 class DynamoDBRepository:
@@ -137,7 +153,11 @@ class GenericDynamoDBRepository(unit_of_work.GenericRepository[unit_of_work.TPri
 
     def update_attributes(self, pk: unit_of_work.TPrimaryKey, **kwargs) -> None:
         """Updates arbitrary attributes of the entity in DynamoDB table."""
+        self._update_attributes(pk, None, **kwargs)
 
+    def _update_attributes(
+        self, pk: unit_of_work.TPrimaryKey, expected: dict[str, typing.Any] | None, **kwargs
+    ) -> None:
         if not kwargs:
             return
 
@@ -175,6 +195,7 @@ class GenericDynamoDBRepository(unit_of_work.GenericRepository[unit_of_work.TPri
         update_expression_setters.extend([f"#{key}=:p{idx}" for idx, (key, _) in enumerate(entity_attributes.items())])
         update_values |= {f":p{idx}": value for idx, (_, value) in enumerate(entity_attributes.items())}
 
+        conditions.extend(_expected_conditions(expected, update_attribute_names, update_values))
         conditions_str = " AND ".join(conditions)
 
         update_expression = [
@@ -195,9 +216,17 @@ class GenericDynamoDBRepository(unit_of_work.GenericRepository[unit_of_work.TPri
             key=self._dynamodb_repository.cfg.primary_key_to_dict(pk),
         )
 
-    def update_entity(self, pk: unit_of_work.TPrimaryKey, entity: unit_of_work.T) -> None:
+    def update_entity(
+        self,
+        pk: unit_of_work.TPrimaryKey,
+        entity: unit_of_work.T,
+        expected: dict[str, typing.Any] | None = None,
+    ) -> None:
         """
         Updates arbitrary entity attributes in the database in a type safe manner.
+
+        expected: attribute values the stored item must still have (None: the attribute is absent);
+        otherwise the commit raises ConditionalCheckFailedException.
         """
 
         updated_attrs = {}
@@ -225,7 +254,7 @@ class GenericDynamoDBRepository(unit_of_work.GenericRepository[unit_of_work.TPri
         if self._dynamodb_repository.cfg.optimistic_concurrency_control:
             updated_attrs[unit_of_work.ATTRIBUTE_NAME_SEQUENCE_NO] = entity._sequence_no
 
-        self.update_attributes(pk, **updated_attrs)
+        self._update_attributes(pk, expected, **updated_attrs)
         entity.refresh_changes()
 
     @staticmethod

@@ -55,6 +55,21 @@ class DynamoDBContext:
         return item["Item"] if "Item" in item else None
 
 
+def _expected_conditions(
+    expected: dict[str, typing.Any] | None, attribute_names: dict[str, str], values: dict[str, typing.Any]
+) -> list[str]:
+    """Optimistic writes: the stored attributes must still have the values that were read (None: absent)."""
+    conditions = []
+    for idx, (key, value) in enumerate((expected or {}).items()):
+        attribute_names[f"#{key}"] = key
+        if value is None:
+            conditions.append(f"attribute_not_exists(#{key})")
+        else:
+            conditions.append(f"#{key} = :e{idx}")
+            values[f":e{idx}"] = value
+    return conditions
+
+
 class DynamoDBRepository:
     """Generic DynamoDB repository."""
 
@@ -180,15 +195,7 @@ class GenericDynamoDBRepository(unit_of_work.GenericRepository[unit_of_work.TPri
         update_expression_setters.extend([f"#{key}=:p{idx}" for idx, (key, _) in enumerate(entity_attributes.items())])
         update_values |= {f":p{idx}": value for idx, (_, value) in enumerate(entity_attributes.items())}
 
-        # Optimistic writes: the stored attributes must still have the values that were read.
-        for idx, (key, value) in enumerate((expected or {}).items()):
-            update_attribute_names[f"#{key}"] = key
-            if value is None:
-                conditions.append(f"attribute_not_exists(#{key})")
-            else:
-                conditions.append(f"#{key} = :e{idx}")
-                update_values[f":e{idx}"] = value
-
+        conditions.extend(_expected_conditions(expected, update_attribute_names, update_values))
         conditions_str = " AND ".join(conditions)
 
         update_expression = [

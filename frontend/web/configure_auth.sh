@@ -43,7 +43,7 @@ fail_if_empty "$region" "Region not specified"
 fail_if_empty "$api_region" "API Region not specified"
 
 echo_info "Using application name: $app_name"
-echo_info "Generating aws-exports.js..."
+echo_info "Generating public/aws-exports.json..."
 
 default_region=$region
 default_api_region=$api_region
@@ -162,51 +162,43 @@ if [ ! -z $provisioning_api_custom_invoke_url ]; then
  provisioning_api_invoke_url="https://$provisioning_api_custom_invoke_url"
 fi
 
-user_pool_client_logout_redirect_url_json=$(jq -n \
-  --arg value "$user_pool_client_logout_redirect_url" '$value')
+# Output public/aws-exports.json: loaded by the app at runtime (src/runtime-config.ts), so the
+# bundle itself carries no environment.
 
-# Output src/aws-exports.js
-
-cat << EOF > src/aws-exports.js
-const awsmobile = {
-  Auth: {
-    Cognito: {
-      userPoolId: '$user_pool_id',
-      userPoolClientId: '$user_pool_client_id',
-      loginWith: {
-        oauth: {
-          domain: '$user_pool_fqdn',
-          scopes: ['email', 'profile', 'openid'],
-          redirectSignIn: ['$user_pool_client_redirect_url'],
-          redirectSignOut: [$user_pool_client_logout_redirect_url_json],
-          responseType: 'code'
+jq -n \
+  --arg userPoolId "$user_pool_id" \
+  --arg userPoolClientId "$user_pool_client_id" \
+  --arg domain "$user_pool_fqdn" \
+  --arg redirectSignIn "$user_pool_client_redirect_url" \
+  --arg redirectSignOut "$user_pool_client_logout_redirect_url" \
+  --arg region "$api_region" \
+  --arg projects "${projects_api_invoke_url%/}" \
+  --arg publishing "${publishing_api_invoke_url%/}" \
+  --arg packaging "${packaging_api_invoke_url%/}" \
+  --arg provisioning "${provisioning_api_invoke_url%/}" \
+  '{
+    Auth: {
+      Cognito: {
+        userPoolId: $userPoolId,
+        userPoolClientId: $userPoolClientId,
+        loginWith: {
+          oauth: {
+            domain: $domain,
+            scopes: ["email", "profile", "openid"],
+            redirectSignIn: [$redirectSignIn],
+            redirectSignOut: [$redirectSignOut],
+            responseType: "code"
+          }
         }
-      }
+      },
+      cookieStorage: { expires: 2 }
     },
-    cookieStorage: {
-      expires: 2
-    }
-  },
-  API: {
-    REST: {
-      ProjectsAPI: {
-        endpoint: '${projects_api_invoke_url%/}',
-        region: '$api_region'
-      },
-      PublishingAPI: {
-        endpoint: '${publishing_api_invoke_url%/}',
-        region: '$api_region'
-      },
-      PackagingAPI: {
-        endpoint: '${packaging_api_invoke_url%/}',
-        region: '$api_region'
-      },
-      ProvisioningAPI: {
-        endpoint: '${provisioning_api_invoke_url%/}',
-        region: '$api_region'
+    API: {
+      REST: {
+        ProjectsAPI: { endpoint: $projects, region: $region },
+        PublishingAPI: { endpoint: $publishing, region: $region },
+        PackagingAPI: { endpoint: $packaging, region: $region },
+        ProvisioningAPI: { endpoint: $provisioning, region: $region }
       }
     }
-  }
-};
-export default awsmobile;
-EOF
+  }' > public/aws-exports.json

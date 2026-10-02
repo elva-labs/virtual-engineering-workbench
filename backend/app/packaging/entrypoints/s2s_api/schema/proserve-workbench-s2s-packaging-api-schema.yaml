@@ -1590,6 +1590,11 @@ components:
           type: array
           items: {type: string}
           nullable: true
+        baseImageChannel:
+          type: string
+          enum: [prod, test]
+          nullable: true
+          description: Base image release channel the parent image came from; null outside the base image entries.
         status: {$ref: '#/components/schemas/RecipeVersionStatus'}
         createDate: {type: string}
         createdBy: {type: string}
@@ -1621,6 +1626,10 @@ components:
           type: array
           maxItems: 50
           items: {type: string, maxLength: 128}
+        baseImageChannel:
+          type: string
+          enum: [prod, test]
+          description: For recipes on a base image entry, the release channel to build on; prod when omitted.
     UpdateRecipeVersionRequest:
       type: object
       additionalProperties: false
@@ -1636,6 +1645,10 @@ components:
           type: array
           maxItems: 50
           items: {type: string, maxLength: 128}
+        baseImageChannel:
+          type: string
+          enum: [prod, test]
+          description: For recipes on a base image entry, the release channel to build on; prod when omitted.
     CreateRecipeResponse:
       type: object
       required: [recipeId]

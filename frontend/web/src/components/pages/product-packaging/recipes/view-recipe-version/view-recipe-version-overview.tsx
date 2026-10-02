@@ -45,6 +45,10 @@ export const ViewRecipeVersionOverview = ({
           <ValueWithLabel label={i18n.detailsVolumeSize} data-test="volume-size">
             {recipeVersion.recipeVersionVolumeSize} GB
           </ValueWithLabel>
+          {recipeVersion.baseImageChannel &&
+            <ValueWithLabel label={i18n.detailsBaseImageChannel} data-test="base-image-channel">
+              {recipeVersion.baseImageChannel}
+            </ValueWithLabel>}
         </SpaceBetween>
         <SpaceBetween size="l">
           <ValueWithLabel label={i18n.detailsAuthor} data-test="created-by">

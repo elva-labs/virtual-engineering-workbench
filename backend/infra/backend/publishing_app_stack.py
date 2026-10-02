@@ -4,7 +4,16 @@ import typing
 import aws_cdk
 import cdk_nag
 import constructs
-from aws_cdk import aws_apigateway, aws_dynamodb, aws_ec2, aws_events, aws_iam, aws_scheduler, aws_ssm
+from aws_cdk import (
+    aws_apigateway,
+    aws_cloudwatch,
+    aws_dynamodb,
+    aws_ec2,
+    aws_events,
+    aws_iam,
+    aws_scheduler,
+    aws_ssm,
+)
 
 from app.publishing import domain
 from app.shared.api import bounded_contexts
@@ -828,6 +837,28 @@ class PublishingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
             self._infra_event_bus.allow_publish_from_account(image_account_id)
 
     def __configure_ops(self, app_config: config.AppConfig):
+        # A finished build that became no product version (the packaging-events handler refused or failed,
+        # e.g. the release candidate limit); the reason is a metric dimension and in the handler's log.
+        version_not_created_alarm = aws_cloudwatch.Alarm(
+            self,
+            "AlarmAutomatedVersionNotCreated",
+            alarm_name=app_config.format_resource_name("automated-version-not-created"),
+            alarm_description=(
+                "A pipeline build finished but no product version was created. The reason is the metric's "
+                "reason dimension and the packaging-events Lambda's log (Failed to create automated product version)."
+            ),
+            metric=aws_cloudwatch.Metric(
+                namespace=constants.VEW_NAMESPACE,
+                metric_name="AutomatedVersionNotCreated",
+                dimensions_map={"service": VEW_SERVICE, "type": "AutomatedVersion"},
+                statistic="Sum",
+                period=aws_cdk.Duration.minutes(5),
+            ),
+            threshold=1,
+            evaluation_periods=1,
+            comparison_operator=aws_cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+            treat_missing_data=aws_cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
         (
             ops_monitoring.OpsMonitoringBuilder(
                 self,
@@ -841,6 +872,7 @@ class PublishingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
             .with_api_gateway(self._open_api.api)
             .with_api_gateway(self._s2s_open_api.api)
             .with_step_functions([self._ami_sharing_state_machine.state_machine])
+            .with_alarms([version_not_created_alarm])
             .with_command_monitoring(domain_module=domain)
             .with_domain_event_monitoring(domain_module=domain)
             .build()

@@ -314,6 +314,7 @@ def bootstrap(app_config: config.AppConfig, logger: logging.Logger) -> Dependenc
             message_bus=message_bus,
             component_version_query_service=component_version_query_service,
             mandatory_components_list_query_service=mandatory_components_list_query_service,
+            recipe_version_query_service=recipe_version_query_service,
         )
 
     def create_recipe(command):

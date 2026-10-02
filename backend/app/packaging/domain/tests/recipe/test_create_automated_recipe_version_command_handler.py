@@ -99,6 +99,7 @@ def test_handle_should_create_new_recipe_version_with_updated_component():
         ],
         status=recipe_version.RecipeVersionStatus.Released,
         parentImageUpstreamId="ami-12345",
+        baseImageChannel="test",
         recipeVersionVolumeSize="8",
         recipeVersionIntegrations=[],
         createDate="2023-09-28T00:00:00+00:00",
@@ -138,6 +139,8 @@ def test_handle_should_create_new_recipe_version_with_updated_component():
     assertpy.assert_that(added_recipe_version.recipeId).is_equal_to("recipe-12345")
     assertpy.assert_that(added_recipe_version.recipeVersionName).is_equal_to("1.0.1-rc.1")
     assertpy.assert_that(added_recipe_version.status).is_equal_to(recipe_version.RecipeVersionStatus.Creating)
+    # The automated version builds on the base image channel of the version it follows.
+    assertpy.assert_that(added_recipe_version.baseImageChannel).is_equal_to("test")
 
     component_entries = added_recipe_version.recipeComponentsVersions
     assertpy.assert_that(component_entries).is_length(2)

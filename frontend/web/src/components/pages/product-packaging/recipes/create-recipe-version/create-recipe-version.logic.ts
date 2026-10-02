@@ -45,6 +45,7 @@ interface RecipeVersionData {
   recipeVersionDescription?: string,
   recipeVersionVolumeSize?: string,
   recipeVersionIntegrations?: string[],
+  baseImageChannel?: string | null,
 }
 
 const FETCH_KEY = (
@@ -194,6 +195,7 @@ export const useCreateRecipeVersion = ({
     recipeVersionVolumeSize: string,
     recipeVersionReleaseType?: string,
     recipeVersionIntegrations?: string[],
+    baseImageChannel?: string,
   ) {
     if (projectId && recipeId) {
       setCreateRecipeVersionInProgress(true);
@@ -204,6 +206,7 @@ export const useCreateRecipeVersion = ({
           recipeComponentsVersions,
           recipeVersionVolumeSize,
           recipeVersionIntegrations,
+          baseImageChannel,
         })
         .then(() => {
           showSuccessNotification({

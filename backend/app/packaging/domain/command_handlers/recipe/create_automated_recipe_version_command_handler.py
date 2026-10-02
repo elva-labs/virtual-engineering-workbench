@@ -245,6 +245,8 @@ def _create_recipe_version_entity(
         recipeId=command.recipeId.value,
         recipeVersionName=recipe_version_name_value_object.from_str(new_recipe_version_name).value,
         parentImageUpstreamId=last_released_version.parentImageUpstreamId,
+        # An automated version builds on the base image channel of the version it follows.
+        baseImageChannel=last_released_version.baseImageChannel,
         recipeComponentsVersions=recipe_components_versions,
         recipeName=last_released_version.recipeName,
         recipeVersionDescription=f"Automated build product for component {command.componentId.value} version {command.componentVersionId.value}",

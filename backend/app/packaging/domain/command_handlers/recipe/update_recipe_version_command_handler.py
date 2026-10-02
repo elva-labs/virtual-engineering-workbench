@@ -8,7 +8,7 @@ from app.packaging.domain.commands.recipe import update_recipe_version_command
 from app.packaging.domain.events.recipe import recipe_version_update_started
 from app.packaging.domain.exceptions import domain_exception
 from app.packaging.domain.model.component import component_version
-from app.packaging.domain.model.recipe import recipe, recipe_version
+from app.packaging.domain.model.recipe import base_image_channels, recipe, recipe_version
 from app.packaging.domain.model.shared import component_version_entry
 from app.packaging.domain.ports import (
     component_query_service,
@@ -22,7 +22,6 @@ from app.packaging.domain.value_objects.recipe_version import (
     recipe_version_components_versions_value_object,
     recipe_version_name_value_object,
     recipe_version_parent_image_upstream_id_value_object,
-    recipe_version_volume_size_value_object,
 )
 from app.shared.adapters.message_bus.message_bus import MessageBus
 from app.shared.adapters.unit_of_work_v2.unit_of_work import UnitOfWork
@@ -205,15 +204,19 @@ def _get_parent_image_upstream_id(
     parameter_qry_srv: parameter_service.ParameterDefinitionService,
     system_configuration_mapping: dict,
     recipe_entity: recipe.Recipe,
+    channels: base_image_channels.BaseImageChannels,
+    channel: str | None,
 ):
+    parameter_name = channels.parent_image_parameter(
+        system_configuration_mapping,
+        recipe_entity.recipePlatform,
+        recipe_entity.recipeArchitecture,
+        recipe_entity.recipeOsVersion,
+        channel,
+    )
     try:
         parent_image_upstream_id = recipe_version_parent_image_upstream_id_value_object.from_str(
-            parameter_qry_srv.get_parameter_value(
-                system_configuration_mapping.get(recipe_entity.recipePlatform)
-                .get(recipe_entity.recipeArchitecture)
-                .get(recipe_entity.recipeOsVersion)
-                .get(SystemConfigurationMappingAttributes.AMI_SSM_PARAM_NAME.value)
-            )
+            parameter_qry_srv.get_parameter_value(parameter_name)
         ).value
     except boto3.client("ssm").exceptions.ParameterNotFound:
         raise domain_exception.DomainException(
@@ -259,8 +262,14 @@ def handle(
     except Exception as e:
         raise domain_exception.DomainException(f"Recipe {command.recipeId.value} not found.") from e
 
+    # A base recipe's version may move to another channel; without one it keeps its own (base_image_channels).
+    channels = base_image_channels.from_environment()
+    channel = channels.resolve_channel(
+        recipe_entity.recipeOsVersion,
+        command.baseImageChannel if command.baseImageChannel is not None else recipe_version_entity.baseImageChannel,
+    )
     parent_image_upstream_id = _get_parent_image_upstream_id(
-        parameter_qry_srv, system_configuration_mapping, recipe_entity
+        parameter_qry_srv, system_configuration_mapping, recipe_entity, channels, channel
     )
 
     recipe_component_versions = __get_recipe_component_versions(
@@ -289,6 +298,7 @@ def handle(
                 recipeVersionId=command.recipeVersionId.value,
             ),
             parentImageUpstreamId=parent_image_upstream_id,
+            baseImageChannel=channel,
             configuredRecipeComponentsVersions=[
                 component_version_entry.ComponentVersionEntry.model_validate(component_version).model_dump()
                 for component_version in configured_components
@@ -312,14 +322,14 @@ def handle(
             project_id=command.projectId.value,
             recipe_id=command.recipeId.value,
             recipe_version_id=command.recipeVersionId.value,
-            parent_image_upstream_id=recipe_version_entity.parentImageUpstreamId,
+            # The deploy builds the Image Builder recipe from the event: the parent and volume size just stored,
+            # not the version's previous ones.
+            parent_image_upstream_id=parent_image_upstream_id,
             previous_recipe_components_versions=recipe_version_entity.recipeComponentsVersions,
             recipe_components_versions=recipe_version_components_versions_value_object.from_list(
                 recipe_component_versions
             ).value,
             recipe_version_name=recipe_version_name_value_object.from_str(update_current_recipe_version).value,
-            recipe_version_volume_size=recipe_version_volume_size_value_object.from_str(
-                recipe_version_entity.recipeVersionVolumeSize
-            ).value,
+            recipe_version_volume_size=command.recipeVersionVolumeSize.value,
         )
     )

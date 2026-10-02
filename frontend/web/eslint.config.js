@@ -252,11 +252,5 @@ export default [
       '@stylistic/wrap-iife': ['error'],
       yoda: ['error']
     }
-  },
-  {
-    files: ['**/aws-exports.js'],
-    rules: {
-      '@stylistic/max-len': 'off'
-    }
   }
 ];

@@ -46,3 +46,6 @@ src/aws-exports.js
 
 # Generated API Gateway OpenAPI exports
 src/services/api-src/
+
+# Written by configure_auth.sh, loaded by the app at runtime (src/runtime-config.ts).
+public/aws-exports.json

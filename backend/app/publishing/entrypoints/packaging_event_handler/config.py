@@ -42,3 +42,6 @@ class AppConfig(BaseModel):
 
     def get_product_rc_version_limit_param_name(self) -> str:
         return os.environ.get("PRODUCT_RC_VERSION_LIMIT_PARAM_NAME", "")
+
+    def get_retire_superseded_rc_versions(self) -> bool:
+        return os.environ.get("RETIRE_SUPERSEDED_RC_VERSIONS", "false").lower() == "true"

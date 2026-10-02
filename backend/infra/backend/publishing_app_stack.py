@@ -444,6 +444,9 @@ class PublishingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                         "CONTAINER_TEMPLATE_NAME_FILE_PATH": CONTAINER_TEMPLATE_NAME,
                         "PRODUCT_VERSION_LIMIT_PARAM_NAME": product_version_limit_param.parameter_name,
                         "PRODUCT_RC_VERSION_LIMIT_PARAM_NAME": product_rc_version_limit_param.parameter_name,
+                        "RETIRE_SUPERSEDED_RC_VERSIONS": str(
+                            app_config.component_specific.get("retire-superseded-rc-versions", False)
+                        ).lower(),
                     },
                     permissions=[
                         lambda lambda_f: self._storage.table.grant_read_write_data(lambda_f),

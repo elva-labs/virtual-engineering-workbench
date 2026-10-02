@@ -98,6 +98,12 @@ export interface RecipeVersion {
      * @memberof RecipeVersion
      */
     lastUpdatedBy: string;
+    /**
+     * Release channel of the base image the parent image comes from (prod or test); only on base image recipes
+     * @type {string}
+     * @memberof RecipeVersion
+     */
+    baseImageChannel?: string | null;
 }
 
 /**
@@ -142,6 +148,7 @@ export function RecipeVersionFromJSONTyped(json: any, ignoreDiscriminator: boole
         'createdBy': json['createdBy'],
         'lastUpdateDate': json['lastUpdateDate'],
         'lastUpdatedBy': json['lastUpdatedBy'],
+        'baseImageChannel': !exists(json, 'baseImageChannel') ? undefined : json['baseImageChannel'],
     };
 }
 
@@ -166,5 +173,6 @@ export function RecipeVersionToJSON(value?: RecipeVersion | null): any {
         'createdBy': value.createdBy,
         'lastUpdateDate': value.lastUpdateDate,
         'lastUpdatedBy': value.lastUpdatedBy,
+        'baseImageChannel': value.baseImageChannel,
     };
 }

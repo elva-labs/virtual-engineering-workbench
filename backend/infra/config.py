@@ -292,6 +292,9 @@ _dev_publishing_config = {
     + "-catalog-service-regional-notifications-dev-{{region}}",
     "product-limit-version": 5,
     "product-limit-rc-version": 2,
+    # On: a pipeline build at the release candidate limit retires the oldest candidates that are in DEV
+    # only and not recommended, then creates its version (off: the build creates no version).
+    "retire-superseded-rc-versions": False,
 }
 
 publishing_app_config = {

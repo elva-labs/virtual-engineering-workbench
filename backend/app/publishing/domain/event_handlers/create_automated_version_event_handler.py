@@ -2,6 +2,8 @@ import logging
 import typing
 from datetime import datetime, timezone
 
+from app.publishing.domain.command_handlers import retire_version_command_handler
+from app.publishing.domain.commands import retire_version_command
 from app.publishing.domain.events import product_version_creation_started
 from app.publishing.domain.exceptions import domain_exception
 from app.publishing.domain.model import portfolio, product, product_template, version
@@ -18,6 +20,8 @@ from app.publishing.domain.value_objects import (
     product_id_value_object,
     product_type_value_object,
     project_id_value_object,
+    user_id_value_object,
+    version_id_value_object,
 )
 from app.shared.adapters.message_bus import message_bus
 from app.shared.adapters.unit_of_work_v2 import unit_of_work
@@ -69,12 +73,69 @@ def _calculate_new_version_name(latest_version_name: str, release_type: str) -> 
         raise domain_exception.DomainException(f"Failed to parse version name {latest_version_name}: {str(e)}")
 
 
+def _superseded_rc_versions(
+    version_qry_srv: versions_query_service.VersionsQueryService, product_entity: product.Product
+) -> list[version.Version]:
+    """Release candidates a new build may replace, oldest first: in DEV only and not recommended.
+
+    One entry per version (a version has a distribution per account)."""
+    distributions = version_qry_srv.get_product_version_distributions(
+        product_id=product_entity.productId, statuses=[version.VersionStatus.Created]
+    )
+    by_version: dict[str, list[version.Version]] = {}
+    for distribution in distributions:
+        by_version.setdefault(distribution.versionId, []).append(distribution)
+    candidates = [
+        dists[0]
+        for version_id, dists in by_version.items()
+        if version.VersionType.ReleaseCandidate.suffix in dists[0].versionName
+        and all(d.stage == version.VersionStage.DEV for d in dists)
+        and version_id != product_entity.recommendedVersionId
+        and not any(d.isRecommendedVersion for d in dists)
+    ]
+    return sorted(candidates, key=lambda v: v.createDate)
+
+
+def _retire_superseded_rc_versions(
+    count: int,
+    version_qry_srv: versions_query_service.VersionsQueryService,
+    product_entity: product.Product,
+    ami_id: str,
+    user_id: str,
+    uow: unit_of_work.UnitOfWork,
+    message_bus: message_bus.MessageBus,
+    logger: logging.Logger,
+) -> bool:
+    """Every build is a DEV release candidate; at the limit the oldest ones make room, as a person would
+    retire them in the portal. False if there are not enough of them (nothing is retired then)."""
+    candidates = _superseded_rc_versions(version_qry_srv, product_entity)
+    if len(candidates) < count:
+        return False
+    for candidate in candidates[:count]:
+        logger.info(f"Retiring release candidate {candidate.versionName} of {product_entity.productId} for {ami_id}")
+        retire_version_command_handler.handle(
+            command=retire_version_command.RetireVersionCommand(
+                projectId=project_id_value_object.from_str(product_entity.projectId),
+                productId=product_id_value_object.from_str(product_entity.productId),
+                versionId=version_id_value_object.from_str(candidate.versionId),
+                userRoles=[],
+                retiredBy=user_id_value_object.from_str(user_id),
+                retireReason=f"Superseded by the automated build of {ami_id} (release candidate limit reached)",
+            ),
+            uow=uow,
+            message_bus=message_bus,
+            versions_qry_srv=version_qry_srv,
+        )
+    return True
+
+
 def _check_versions_limit(
     param_service: parameter_service.ParameterService,
     product_version_limit_param_name: str,
     version_qry_srv: versions_query_service.VersionsQueryService,
     product_entity: product.Product,
     product_rc_version_limit_param_name: str,
+    make_room: typing.Callable[[int], bool] | None = None,
 ):
     version_limit = int(param_service.get_parameter_value(parameter_name=product_version_limit_param_name))
 
@@ -96,7 +157,9 @@ def _check_versions_limit(
         version_name_filter=version.VersionType.ReleaseCandidate.suffix,
     )
 
-    if number_of_rc_versions >= rc_version_limit:
+    if number_of_rc_versions >= rc_version_limit and not (
+        make_room and make_room(number_of_rc_versions - rc_version_limit + 1)
+    ):
         raise domain_exception.DomainException(
             "You have reached the maximum number of active RC versions for this product."
         )
@@ -264,6 +327,7 @@ def handle(
     product_rc_version_limit_param_name: str,
     stack_srv: iac_service.IACService,
     file_service: template_service.TemplateService,
+    retire_superseded_rc_versions: bool = False,
 ) -> None:
     try:
         logger.info(f"Starting automated version creation for AMI {ami_id}, product {product_id}, project {project_id}")
@@ -277,12 +341,24 @@ def handle(
 
         fetched_dev_portfolios = _get_dev_portfolios(portf_qry_srv, product_entity)
 
+        # Opt-in: a build at the release candidate limit retires the oldest DEV-only candidates
+        # instead of being dropped (a product built on every change reaches the limit quickly).
+        make_room = (
+            (
+                lambda count: _retire_superseded_rc_versions(
+                    count, version_qry_srv, product_entity, ami_id, user_id, uow, message_bus, logger
+                )
+            )
+            if retire_superseded_rc_versions
+            else None
+        )
         _check_versions_limit(
             param_service,
             product_version_limit_param_name,
             version_qry_srv,
             product_entity,
             product_rc_version_limit_param_name,
+            make_room,
         )
 
         version_id = version.generate_version_id()

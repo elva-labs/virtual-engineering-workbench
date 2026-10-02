@@ -236,6 +236,8 @@ class RecipeVersion(BaseModel):
     recipeVersionName: str
     recipeVersionVolumeSize: str
     recipeVersionIntegrations: list[str] | None = None
+    # The base image release channel the parent image came from (None outside the base image entries).
+    baseImageChannel: str | None = None
     status: RecipeVersionStatus
     createDate: str
     createdBy: str
@@ -252,6 +254,13 @@ class CreateRecipeRequest(BaseModel):
     recipeOsVersion: str = Field(..., max_length=64)
 
 
+class BaseImageChannel(Enum):
+    """Which released base image a recipe version builds on."""
+
+    prod = "prod"
+    test = "test"
+
+
 class RecipeVersionReleaseType(Enum):
     MAJOR = "MAJOR"
     MINOR = "MINOR"
@@ -265,6 +274,7 @@ class CreateRecipeVersionRequest(BaseModel):
     recipeVersionReleaseType: RecipeVersionReleaseType
     recipeVersionVolumeSize: str = Field(..., max_length=8)
     recipeVersionIntegrations: list[Annotated[str, Field(max_length=128)]] | None = Field(None, max_length=50)
+    baseImageChannel: BaseImageChannel | None = None
 
 
 class UpdateRecipeVersionRequest(BaseModel):
@@ -273,6 +283,7 @@ class UpdateRecipeVersionRequest(BaseModel):
     recipeVersionDescription: str = Field(..., max_length=100)
     recipeVersionVolumeSize: str = Field(..., max_length=8)
     recipeVersionIntegrations: list[Annotated[str, Field(max_length=128)]] | None = Field(None, max_length=50)
+    baseImageChannel: BaseImageChannel | None = None
 
 
 class CreateRecipeResponse(BaseModel):

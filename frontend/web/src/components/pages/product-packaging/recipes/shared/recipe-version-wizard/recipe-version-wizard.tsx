@@ -26,6 +26,7 @@ interface RecipeVersionWizardProps {
     volumeSize: string,
     versionReleaseType?: string,
     integrations?: string[],
+    baseImageChannel?: string,
   ) => void,
   wizardSubmitInProgress: boolean,
   activeStepIndex: number,
@@ -73,6 +74,9 @@ export const RecipeVersionWizard: FC<RecipeVersionWizardProps> = ({
     setSelectedIntegrations,
     integrationComponents,
     isLoadingIntegrationComponents,
+    hasBaseImageChannel,
+    baseImageChannel,
+    setBaseImageChannel,
   } = useRecipeVersionWizard({
     projectId,
     recipeId,
@@ -106,6 +110,9 @@ export const RecipeVersionWizard: FC<RecipeVersionWizardProps> = ({
         isIntegrationsLoading={isIntegrationsLoading}
         selectedIntegrations={selectedIntegrations}
         setSelectedIntegrations={setSelectedIntegrations}
+        hasBaseImageChannel={hasBaseImageChannel}
+        baseImageChannel={baseImageChannel}
+        setBaseImageChannel={setBaseImageChannel}
       />
     },
     {
@@ -133,6 +140,7 @@ export const RecipeVersionWizard: FC<RecipeVersionWizardProps> = ({
         integrationComponentsVersions={integrationComponents}
         selectedIntegrations={selectedIntegrations}
         availableIntegrations={integrations}
+        baseImageChannel={hasBaseImageChannel ? baseImageChannel : undefined}
       />
     },
   ];
@@ -157,6 +165,7 @@ export const RecipeVersionWizard: FC<RecipeVersionWizardProps> = ({
           volumeSize.toString(),
           versionReleaseType,
           selectedIntegrations,
+          hasBaseImageChannel ? baseImageChannel : undefined,
         )
       }
       onCancel={() => setCancelConfirmVisible(true)}

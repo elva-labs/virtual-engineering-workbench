@@ -56,6 +56,12 @@ export interface CreateRecipeVersionRequest {
      * @memberof CreateRecipeVersionRequest
      */
     recipeVersionIntegrations?: Array<string>;
+    /**
+     * Release channel of the base image the parent image comes from (prod or test); only on base image recipes
+     * @type {string}
+     * @memberof CreateRecipeVersionRequest
+     */
+    baseImageChannel?: string | null;
 }
 
 /**
@@ -86,6 +92,7 @@ export function CreateRecipeVersionRequestFromJSONTyped(json: any, ignoreDiscrim
         'recipeVersionReleaseType': json['recipeVersionReleaseType'],
         'recipeVersionVolumeSize': json['recipeVersionVolumeSize'],
         'recipeVersionIntegrations': !exists(json, 'recipeVersionIntegrations') ? undefined : json['recipeVersionIntegrations'],
+        'baseImageChannel': !exists(json, 'baseImageChannel') ? undefined : json['baseImageChannel'],
     };
 }
 
@@ -103,5 +110,6 @@ export function CreateRecipeVersionRequestToJSON(value?: CreateRecipeVersionRequ
         'recipeVersionReleaseType': value.recipeVersionReleaseType,
         'recipeVersionVolumeSize': value.recipeVersionVolumeSize,
         'recipeVersionIntegrations': value.recipeVersionIntegrations,
+        'baseImageChannel': value.baseImageChannel,
     };
 }

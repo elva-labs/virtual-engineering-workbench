@@ -19,6 +19,9 @@ const STEP_1_INDEX = 1;
 const STEP_2_INDEX = 2;
 const MIN_RECIPE_COMPONENT_VERSIONS = 1;
 const MAX_VOLUME_SIZE = 500;
+// A recipe on a base image entry picks the base image release channel per version (prod by default).
+export const BASE_IMAGE_CHANNELS = ['prod', 'test'];
+const DEFAULT_BASE_IMAGE_CHANNEL = 'prod';
 
 interface ServiceAPI {
   getRecipe: (projectId: string, recipeId: string) => Promise<GetRecipeResponse>,
@@ -92,6 +95,9 @@ export const useRecipeVersionWizard = ({
   const [selectedIntegrations, setSelectedIntegrations] = useState<string[]>(
     recipeVersion?.recipeVersionIntegrations || []
   );
+  const [baseImageChannel, setBaseImageChannel] = useState(
+    recipeVersion?.baseImageChannel || DEFAULT_BASE_IMAGE_CHANNEL
+  );
 
   useEffect(() => {
     if (recipeVersion?.recipeVersionDescription) {
@@ -102,6 +108,9 @@ export const useRecipeVersionWizard = ({
     }
     if (recipeVersion?.recipeVersionIntegrations) {
       setSelectedIntegrations(recipeVersion.recipeVersionIntegrations);
+    }
+    if (recipeVersion?.baseImageChannel) {
+      setBaseImageChannel(recipeVersion.baseImageChannel);
     }
   }, [recipeVersion]);
   const [integrationComponents, setIntegrationComponents] = useState<ComponentVersionEntry[]>([]);
@@ -247,6 +256,8 @@ export const useRecipeVersionWizard = ({
   ]);
 
   const minVolumeSize = data?.recipe?.recipePlatform === 'Windows' ? 30 : 8;
+  // Only versions on a base image entry carry a channel (the portal does not list the base entries).
+  const hasBaseImageChannel = !!recipeVersion?.baseImageChannel;
 
   function isStep1Valid() {
     setIsDescriptionValid(!!description);
@@ -329,5 +340,8 @@ export const useRecipeVersionWizard = ({
     setSelectedIntegrations,
     integrationComponents,
     isLoadingIntegrationComponents,
+    hasBaseImageChannel,
+    baseImageChannel,
+    setBaseImageChannel,
   };
 };

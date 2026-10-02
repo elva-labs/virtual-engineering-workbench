@@ -47,6 +47,10 @@ class RecipeVersion(unit_of_work.Entity):
     recipeId: str = Field(..., title="RecipeId")
     recipeVersionId: str = Field(default_factory=generate_version_id, title="RecipeVersionId")
     parentImageUpstreamId: str = Field(..., title="ParentImageUpstreamId")
+    # The base image release channel the parent came from (base_image_channels): "prod" or "test" for recipes
+    # on a base image entry, None otherwise. Versions created before the field have None and built on their
+    # entry's channel.
+    baseImageChannel: typing.Optional[str] = Field(None, title="BaseImageChannel")
     configuredRecipeComponentsVersions: typing.Optional[list[component_version_entry.ComponentVersionEntry]] = Field(
         None, title="ConfiguredRecipeComponentsVersions"
     )

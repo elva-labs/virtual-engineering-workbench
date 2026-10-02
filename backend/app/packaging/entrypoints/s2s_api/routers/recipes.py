@@ -12,7 +12,7 @@ from app.packaging.domain.commands.recipe import (
     retire_recipe_version_command,
     update_recipe_version_command,
 )
-from app.packaging.domain.model.recipe import recipe, recipe_version
+from app.packaging.domain.model.recipe import base_image_channels, recipe, recipe_version
 from app.packaging.domain.value_objects.recipe import (
     recipe_description_value_object,
     recipe_id_value_object,
@@ -39,8 +39,15 @@ WRITE_SCOPE = "clients/packaging/recipe.write"
 RELEASE_SCOPE = "clients/packaging/recipe.release"
 
 
-def recipe_version_model(version) -> api_model.RecipeVersion:
+def recipe_version_model(
+    version,
+    recipe_os_version: str | None = None,
+    channels: base_image_channels.BaseImageChannels = base_image_channels.BaseImageChannels(),
+) -> api_model.RecipeVersion:
     payload = version.model_dump()
+    # A version created before the channel was stored reports the channel it was built on, so the
+    # provider's base_image_channel reads the same before and after.
+    payload["baseImageChannel"] = channels.effective_channel(recipe_os_version, payload.get("baseImageChannel"))
     payload["effectiveComponentsVersions"] = [
         recipe_component_model(entry) for entry in payload.pop("recipeComponentsVersions")
     ]
@@ -75,6 +82,13 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             project_id_value_object.from_str(project_id),
             recipe_id_value_object.from_str(recipe_id),
         )
+
+    def recipe_os_version(project_id: str, recipe_id: str) -> str | None:
+        entity = dependencies.recipe_domain_qry_srv.get_recipe(
+            project_id_value_object.from_str(project_id),
+            recipe_id_value_object.from_str(recipe_id),
+        )
+        return getattr(entity, "recipeOsVersion", None)
 
     def action_response(recipe_version_id: str) -> api_gateway.Response:
         return api_gateway.Response(
@@ -212,8 +226,11 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
         versions = dependencies.recipe_version_domain_qry_srv.get_recipe_versions(
             recipe_id_value_object.from_str(recipe_id)
         )
+        os_version = recipe_os_version(project_id, recipe_id)
         return api_model.RecipeVersionPage(
-            recipe_versions=[recipe_version_model(version) for version in versions]
+            recipe_versions=[
+                recipe_version_model(version, os_version, dependencies.base_image_channels) for version in versions
+            ]
         ).model_dump(mode="json", exclude_none=True)
 
     @tracer.capture_method(capture_response=False, capture_error=False)
@@ -229,9 +246,11 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
             recipe_id_value_object.from_str(recipe_id),
             recipe_version_id_value_object.from_str(version_id),
         )
-        return api_model.RecipeVersionResponse(recipe_version=recipe_version_model(version)).model_dump(
-            mode="json", exclude_none=True
-        )
+        return api_model.RecipeVersionResponse(
+            recipe_version=recipe_version_model(
+                version, recipe_os_version(project_id, recipe_id), dependencies.base_image_channels
+            )
+        ).model_dump(mode="json", exclude_none=True)
 
     @tracer.capture_method(capture_response=False, capture_error=False)
     @router.put("/projects/<project_id>/recipes/<recipe_id>/versions/<version_id>")
@@ -264,6 +283,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
                 recipeVersionIntegrations=recipe_version_integration_value_object.from_str_array(
                     request.recipeVersionIntegrations or []
                 ),
+                baseImageChannel=request.baseImageChannel.value if request.baseImageChannel else None,
                 lastUpdatedBy=user_id_value_object.from_str(f"service:{client_id}"),
             )
         )
@@ -381,6 +401,7 @@ def create_recipe_version_response(
             recipeVersionIntegrations=recipe_version_integration_value_object.from_str_array(
                 request.recipeVersionIntegrations or []
             ),
+            baseImageChannel=request.baseImageChannel.value if request.baseImageChannel else None,
             createdBy=user_id_value_object.from_str(f"service:{client_id}"),
         )
     )

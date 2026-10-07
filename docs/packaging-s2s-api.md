@@ -56,7 +56,20 @@ or `FAILED`; pipelines use `CREATING`, `CREATED`, `UPDATING`, `RETIRED`, or
 
 ## Assign the client to a project
 
-Use a management client with `clients/projects/client_assignment.write` to create or reactivate the assignment. The `clientId` path value is the client ID contained in the Packaging access token.
+Use the dedicated `projects-assignment-management` OAuth client with
+`clients/projects/client_assignment.write` and an existing `ACTIVE` assignment to
+the target project to create or reactivate assignments. This client has
+assignment read/write scopes and no Packaging scopes. The `sample-s2s` client
+retains its Packaging scopes and no longer has assignment-write access.
+
+A client must never hold both `clients/projects/client_assignment.write` and
+any `clients/packaging/*` scopes. Use separate credentials for assignment
+management and Packaging operations, including for custom clients.
+
+The `clientId` path value is the client ID contained in the Packaging access
+token. It must differ from the calling management client's token `client_id`.
+Self-assignment PUT requests return HTTP `403`, even when the caller already
+has an active assignment or holds the bootstrap scope.
 
 ```bash
 curl --fail-with-body --request PUT \
@@ -65,6 +78,16 @@ curl --fail-with-body --request PUT \
 ```
 
 The response reports `ACTIVE`. A Packaging request for an unassigned project returns `403 PROJECT_ACCESS_DENIED` before Packaging looks up the requested resource. Deleting the same Projects URL revokes the assignment.
+
+For initial setup or orphan-project recovery, obtain a token from the separate
+`platform-projects-bootstrap` client requesting both
+`clients/projects/client_assignment.write` and
+`clients/projects/client_assignment.bootstrap`. Use that token to assign the
+management client's ID to an existing project with no active service-client
+assignments. Then use the management client's token to assign the Packaging
+client. The bootstrap client cannot assign itself, and it has no Packaging
+scopes. Projects with active service clients require an already assigned
+management client to grant access.
 
 ## Component POC
 

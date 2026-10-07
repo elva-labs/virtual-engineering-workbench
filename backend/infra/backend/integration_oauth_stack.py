@@ -152,7 +152,6 @@ class IntegrationOauthStack(aws_cdk.Stack):
                         "assignment.write",
                         "assignment.read",
                         "client_assignment.read",
-                        "client_assignment.write",
                         "technology.read",
                         "technology.write",
                         "account.read",
@@ -187,6 +186,21 @@ class IntegrationOauthStack(aws_cdk.Stack):
                 ),
             ],
             client_name="sample-s2s",
+        )
+
+        backend_app_api_oauth_client.BackendAppApiOAuthClient(
+            self,
+            "ProjectsAssignmentManagementClient",
+            app_config=app_config,
+            user_pool=user_pool,
+            resource_servers=[
+                backend_app_api_oauth_client.AppClientResourceServer(
+                    resource_server=projects_resource_server,
+                    scopes=["client_assignment.read", "client_assignment.write"],
+                ),
+            ],
+            client_name="projects-assignment-management",
+            client_construct_id="ProjectsAssignmentManagementOAuthClient",
         )
 
         backend_app_api_oauth_client.BackendAppApiOAuthClient(

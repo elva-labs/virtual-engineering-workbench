@@ -41,3 +41,5 @@ class LaunchProductCommand(command_bus.Command):
         provisioned_compound_product_id_value_object.ProvisionedCompoundProductIdValueObject
     ) = pydantic.Field(provisioned_compound_product_id_value_object.no_id())
     deployment_option: deployment_option_value_object.DeploymentOptionValueObject = pydantic.Field(...)
+    # A workbench-only program: only products of type WORKBENCH may be launched.
+    workbenches_only: bool = pydantic.Field(False)

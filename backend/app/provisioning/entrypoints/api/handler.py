@@ -92,6 +92,19 @@ TAG_PROVISIONED_PRODUCTS_INTERNAL = "Provisioned Products (internal use)"
 TAG_USER_PROFILE = "User Profile"
 TAG_MAINTENANCE_WINDOWS = "Maintenance Windows"
 TAG_PROVISIONING_INFRASTRUCTURE = "Provisioning Infrastructure"
+# The product type a workbench-only program offers.
+WORKBENCH_PRODUCT_TYPE = "WORKBENCH"
+
+
+def _stage_roles() -> list[str]:
+    """The roles that decide which release stages the caller sees.
+
+    In a workbench-only program everyone but an ADMIN consumes PROD only, like a user.
+    """
+    principal = app.context.get("user_principal")
+    if principal.workbenches_only:
+        return ["PLATFORM_USER"]
+    return list(principal.user_roles or [])
 
 
 @tracer.capture_method
@@ -105,10 +118,22 @@ def get_available_products(
     Lists available products associated to a project. Clients can filter results when providing product ids in filter
     query parameter.
     """
+    requested_type = product_type.pop() if product_type else None
+    # A workbench-only program lists workbenches only (no virtual targets) for its members.
+    if app.context.get("user_principal").workbenches_only:
+        # "Workbench" or "WORKBENCH": the value object normalises the casing.
+        if requested_type and product_type_value_object.from_str(requested_type).value != WORKBENCH_PRODUCT_TYPE:
+            return api_gateway.Response(
+                status_code=HTTPStatus.OK,
+                body=api_model.GetAvailableProductsResponse(availableProducts=[]),
+                content_type=content_types.APPLICATION_JSON,
+            )
+        # The query value is PascalCase, as the portal sends it (product_type_value_object).
+        requested_type = "Workbench"
     products = dependencies.products_domain_qry_srv.get_available_products(
         project_id=project_id_value_object.from_str(project_id),
-        user_roles=[user_role_value_object.from_str(role) for role in app.context.get("user_principal").user_roles],
-        product_type=product_type_value_object.from_str(product_type.pop() if product_type else None),
+        user_roles=[user_role_value_object.from_str(role) for role in _stage_roles()],
+        product_type=product_type_value_object.from_str(requested_type),
         product_id_filter=product_id_value_object.from_list(filter) if filter else None,
     )
 
@@ -148,6 +173,7 @@ def launch_product(
             app.current_event.raw_event.get("requestContext").get("identity").get("sourceIp")
         ),
         deployment_option=deployment_option_value_object.multi_az(),
+        workbenches_only=app.context.get("user_principal").workbenches_only,
     )
 
     dependencies.command_bus.handle(command)
@@ -256,7 +282,7 @@ def get_available_product_versions(
         stage=stage,
         region=region,
         return_technical_params=False,
-        user_roles=list(app.context.get("user_principal").user_roles or []),
+        user_roles=_stage_roles(),
         project_id=project_id,
     )
 

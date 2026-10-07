@@ -43,6 +43,7 @@ def test_authorizer_lambda_handler_successful_authorization(
                 "userGroups": "[]",
                 "projectManagedBy": "",
                 "projectManagedSource": "",
+                "projectExperience": "",
                 "stages": '["prod"]',
             },
             "policyDocument": {
@@ -218,6 +219,7 @@ def test_authorizer_lambda_handler_multiple_roles_and_domains(
                 "userGroups": "[]",
                 "projectManagedBy": "",
                 "projectManagedSource": "",
+                "projectExperience": "",
             },
             "policyDocument": {
                 "Version": "2012-10-17",
@@ -269,6 +271,7 @@ def test_authorizer_lambda_handler_when_no_assignments(
                 "userGroups": "[]",
                 "projectManagedBy": "",
                 "projectManagedSource": "",
+                "projectExperience": "",
             },
             "policyDocument": {
                 "Version": "2012-10-17",
@@ -323,6 +326,7 @@ def test_authorizer_lambda_handler_when_not_in_a_project_scope(
                 "userGroups": "[]",
                 "projectManagedBy": "",
                 "projectManagedSource": "",
+                "projectExperience": "",
             },
             "policyDocument": {
                 "Version": "2012-10-17",

@@ -55,6 +55,12 @@ export interface Project {
      * @memberof Project
      */
     lastUpdateDate?: string;
+    /**
+     * full, or workbench-only: members other than platform admins only see their workbenches.
+     * @type {string}
+     * @memberof Project
+     */
+    experience?: string | null;
 }
 
 /**
@@ -83,6 +89,7 @@ export function ProjectFromJSONTyped(json: any, ignoreDiscriminator: boolean): P
         'isActive': !exists(json, 'isActive') ? undefined : json['isActive'],
         'createDate': !exists(json, 'createDate') ? undefined : json['createDate'],
         'lastUpdateDate': !exists(json, 'lastUpdateDate') ? undefined : json['lastUpdateDate'],
+        'experience': !exists(json, 'experience') ? undefined : json['experience'],
     };
 }
 
@@ -101,5 +108,6 @@ export function ProjectToJSON(value?: Project | null): any {
         'isActive': value.isActive,
         'createDate': value.createDate,
         'lastUpdateDate': value.lastUpdateDate,
+        'experience': value.experience,
     };
 }

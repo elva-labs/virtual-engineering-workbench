@@ -8,7 +8,7 @@ def handle(event: project_updated.ProjectUpdated, uow: unit_of_work.UnitOfWork):
     tool manages the project. Fields absent from the event (from before they existed) keep the stored
     value."""
     has_management = "managedBy" in event.model_fields_set
-    if event.remoteSupportEnabled is None and not has_management:
+    if event.remoteSupportEnabled is None and not has_management and event.experience is None:
         return
 
     with uow:
@@ -22,6 +22,8 @@ def handle(event: project_updated.ProjectUpdated, uow: unit_of_work.UnitOfWork):
         if has_management:
             settings.managedBy = event.managedBy or None
             settings.managedSource = event.managedSource if event.managedBy else None
+        if event.experience is not None:
+            settings.experience = event.experience
         if stored:
             settings_repo.update_entity(settings_id, settings)
         else:

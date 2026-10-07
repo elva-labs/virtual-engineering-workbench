@@ -1916,6 +1916,11 @@ components:
           nullable: true
           additionalProperties: true
           description: The project's workbench stop policy and what its users may change; null = the deployment's defaults.
+        experience:
+          title: Experience
+          type: string
+          nullable: true
+          description: full, or workbench-only - members other than platform admins only see their workbenches.
     ProjectAssignment:
       title: ProjectAssignment
       type: object

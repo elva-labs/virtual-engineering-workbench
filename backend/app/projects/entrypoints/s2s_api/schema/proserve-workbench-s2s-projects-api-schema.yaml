@@ -2085,6 +2085,9 @@ components:
           type: array
           items:
             type: string
+        groupName:
+          type: string
+          maxLength: 256
     ProjectGroupAssignment:
       type: object
       required: [projectId, groupId, roles, version, createDate, lastUpdateDate]
@@ -2098,6 +2101,8 @@ components:
           type: array
           items:
             type: string
+        groupName:
+          type: string
         version:
           type: integer
         createDate:

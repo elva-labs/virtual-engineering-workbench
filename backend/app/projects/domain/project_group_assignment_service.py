@@ -1,12 +1,10 @@
 from datetime import datetime, timezone
 from uuid import UUID
 
-from app.projects.domain.events.groups.project_group_assignment_changed import (
-    ProjectGroupAssignmentChanged,
-)
-from app.projects.domain.model import project_group_assignment, project_assignment
-from app.shared.adapters.unit_of_work_v2 import unit_of_work
+from app.projects.domain.events.groups.project_group_assignment_changed import ProjectGroupAssignmentChanged
+from app.projects.domain.model import project_assignment, project_group_assignment
 from app.shared.adapters.message_bus import message_bus
+from app.shared.adapters.unit_of_work_v2 import unit_of_work
 
 
 class ProjectGroupAssignmentService:
@@ -20,25 +18,34 @@ class ProjectGroupAssignmentService:
         self._query = query_service
         self._events = events
 
-    def put(self, project_id: str, group_id: str, roles: list[str]):
+    def put(self, project_id: str, group_id: str, roles: list[str], group_name: str | None = None):
         group_id = str(UUID(group_id))
         if self._query.get_project_by_id(project_id) is None:
             raise ValueError("Project not found")
         validated = list(dict.fromkeys(project_assignment.Role(role) for role in roles))
         current = self._query.get_project_group_assignment(project_id, group_id)
-        if current and not current.isDeleted and set(current.roles) == set(validated):
+        # The display name is a label only; None keeps a stored one (older providers send none).
+        group_name = (group_name or "").strip() or (current.groupName if current else None)
+        if (
+            current
+            and not current.isDeleted
+            and set(current.roles) == set(validated)
+            and current.groupName == group_name
+        ):
             return current
         now = datetime.now(timezone.utc).isoformat()
         assignment = current or project_group_assignment.ProjectGroupAssignment(
             projectId=project_id,
             groupId=group_id,
             roles=validated,
+            groupName=group_name,
             version=1,
             createDate=now,
             lastUpdateDate=now,
         )
         if current:
             assignment.roles = validated
+            assignment.groupName = group_name
             assignment.version += 1
             assignment.isDeleted = False
             assignment.lastUpdateDate = now
@@ -49,9 +56,7 @@ class ProjectGroupAssignmentService:
             )
             if current:
                 repository.update_entity(
-                    project_group_assignment.ProjectGroupAssignmentPrimaryKey(
-                        projectId=project_id, groupId=group_id
-                    ),
+                    project_group_assignment.ProjectGroupAssignmentPrimaryKey(projectId=project_id, groupId=group_id),
                     assignment,
                 )
             else:
@@ -73,9 +78,7 @@ class ProjectGroupAssignmentService:
                 project_group_assignment.ProjectGroupAssignmentPrimaryKey,
                 project_group_assignment.ProjectGroupAssignment,
             ).update_entity(
-                project_group_assignment.ProjectGroupAssignmentPrimaryKey(
-                    projectId=project_id, groupId=group_id
-                ),
+                project_group_assignment.ProjectGroupAssignmentPrimaryKey(projectId=project_id, groupId=group_id),
                 current,
             )
             self._uow.commit()

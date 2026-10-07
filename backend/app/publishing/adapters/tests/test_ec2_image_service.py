@@ -151,6 +151,20 @@ def test_store_ami_status_raises_on_failed_task(ec2_calls):
     ).when_called_with("eu-west-3", "ami-54321")
 
 
+def test_store_ami_status_reads_the_task_of_the_target_accounts_bucket(ec2_calls):
+    # One image stored into two accounts at once: each distribution reads its own bucket's task.
+    ec2_calls["DescribeStoreImageTasks"].return_value = {
+        "StoreImageTaskResults": [
+            {"AmiId": "ami-54321", "Bucket": "vew-image-import-999999999999-eu-west-3", "StoreTaskState": "Failed"},
+            {"AmiId": "ami-54321", "Bucket": IMPORT_BUCKET, "StoreTaskState": "Completed"},
+        ]
+    }
+
+    status = _distribution_service().get_store_ami_status("eu-west-3", "ami-54321", "322234948118")
+
+    assertpy.assert_that(status).is_equal_to("Completed")
+
+
 def test_restore_ami_restores_in_the_target_account(ec2_calls):
     ami_id = _distribution_service().restore_ami("eu-west-3", "ami-54321.bin", "322234948118", "vew-ami-orig")
 

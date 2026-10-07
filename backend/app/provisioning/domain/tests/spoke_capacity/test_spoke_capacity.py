@@ -18,11 +18,17 @@ CONFIG = spoke_capacity.CapacityConfig(
     staleAfterMinutes=30,
     quotas=[
         spoke_capacity.QuotaConfig(
-            serviceCode="ec2", quotaCode="L-1216C47A", label="Standard vCPU",
+            serviceCode="ec2",
+            quotaCode="L-1216C47A",
+            label="Standard vCPU",
             instanceFamilies=["a", "c", "d", "h", "i", "m", "r", "t", "z"],
         ),
-        spoke_capacity.QuotaConfig(serviceCode="ec2", quotaCode="L-DB2E81BA", label="GPU vCPU (G, VT)", instanceFamilies=["g", "vt"]),
-        spoke_capacity.QuotaConfig(serviceCode="ebs", quotaCode="L-7A658B76", label="gp3 storage (TiB)", volumeType="gp3"),
+        spoke_capacity.QuotaConfig(
+            serviceCode="ec2", quotaCode="L-DB2E81BA", label="GPU vCPU (G, VT)", instanceFamilies=["g", "vt"]
+        ),
+        spoke_capacity.QuotaConfig(
+            serviceCode="ebs", quotaCode="L-7A658B76", label="gp3 storage (TiB)", volumeType="gp3"
+        ),
     ],
 )
 
@@ -34,9 +40,30 @@ def snapshot(standard=(60, 52), gpu=(0, 0), gp3=(50, 1.0), age_minutes=5, progra
         collectedAt=(NOW - timedelta(minutes=age_minutes)).isoformat(),
         programs=programs or [spoke_capacity.ProgramRef(projectId="proj-a", projectName="AiPlatform", stages=["DEV"])],
         quotas=[
-            spoke_capacity.QuotaUsage(serviceCode="ec2", quotaCode="L-1216C47A", label="Standard vCPU", unit="vCPU", limit=standard[0], used=standard[1]),
-            spoke_capacity.QuotaUsage(serviceCode="ec2", quotaCode="L-DB2E81BA", label="GPU vCPU (G, VT)", unit="vCPU", limit=gpu[0], used=gpu[1]),
-            spoke_capacity.QuotaUsage(serviceCode="ebs", quotaCode="L-7A658B76", label="gp3 storage (TiB)", unit="TiB", limit=gp3[0], used=gp3[1]),
+            spoke_capacity.QuotaUsage(
+                serviceCode="ec2",
+                quotaCode="L-1216C47A",
+                label="Standard vCPU",
+                unit="vCPU",
+                limit=standard[0],
+                used=standard[1],
+            ),
+            spoke_capacity.QuotaUsage(
+                serviceCode="ec2",
+                quotaCode="L-DB2E81BA",
+                label="GPU vCPU (G, VT)",
+                unit="vCPU",
+                limit=gpu[0],
+                used=gpu[1],
+            ),
+            spoke_capacity.QuotaUsage(
+                serviceCode="ebs",
+                quotaCode="L-7A658B76",
+                label="gp3 storage (TiB)",
+                unit="TiB",
+                limit=gp3[0],
+                used=gp3[1],
+            ),
         ],
     )
 
@@ -46,8 +73,16 @@ def snapshot(standard=(60, 52), gpu=(0, 0), gp3=(50, 1.0), age_minutes=5, progra
 
 @pytest.mark.parametrize(
     "instance_type,family,vcpus",
-    [("m7i.xlarge", "m", 4), ("m7i.2xlarge", "m", 8), ("m7i.4xlarge", "m", 16), ("g6.xlarge", "g", 4),
-     ("g6.4xlarge", "g", 16), ("vt1.3xlarge", "vt", 12), ("t3.medium", "t", 2), ("m7i.metal-24xl", "m", None)],
+    [
+        ("m7i.xlarge", "m", 4),
+        ("m7i.2xlarge", "m", 8),
+        ("m7i.4xlarge", "m", 16),
+        ("g6.xlarge", "g", 4),
+        ("g6.4xlarge", "g", 16),
+        ("vt1.3xlarge", "vt", 12),
+        ("t3.medium", "t", 2),
+        ("m7i.metal-24xl", "m", None),
+    ],
 )
 def test_family_and_vcpus(instance_type, family, vcpus):
     assert spoke_capacity.instance_family(instance_type) == family
@@ -142,10 +177,16 @@ class _Paginator:
 class FakeEc2:
     def __init__(self):
         self.instances = [
-            {"InstanceType": "m7i.xlarge", "State": {"Name": "running"},
-             "Tags": [{"Key": "vew:provisionedProduct:productType", "Value": "WORKBENCH"}]},
-            {"InstanceType": "m7i.xlarge", "State": {"Name": "stopped"},
-             "Tags": [{"Key": "vew:provisionedProduct:productType", "Value": "WORKBENCH"}]},
+            {
+                "InstanceType": "m7i.xlarge",
+                "State": {"Name": "running"},
+                "Tags": [{"Key": "vew:provisionedProduct:productType", "Value": "WORKBENCH"}],
+            },
+            {
+                "InstanceType": "m7i.xlarge",
+                "State": {"Name": "stopped"},
+                "Tags": [{"Key": "vew:provisionedProduct:productType", "Value": "WORKBENCH"}],
+            },
             {"InstanceType": "t3.medium", "State": {"Name": "running"}, "Tags": [{"Key": "Name", "Value": "jumphost"}]},
             {"InstanceType": "m7i.4xlarge", "State": {"Name": "running"}, "InstanceLifecycle": "spot"},
         ]
@@ -154,10 +195,16 @@ class FakeEc2:
         if name == "describe_instances":
             return _Paginator([{"Reservations": [{"Instances": self.instances}]}])
         if name == "describe_instance_types":
-            return _Paginator([{"InstanceTypes": [
-                {"InstanceType": "m7i.xlarge", "VCpuInfo": {"DefaultVCpus": 4}},
-                {"InstanceType": "t3.medium", "VCpuInfo": {"DefaultVCpus": 2}},
-            ]}])
+            return _Paginator(
+                [
+                    {
+                        "InstanceTypes": [
+                            {"InstanceType": "m7i.xlarge", "VCpuInfo": {"DefaultVCpus": 4}},
+                            {"InstanceType": "t3.medium", "VCpuInfo": {"DefaultVCpus": 2}},
+                        ]
+                    }
+                ]
+            )
         if name == "describe_volumes":
             return _Paginator([{"Volumes": [{"Size": 250}, {"Size": 774}]}])
         raise AssertionError(name)
@@ -249,7 +296,10 @@ class MemoryStore:
 
 class FakeProjects:
     def get_projects(self):
-        return [SimpleNamespace(projectId="proj-a", projectName="AiPlatform"), SimpleNamespace(projectId="proj-b", projectName="Empty")]
+        return [
+            SimpleNamespace(projectId="proj-a", projectName="AiPlatform"),
+            SimpleNamespace(projectId="proj-b", projectName="Empty"),
+        ]
 
     def get_aws_accounts_by_status(self, project_id, statuses):
         if project_id == "proj-b":
@@ -263,8 +313,12 @@ class FakeProjects:
 def service(quotas=None, store=None):
     quotas = quotas or FakeQuotas({"L-1216C47A": 60.0, "L-DB2E81BA": 0.0, "L-7A658B76": 50.0})
     return svc.SpokeCapacityDomainQueryService(
-        config=CONFIG, store=store or MemoryStore(), reader=reader(quotas), projects_qry_srv=FakeProjects(),
-        logger=logging.getLogger("test"), default_region="eu-north-1",
+        config=CONFIG,
+        store=store or MemoryStore(),
+        reader=reader(quotas),
+        projects_qry_srv=FakeProjects(),
+        logger=logging.getLogger("test"),
+        default_region="eu-north-1",
     )
 
 
@@ -274,7 +328,10 @@ def test_collect_reads_each_spoke_once_with_its_programs_and_stages():
     assert len(snapshots) == 1
     assert snapshots[0].programs[0].stages == ["DEV", "PROD"]
     overview = s.overview()
-    assert overview["totals"]["accounts"] == 1 and overview["totals"]["workbenchesByState"] == {"running": 1, "stopped": 1}
+    assert overview["totals"]["accounts"] == 1 and overview["totals"]["workbenchesByState"] == {
+        "running": 1,
+        "stopped": 1,
+    }
     assert overview["totals"]["runningByInstanceType"] == {"m7i.xlarge": 1, "t3.medium": 1}
 
 

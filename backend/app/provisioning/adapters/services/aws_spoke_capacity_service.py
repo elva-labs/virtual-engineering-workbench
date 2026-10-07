@@ -43,7 +43,9 @@ class AWSSpokeCapacityService:
             instances = self._instances(ec2)
             vcpus_by_type = self._vcpus_by_type(ec2, {i.instanceType for i in instances})
             for instance in instances:
-                instance.vcpus = vcpus_by_type.get(instance.instanceType) or spoke_capacity.vcpus_of(instance.instanceType) or 0
+                instance.vcpus = (
+                    vcpus_by_type.get(instance.instanceType) or spoke_capacity.vcpus_of(instance.instanceType) or 0
+                )
             gp3_gib = self._volume_gib(ec2, "gp3")
         except Exception as error:  # noqa: BLE001 - one spoke must not stop the others
             self._logger.warning("capacity: reading EC2 in %s/%s failed: %s", aws_account_id, region, error)
@@ -57,7 +59,11 @@ class AWSSpokeCapacityService:
             limit, error = self._quota_value(aws_account_id, region, quota)
             if error:
                 errors.append(error)
-            used = used_vcpus.get(quota.quotaCode, 0.0) if quota.serviceCode == "ec2" else gp3_gib / spoke_capacity.GIB_PER_TIB
+            used = (
+                used_vcpus.get(quota.quotaCode, 0.0)
+                if quota.serviceCode == "ec2"
+                else gp3_gib / spoke_capacity.GIB_PER_TIB
+            )
             quotas.append(
                 spoke_capacity.QuotaUsage(
                     serviceCode=quota.serviceCode,
@@ -114,7 +120,9 @@ class AWSSpokeCapacityService:
             client = self._sq(aws_account_id, region, SERVICE_USER_ID)
             value = client.get_service_quota(ServiceCode=quota.serviceCode, QuotaCode=quota.quotaCode)["Quota"]["Value"]
         except Exception as error:  # noqa: BLE001 - an unreadable quota is reported, not fatal
-            self._logger.warning("capacity: quota %s in %s/%s unreadable: %s", quota.quotaCode, aws_account_id, region, error)
+            self._logger.warning(
+                "capacity: quota %s in %s/%s unreadable: %s", quota.quotaCode, aws_account_id, region, error
+            )
             return None, f"{quota.quotaCode}: {error}"
         self._quota_cache[key] = (self._clock(), float(value))
         return float(value), None

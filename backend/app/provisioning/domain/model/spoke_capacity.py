@@ -188,9 +188,7 @@ def vcpus_of(instance_type: str, known: dict[str, int] | None = None) -> Optiona
     return 4 * int(match.group(1)) if match else None
 
 
-def vcpu_usage(
-    config: CapacityConfig, instances: list[InstanceCount]
-) -> dict[str, float]:
+def vcpu_usage(config: CapacityConfig, instances: list[InstanceCount]) -> dict[str, float]:
     """vCPUs in use per EC2 quota code, from the counted (pending, running) instances."""
     used: dict[str, float] = {q.quotaCode: 0.0 for q in config.quotas if q.serviceCode == "ec2"}
     for instance in instances:

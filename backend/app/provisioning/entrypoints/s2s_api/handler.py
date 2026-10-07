@@ -224,7 +224,9 @@ def request_quota_increase(aws_account_id: str, quota_code: str) -> api_gateway.
     try:
         desired = float(body.get("desiredValue"))
     except (TypeError, ValueError):
-        return _json(HTTPStatus.BAD_REQUEST, {"code": "INVALID_DESIRED_VALUE", "message": "desiredValue must be a number."})
+        return _json(
+            HTTPStatus.BAD_REQUEST, {"code": "INVALID_DESIRED_VALUE", "message": "desiredValue must be a number."}
+        )
     region = body.get("region") or app_config.get_default_region()
     try:
         request = dependencies.spoke_capacity_srv.request_increase(

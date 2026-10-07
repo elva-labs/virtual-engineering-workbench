@@ -15,8 +15,6 @@ from app.provisioning.adapters.query_services import (
 from app.provisioning.adapters.repository import dynamo_entity_config, dynamodb_spoke_capacity_store
 from app.provisioning.adapters.services import aws_parameter_service as ssm_parameter_service_v2
 from app.provisioning.adapters.services import aws_spoke_capacity_service
-from app.provisioning.domain.model import spoke_capacity
-from app.provisioning.domain.query_services import spoke_capacity_domain_query_service
 from app.provisioning.domain.command_handlers.product_provisioning import (
     launch,
     remove,
@@ -33,9 +31,11 @@ from app.provisioning.domain.commands.provisioned_product_state import (
     initiate_provisioned_product_start_command,
     initiate_provisioned_product_stop_command,
 )
+from app.provisioning.domain.model import spoke_capacity
 from app.provisioning.domain.query_services import (
     products_domain_query_service,
     provisioned_products_domain_query_service,
+    spoke_capacity_domain_query_service,
     versions_domain_query_service,
 )
 from app.provisioning.domain.read_models import project_account

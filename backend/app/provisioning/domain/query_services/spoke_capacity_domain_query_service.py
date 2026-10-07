@@ -116,7 +116,9 @@ class SpokeCapacityDomainQueryService:
             "collectedAt": max((s.collectedAt for s in snapshots), default=None),
             "alarmUsedPercent": self._config.alarmUsedPercent,
             "totals": _totals(snapshots),
-            "accounts": [_account_view(s, [r for r in requests if r.awsAccountId == s.awsAccountId]) for s in snapshots],
+            "accounts": [
+                _account_view(s, [r for r in requests if r.awsAccountId == s.awsAccountId]) for s in snapshots
+            ],
         }
 
     def project_capacity(self, project_id: str, instance_types: list[str]) -> dict:
@@ -159,7 +161,9 @@ class SpokeCapacityDomainQueryService:
                     "startDate": pp.startDate,
                     "lastUpdateDate": pp.lastUpdateDate,
                     "idleTimeoutMinutes": (pp.lifecycleSettings.idleTimeoutMinutes if pp.lifecycleSettings else None),
-                    "nightlyStopDisabled": (pp.lifecycleSettings.nightlyStopDisabled if pp.lifecycleSettings else False),
+                    "nightlyStopDisabled": (
+                        pp.lifecycleSettings.nightlyStopDisabled if pp.lifecycleSettings else False
+                    ),
                 }
             )
         by_type: dict[str, int] = defaultdict(int)

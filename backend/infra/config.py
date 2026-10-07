@@ -421,7 +421,12 @@ _dev_provisioning_config = {
                 "label": "Standard vCPU",
                 "instanceFamilies": ["a", "c", "d", "h", "i", "m", "r", "t", "z"],
             },
-            {"serviceCode": "ec2", "quotaCode": "L-DB2E81BA", "label": "GPU vCPU (G, VT)", "instanceFamilies": ["g", "vt"]},
+            {
+                "serviceCode": "ec2",
+                "quotaCode": "L-DB2E81BA",
+                "label": "GPU vCPU (G, VT)",
+                "instanceFamilies": ["g", "vt"],
+            },
             {"serviceCode": "ec2", "quotaCode": "L-417A185B", "label": "GPU vCPU (P)", "instanceFamilies": ["p"]},
             {"serviceCode": "ebs", "quotaCode": "L-7A658B76", "label": "gp3 storage (TiB)", "volumeType": "gp3"},
         ],

@@ -893,19 +893,21 @@ def request_quota_increase(aws_account_id: str, quota_code: str) -> api_gateway.
     Idempotent: an open request that asks for at least as much is returned (200)."""
     principal = app.context.get("user_principal")
     body = app.current_event.json_body or {}
-    return _request_quota_increase(
-        aws_account_id, quota_code, body, principal.user_email or principal.user_name
-    )
+    return _request_quota_increase(aws_account_id, quota_code, body, principal.user_email or principal.user_name)
 
 
 def _request_quota_increase(aws_account_id: str, quota_code: str, body: dict, requested_by: str):
     try:
         desired = float(body.get("desiredValue"))
     except (TypeError, ValueError):
-        return _json(HTTPStatus.BAD_REQUEST, {"code": "INVALID_DESIRED_VALUE", "message": "desiredValue must be a number."})
+        return _json(
+            HTTPStatus.BAD_REQUEST, {"code": "INVALID_DESIRED_VALUE", "message": "desiredValue must be a number."}
+        )
     region = body.get("region") or default_region_name
     try:
-        request = dependencies.spoke_capacity_srv.request_increase(aws_account_id, region, quota_code, desired, requested_by)
+        request = dependencies.spoke_capacity_srv.request_increase(
+            aws_account_id, region, quota_code, desired, requested_by
+        )
     except spoke_capacity_domain_query_service.UnknownQuota as error:
         return _json(HTTPStatus.NOT_FOUND, {"code": "QUOTA_NOT_WATCHED", "message": str(error)})
     except spoke_capacity_domain_query_service.QuotaAlreadySufficient as error:

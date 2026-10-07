@@ -8,31 +8,26 @@ import assertpy
 import pytest
 
 from app.projects.adapters.query_services import dynamodb_query_service
-from app.projects.domain.commands.enrolments import (
-    approve_enrolments_command,
-    enrol_user_to_program_command,
-)
+from app.projects.domain.commands.enrolments import approve_enrolments_command, enrol_user_to_program_command
 from app.projects.domain.commands.project_accounts import (
     activate_project_account_command,
     deactivate_project_account_command,
     on_board_project_account_command,
     reonboard_project_account_command,
 )
-from app.projects.domain.commands.projects import (
-    create_project_command,
-    update_project_command,
-)
+from app.projects.domain.commands.projects import create_project_command, update_project_command
 from app.projects.domain.commands.technologies import (
     add_technology,
     delete_technology_command,
     update_technology_command,
 )
-from app.projects.domain.commands.users import (
-    assign_user_command,
-    reassign_user_command,
-    unassign_user_command,
+from app.projects.domain.commands.users import assign_user_command, reassign_user_command, unassign_user_command
+from app.projects.domain.model import (
+    project_assignment,
+    project_group_assignment,
+    service_client_assignment,
+    technology,
 )
-from app.projects.domain.model import project_assignment, project_group_assignment, service_client_assignment, technology
 from app.projects.domain.ports import projects_query_service
 from app.projects.entrypoints.api import bootstrapper
 from app.projects.entrypoints.api.model import api_model
@@ -94,7 +89,18 @@ def test_get_projects(lambda_context, authenticated_event, get_mock_dependencies
         project_assignment.Role.PLATFORM_USER.value
     )
     assert response.effectiveAccess is not None
-    assert any(access.projectId == "project-4" and access.roles == ["PLATFORM_USER"] for access in response.effectiveAccess)
+    assert any(
+        access.projectId == "project-4" and access.roles == ["PLATFORM_USER"] for access in response.effectiveAccess
+    )
+
+
+GROUP_ID = "f883a15c-90e0-4341-9a23-ef4f18937b4d"
+
+
+def _with_groups(event, groups):
+    # The authorizer passes the sign-in's groups on as userGroups.
+    event["requestContext"]["authorizer"]["userGroups"] = json.dumps(sorted(groups))
+    return event
 
 
 def _group_assignment(project_id="project-5", deleted=False):
@@ -113,9 +119,9 @@ def test_get_projects_group_only_and_paginated_union(lambda_context, authenticat
     from app.projects.entrypoints.api import handler
 
     handler.dependencies = get_mock_dependencies
-    handler.dependencies.user_info_client = lambda token: {"custom:entra_groups": [
-        "f883a15c-90e0-4341-9a23-ef4f18937b4d"
-    ]}
+    handler.dependencies.user_info_client = lambda token: {
+        "custom:entra_groups": ["f883a15c-90e0-4341-9a23-ef4f18937b4d"]
+    }
     handler.dependencies.projects_query_service.get_group_assignments = lambda ids: [_group_assignment()] if ids else []
 
     pages = []
@@ -141,7 +147,9 @@ def test_get_projects_group_only_and_paginated_union(lambda_context, authenticat
     ]
 
 
-def test_get_projects_missing_trusted_claim_keeps_direct_grant(lambda_context, authenticated_event, get_mock_dependencies):
+def test_get_projects_missing_trusted_claim_keeps_direct_grant(
+    lambda_context, authenticated_event, get_mock_dependencies
+):
     from app.projects.entrypoints.api import handler
 
     handler.dependencies = get_mock_dependencies
@@ -160,9 +168,9 @@ def test_get_projects_unions_direct_and_group_roles(lambda_context, authenticate
     from app.projects.entrypoints.api import handler
 
     handler.dependencies = get_mock_dependencies
-    handler.dependencies.user_info_client = lambda token: {"custom:entra_groups": [
-        "f883a15c-90e0-4341-9a23-ef4f18937b4d"
-    ]}
+    handler.dependencies.user_info_client = lambda token: {
+        "custom:entra_groups": ["f883a15c-90e0-4341-9a23-ef4f18937b4d"]
+    }
     handler.dependencies.projects_query_service.get_group_assignments = lambda ids: [_group_assignment("project-4")]
     event = authenticated_event(None, "/projects", "GET", {"pageSize": "25"})
 
@@ -173,7 +181,9 @@ def test_get_projects_unions_direct_and_group_roles(lambda_context, authenticate
     assert direct.roles == ["PLATFORM_USER"]
 
 
-def test_get_projects_user_info_failure_grants_no_group_roles(lambda_context, authenticated_event, get_mock_dependencies):
+def test_get_projects_user_info_failure_grants_no_group_roles(
+    lambda_context, authenticated_event, get_mock_dependencies
+):
     from app.projects.entrypoints.api import handler
 
     def unavailable(_token):
@@ -195,7 +205,7 @@ def test_get_project_groups_separates_active_and_tombstones(lambda_context, auth
     active = _group_assignment("project-4")
     deleted = _group_assignment("project-4", deleted=True)
     handler.dependencies.projects_query_service.list_project_group_assignments = (
-        lambda project_id, include_deleted=False: [active, deleted] if include_deleted else [active]
+        lambda project_id, include_deleted=False: ([active, deleted] if include_deleted else [active])
     )
 
     human = authenticated_event(None, "/projects/project-4/groups", "GET")
@@ -497,8 +507,69 @@ def test_get_project_users_should_return_all_users(lambda_context, authenticated
                 }
             ],
             "nextToken": None,
+            "groupMembers": [],
         }
     )
+
+
+def test_get_projects_records_members_through_groups(lambda_context, authenticated_event, get_mock_dependencies):
+    # a group-only member becomes known to Members at sign-in (the portal lists programs).
+    from app.projects.entrypoints.api import handler
+
+    handler.dependencies = get_mock_dependencies
+    query_service = handler.dependencies.projects_query_service
+    query_service.get_group_assignments = lambda ids: [_group_assignment("project-5")] if ids else []
+    recorded, forgotten = [], []
+    query_service.record_group_member = lambda **kwargs: recorded.append(kwargs)
+    query_service.forget_group_memberships = lambda user_id, keep: forgotten.append((user_id, keep))
+    event = _with_groups(authenticated_event(None, "/projects", "GET", {"pageSize": "25"}), [GROUP_ID])
+
+    assert handler.handler(event, lambda_context)["statusCode"] == 200
+
+    assert [(r["project_id"], r["group_ids"], r["roles"]) for r in recorded] == [("project-5", [GROUP_ID], ["ADMIN"])]
+    assert forgotten == [(recorded[0]["user_id"], {"project-5"})]
+
+
+def test_get_projects_survives_a_failed_member_record(lambda_context, authenticated_event, get_mock_dependencies):
+    from app.projects.entrypoints.api import handler
+
+    handler.dependencies = get_mock_dependencies
+    query_service = handler.dependencies.projects_query_service
+    query_service.get_group_assignments = lambda ids: [_group_assignment("project-5")] if ids else []
+
+    def fail(**kwargs):
+        raise RuntimeError("throttled")
+
+    query_service.record_group_member = fail
+    event = _with_groups(authenticated_event(None, "/projects", "GET", {"pageSize": "25"}), [GROUP_ID])
+
+    assert handler.handler(event, lambda_context)["statusCode"] == 200
+
+
+def test_get_project_users_lists_members_of_bound_groups(lambda_context, authenticated_event, get_mock_dependencies):
+    from app.projects.entrypoints.api import handler
+
+    handler.dependencies = get_mock_dependencies
+    query_service = handler.dependencies.projects_query_service
+    query_service.list_project_group_assignments = lambda project_id, include_deleted=False: [
+        _group_assignment(project_id)
+    ]
+    query_service.list_group_members = lambda project_id: [
+        {
+            "userId": "U1",
+            "userEmail": "u1@example.com",
+            "groupIds": [GROUP_ID],
+            "roles": ["PLATFORM_USER"],
+            "firstSeen": "2026-10-07T09:16:20+00:00",
+            "lastSeen": "2026-10-07T13:00:00+00:00",
+        },
+        {"userId": "U2", "userEmail": "u2@example.com", "groupIds": ["unbound-group"], "roles": ["PLATFORM_USER"]},
+    ]
+
+    result = handler.handler(authenticated_event(None, "/projects/project-id/users", "GET"), lambda_context)
+
+    members = json.loads(result["body"])["groupMembers"]
+    assert [(m["userId"], m["groupIds"]) for m in members] == [("U1", [GROUP_ID])]
 
 
 def test_get_user_roles(lambda_context, authenticated_event, get_mock_dependencies):

@@ -1670,3 +1670,40 @@ def test_service_client_assignment_repository_uses_client_and_project_keys(
     assert item["clientId"] == "terraform-prod"
     assert item["projectId"] == "proj-1"
     assert item["sequenceNo"] == 0
+
+
+def test_group_members_are_recorded_listed_and_forgotten(
+    mock_dynamodb, backend_app_dynamodb_table, test_table_name, gsi_name, gsi_aws_accounts, gsi_entities
+):
+    # members through a group binding are recorded at sign-in, per program.
+    query_service = dynamodb_query_service.DynamoDBProjectsQueryService(
+        table_name=test_table_name,
+        dynamodb_client=mock_dynamodb.meta.client,
+        gsi_inverted_primary_key=gsi_name,
+        gsi_aws_accounts=gsi_aws_accounts,
+        gsi_entities=gsi_entities,
+    )
+    query_service.record_group_member(
+        "proj-a", "U1", "u1@example.com", ["g1"], ["PLATFORM_USER"], "2026-10-07T09:00:00+00:00"
+    )
+    query_service.record_group_member("proj-a", "U1", None, ["g1"], ["PLATFORM_USER"], "2026-10-07T10:00:00+00:00")
+    query_service.record_group_member(
+        "proj-b", "U1", "u1@example.com", ["g2"], ["PROGRAM_OWNER"], "2026-10-07T10:00:00+00:00"
+    )
+
+    assert query_service.list_group_members("proj-a") == [
+        {
+            "userId": "U1",
+            "userEmail": "u1@example.com",
+            "groupIds": ["g1"],
+            "roles": ["PLATFORM_USER"],
+            "firstSeen": "2026-10-07T09:00:00+00:00",
+            "lastSeen": "2026-10-07T10:00:00+00:00",
+        }
+    ]
+    # Direct assignments are untouched by these items.
+    assert query_service.list_users_by_project("proj-a") == []
+
+    query_service.forget_group_memberships("U1", {"proj-b"})
+    assert query_service.list_group_members("proj-a") == []
+    assert [member["userId"] for member in query_service.list_group_members("proj-b")] == ["U1"]

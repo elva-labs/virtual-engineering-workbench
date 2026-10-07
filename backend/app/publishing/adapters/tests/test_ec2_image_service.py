@@ -139,6 +139,29 @@ def test_store_ami_retry_returns_the_existing_task(ec2_calls):
     assertpy.assert_that(object_key).is_equal_to("ami-54321.bin")
 
 
+def test_store_ami_waits_while_another_store_of_the_image_runs(ec2_calls):
+    # A version stored into two accounts at once: EC2 runs one store per image.
+    ec2_calls["CreateStoreImageTask"].side_effect = botocore.exceptions.ClientError(
+        {
+            "Error": {
+                "Code": "InvalidRequest",
+                "Message": "A CreateStoreImageTask is already in progress for the AMI. You can't run multiple "
+                "concurrent store image requests for the same AMI.",
+            }
+        },
+        "CreateStoreImageTask",
+    )
+    ec2_calls["DescribeStoreImageTasks"].return_value = {
+        "StoreImageTaskResults": [
+            {"AmiId": "ami-54321", "Bucket": "vew-image-import-999999999999-eu-west-3", "StoreTaskState": "InProgress"}
+        ]
+    }
+
+    assertpy.assert_that(_distribution_service().store_ami).raises(
+        adapter_exception.StoreImageTaskBusy
+    ).when_called_with("eu-west-3", "ami-54321", "322234948118")
+
+
 def test_store_ami_status_raises_on_failed_task(ec2_calls):
     ec2_calls["DescribeStoreImageTasks"].return_value = {
         "StoreImageTaskResults": [

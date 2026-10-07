@@ -166,12 +166,14 @@ class PutUserAssignmentRequest(BaseModel):
 
 class PutProjectGroupAssignmentRequest(BaseModel):
     roles: List[str]
+    groupName: Optional[str] = None
 
 
 class ProjectGroupAssignment(BaseModel):
     projectId: str
     groupId: str
     roles: List[str]
+    groupName: Optional[str] = None
     version: int
     createDate: str
     lastUpdateDate: str

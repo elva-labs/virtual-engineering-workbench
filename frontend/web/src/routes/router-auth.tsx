@@ -218,6 +218,14 @@ export const RouterAuth = (): React.ReactElement => {
         element={getComponentFor(RouteNames.ProvisionedProductsAdministration)}
       />
       <Route
+        path={getPathFor(RouteNames.CapacityAdministration)}
+        element={getComponentFor(RouteNames.CapacityAdministration)}
+      />
+      <Route
+        path={getPathFor(RouteNames.ProgramCapacity)}
+        element={getComponentFor(RouteNames.ProgramCapacity)}
+      />
+      <Route
         path={getPathFor(RouteNames.MyVirtualTargets)}
         element={getComponentFor(RouteNames.MyVirtualTargets)}
       />

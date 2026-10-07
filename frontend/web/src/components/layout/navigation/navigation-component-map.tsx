@@ -46,6 +46,8 @@ import {
   UpdateMandatoryComponentsList,
   ViewMandatoryComponentsList,
   ProvisionedProductsAdministration,
+  CapacityAdministration,
+  ProgramCapacity,
   i18nVirtualTarget,
   i18nProvisionVirtualTarget,
   i18nVirtualTargetSteps,
@@ -216,6 +218,12 @@ export const ROUTES: { [key in RouteNames]: RouteConfig } = {
   },
   ProvisionedProductsAdministration: {
     component: <ProvisionedProductsAdministration />
+  },
+  CapacityAdministration: {
+    component: <CapacityAdministration />
+  },
+  ProgramCapacity: {
+    component: <ProgramCapacity />
   },
   MyVirtualTargets: {
     component: <MyVirtualTargets />

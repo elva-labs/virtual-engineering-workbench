@@ -42,6 +42,8 @@ export const ROUTE_REGULAR_EXPRESSIONS = {
   sharedImages: /^\/shared-images$/giu,
   viewSharedImage: /^\/shared-images\/.+$/giu,
   provisionedProductsAdministration: /^\/administration\/provisioned-products$/giu,
+  capacityAdministration: /^\/administration\/capacity$/giu,
+  programCapacity: /^\/administration\/program-capacity$/giu,
   myVirtualTargets: /^\/my-virtual-targets\/.*|\/my-virtual-targets$/giu,
   availableVirtualTargets: /^\/available-virtual-targets\/.*|\/available-virtual-targets$/giu,
   pipelines: /^\/pipelines$/giu,
@@ -98,6 +100,8 @@ export enum RouteNames {
   CreatePipeline = 'CreatePipeline',
   UpdatePipeline = 'UpdatePipeline',
   ProvisionedProductsAdministration = 'ProvisionedProductsAdministration',
+  CapacityAdministration = 'CapacityAdministration',
+  ProgramCapacity = 'ProgramCapacity',
   MyVirtualTargets = 'MyVirtualTargets',
   AvailableVirtualTargets = 'AvailableVirtualTargets',
   ProvisionVirtualTarget = 'ProvisionVirtualTarget',
@@ -227,6 +231,14 @@ export const USER_NAVIGATION_MAP = [{
 {
   pathRegexMatcher: ROUTE_REGULAR_EXPRESSIONS.provisionedProductsAdministration,
   routeName: RouteNames.ProvisionedProductsAdministration,
+},
+{
+  pathRegexMatcher: ROUTE_REGULAR_EXPRESSIONS.capacityAdministration,
+  routeName: RouteNames.CapacityAdministration,
+},
+{
+  pathRegexMatcher: ROUTE_REGULAR_EXPRESSIONS.programCapacity,
+  routeName: RouteNames.ProgramCapacity,
 },
 {
   pathRegexMatcher: ROUTE_REGULAR_EXPRESSIONS.myVirtualTargets,

@@ -89,6 +89,7 @@ def handle_verify_store(event: step_function_model.VerifyStoreRequest):
     is_store_verified = dependencies.shared_amis_domain_qry_svc.verify_store(
         region=region_value_object.from_str(event.region),
         source_ami_id=ami_id_value_object.from_str(event.source_ami_id),
+        aws_account_id=aws_account_id_value_object.from_str(event.aws_account_id) if event.aws_account_id else None,
     )
     return step_function_model.VerifyStoreResponse(isStoreVerified=is_store_verified).model_dump(by_alias=True)
 

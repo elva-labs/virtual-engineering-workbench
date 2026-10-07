@@ -19,6 +19,15 @@ class ProjectPrimaryKey(unit_of_work.PrimaryKey):
     projectId: str = Field(..., title="ProjectId")
 
 
+# What the program's members get in the portal. "full" is upstream's portal; in a
+# "workbench-only" program everyone but platform admins sees only their workbenches, consumes PROD
+# only and launches workbenches only.
+EXPERIENCE_FULL = "full"
+EXPERIENCE_WORKBENCH_ONLY = "workbench-only"
+EXPERIENCES = (EXPERIENCE_FULL, EXPERIENCE_WORKBENCH_ONLY)
+EXPERIENCE_PATTERN = r"^(full|workbench-only)$"
+
+
 class Project(unit_of_work.Entity):
     projectId: str = Field(default_factory=generate_project_id, title="ProjectId")
     projectName: str = Field(..., title="ProjectName")
@@ -37,3 +46,5 @@ class Project(unit_of_work.Entity):
     # The project's workbench stop policy and what its users may change; None = the deployment's
     # defaults, users may change nothing.
     workbenchLifecycle: Optional[workbench_lifecycle.WorkbenchLifecycle] = Field(None, title="WorkbenchLifecycle")
+    # Absent on older items, which means "full".
+    experience: str = Field(EXPERIENCE_FULL, title="Experience", pattern=EXPERIENCE_PATTERN)

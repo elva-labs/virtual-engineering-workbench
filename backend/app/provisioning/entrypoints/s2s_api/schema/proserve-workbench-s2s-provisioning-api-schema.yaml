@@ -386,6 +386,82 @@ paths:
         passthroughBehavior: "when_no_match"
         contentHandling: "CONVERT_TO_TEXT"
         credentials: "{{apigw_invocation_role_arn}}"
+  /capacity:
+    get:
+      description: "Every spoke's service quotas, what uses them and the quota requests."
+      operationId: "GetCapacityOverview"
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "200 response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Empty"
+      security:
+        - ClientCredentials: ["clients/provisioning/capacity.read"]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        contentHandling: "CONVERT_TO_TEXT"
+        credentials: "{{apigw_invocation_role_arn}}"
+  /capacity/accounts/{awsAccountId}/quotas/{quotaCode}/increase:
+    put:
+      description: "Request more of a spoke's quota from AWS Service Quotas. Idempotent: an open request asking for at least as much is returned."
+      operationId: "RequestQuotaIncrease"
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: awsAccountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: quotaCode
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuotaIncreaseRequestBody"
+      responses:
+        "200":
+          description: "200 response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Empty"
+      security:
+        - ClientCredentials: ["clients/provisioning/capacity.quota_increase"]
+      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        contentHandling: "CONVERT_TO_TEXT"
+        credentials: "{{apigw_invocation_role_arn}}"
   /projects/{projectId}/products/provisioned/{provisionedProductId}/start:
     patch:
       description: "Start provisioned product"
@@ -483,6 +559,18 @@ components:
     Empty:
       title: "Empty Schema"
       type: "object"
+    QuotaIncreaseRequestBody:
+      title: QuotaIncreaseRequestBody
+      type: object
+      description: "The quota value to ask AWS for (vCPU, or TiB for gp3), in the spoke's region."
+      required:
+        - desiredValue
+      properties:
+        desiredValue:
+          type: number
+          minimum: 1
+        region:
+          type: string
     AvailableProduct:
       title: AvailableProduct
       type: object

@@ -23,4 +23,5 @@ export * from './product-management/compare-product-versions';
 export * from './product-packaging';
 export * from './products';
 export * from './provisioned-products-administration';
+export * from './capacity-administration';
 export * from './virtual-targets';

@@ -10,6 +10,9 @@ import {
   Spinner
 } from '@cloudscape-design/components';
 import { FC } from 'react';
+import { useRecoilValue } from 'recoil';
+import { selectedProjectState } from '../../../../state';
+import { CapacityHint } from '../../capacity-administration/capacity-hint';
 import { ProductParameter } from '../../../../services/API/proserve-wb-provisioning-api';
 import {
   DropdownParameterRenderer,
@@ -64,6 +67,8 @@ const setParametersStep: FC<Params> = ({
   setIsExperimentalWorkbench,
   isExperimentalWorkbenchAvailable,
 }: Params) => {
+  // ADR 0041: the size field shows how many more of that size fit the program's account.
+  const selectedProject = useRecoilValue(selectedProjectState);
 
   const isVVAdditionalConfiguration = () => {
     return vvJobName || vvPlatform || vvVersion || vvArtifactUpstreamPath;
@@ -127,6 +132,9 @@ const setParametersStep: FC<Params> = ({
           parameterLabelSubHeading: renderParameterLabelSubHeading(value.parameterKey),
         })
       }
+      {value.parameterKey === 'InstanceType' && <CapacityHint projectId={selectedProject.projectId}
+        instanceType={productParameterState.InstanceType || value.defaultValue}
+        instanceTypes={value.parameterConstraints?.allowedValues || []} />}
     </Box>;
   }
 

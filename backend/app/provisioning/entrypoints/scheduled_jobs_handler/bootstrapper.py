@@ -12,12 +12,13 @@ from app.provisioning.adapters.query_services import (
     dynamodb_versions_query_service,
     projects_api_query_service,
 )
-from app.provisioning.adapters.repository import dynamo_entity_config
+from app.provisioning.adapters.repository import dynamo_entity_config, dynamodb_spoke_capacity_store
 from app.provisioning.adapters.repository.dynamo_entity_migrations import (
     migrations_config,
 )
 from app.provisioning.adapters.services import aws_parameter_service as ssm_parameter_service_v2
 from app.provisioning.adapters.services import (
+    aws_spoke_capacity_service,
     cloudwatch_workbench_signals_service,
     ec2_instance_management_service,
     ec2_instance_management_service_in_mem_cached,
@@ -39,11 +40,12 @@ from app.provisioning.domain.commands.provisioned_product_state import (
     initiate_provisioned_product_batch_stop_command,
     sync_provisioned_product_state_command,
 )
-from app.provisioning.domain.model import idle_signals
+from app.provisioning.domain.model import idle_signals, spoke_capacity
 from app.provisioning.domain.model import workbench_lifecycle as workbench_lifecycle_model
 from app.provisioning.domain.query_services import (
     projects_domain_query_service,
     provisioned_products_domain_query_service,
+    spoke_capacity_domain_query_service,
 )
 from app.provisioning.entrypoints.scheduled_jobs_handler import config
 from app.shared.adapters.auth import temporary_credential_provider
@@ -71,6 +73,7 @@ class Dependencies(BaseModel):
     projects_domain_query_service: projects_domain_query_service.ProjectsDomainQueryService
     provisioned_product_cleanup_config: str
     workbench_lifecycle_srv: workbench_lifecycle.WorkbenchLifecycleService | None = None
+    spoke_capacity_srv: spoke_capacity_domain_query_service.SpokeCapacityDomainQueryService | None = None
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -330,4 +333,19 @@ def bootstrap(  # noqa: C901
         projects_domain_query_service=projects_domain_qs,
         provisioned_product_cleanup_config=provisioned_product_cleanup_config,
         workbench_lifecycle_srv=workbench_lifecycle_srv,
+        # The spokes' quotas and what uses them, read through the provisioning role.
+        spoke_capacity_srv=spoke_capacity_domain_query_service.SpokeCapacityDomainQueryService(
+            config=spoke_capacity.CapacityConfig.from_env(),
+            store=dynamodb_spoke_capacity_store.DynamoDBSpokeCapacityStore(dynamodb.Table(app_config.get_table_name())),
+            reader=aws_spoke_capacity_service.AWSSpokeCapacityService(
+                servicequotas_client_provider=lambda aws_account_id, region, user_id: _get_boto_client_for(
+                    client_name="service-quotas", aws_account_id=aws_account_id, region=region, user_id=user_id
+                ),
+                ec2_client_provider=_get_ec2_boto_client,
+                logger=logger,
+            ),
+            projects_qry_srv=projects_api_qs,
+            logger=logger,
+            default_region=app_config.get_default_region(),
+        ),
     )

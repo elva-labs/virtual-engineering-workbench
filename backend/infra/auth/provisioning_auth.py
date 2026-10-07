@@ -1,5 +1,5 @@
 from infra import config
-from infra.auth import provisioning_auth_schema
+from infra.auth import provisioning_auth_schema, shared_auth_schema
 from infra.constructs import backend_app_api_auth
 
 provisioning_bc_auth_policies: list[backend_app_api_auth.CedarPolicy] = [
@@ -9,6 +9,7 @@ provisioning_bc_auth_policies: list[backend_app_api_auth.CedarPolicy] = [
             permit (
                 principal,
                 action in {provisioning_auth_schema.get_full_action_names([
+                    provisioning_auth_schema.ProvisioningBCActions.GetProjectCapacityWorkbenches,
                     provisioning_auth_schema.ProvisioningBCActions.GetFeatures,
                     provisioning_auth_schema.ProvisioningBCActions.GetProductsIPMappings,
                     provisioning_auth_schema.ProvisioningBCActions.UpdateFeatures,
@@ -25,6 +26,9 @@ provisioning_bc_auth_policies: list[backend_app_api_auth.CedarPolicy] = [
             permit (
                 principal,
                 action in {provisioning_auth_schema.get_full_action_names([
+                    # Program admins see their own program's capacity.
+                    provisioning_auth_schema.ProvisioningBCActions.GetProjectCapacity,
+                    provisioning_auth_schema.ProvisioningBCActions.GetProjectCapacityWorkbenches,
                     provisioning_auth_schema.ProvisioningBCActions.GetProjectPaginatedProvisionedProducts,
                     provisioning_auth_schema.ProvisioningBCActions.GetProjectProvisionedProducts,
                     provisioning_auth_schema.ProvisioningBCActions.RemoveProvisionedProducts,
@@ -48,6 +52,7 @@ provisioning_bc_auth_policies: list[backend_app_api_auth.CedarPolicy] = [
                     provisioning_auth_schema.ProvisioningBCActions.GetProvisionedProduct,
                     provisioning_auth_schema.ProvisioningBCActions.GetProvisionedProductActivities,
                     provisioning_auth_schema.ProvisioningBCActions.GetProvisionedProductLifecycle,
+                    provisioning_auth_schema.ProvisioningBCActions.GetProjectCapacity,
                     provisioning_auth_schema.ProvisioningBCActions.GetProvisionedProducts,
                     provisioning_auth_schema.ProvisioningBCActions.GetProvisionedProductSSHKey,
                     provisioning_auth_schema.ProvisioningBCActions.GetProvisionedProductUserCredentials,
@@ -75,6 +80,22 @@ provisioning_bc_auth_policies: list[backend_app_api_auth.CedarPolicy] = [
                 resource
             )
             when {{ principal in {config.CedarResourceAttribute.SUPPORTERS} && {config.CEDAR_REMOTE_SUPPORT_ENABLED} }};
+    """,
+    ),
+    backend_app_api_auth.CedarPolicy(
+        # Not under a program, so no project entity: platform admins are counted by the authorizer as
+        # ADMIN somewhere (totalAdminAssignments), as CreateProject requires.
+        description="Allows platform admins to view every spoke's capacity and request more quota.",
+        statement=f"""
+            permit (
+                principal,
+                action in {provisioning_auth_schema.get_full_action_names([
+                    provisioning_auth_schema.ProvisioningBCActions.GetCapacityOverview,
+                    provisioning_auth_schema.ProvisioningBCActions.RequestQuotaIncrease,
+                ])},
+                resource
+            )
+            when {{ principal has {shared_auth_schema.SharedAttributes.TotalAdminAssignments} && principal.{shared_auth_schema.SharedAttributes.TotalAdminAssignments} > 0 }};
     """,
     ),
     backend_app_api_auth.CedarPolicy(

@@ -48,6 +48,8 @@ enum RoleAccessFeatureNames {
   AuthorizeUserIp = 'AuthorizeUserIp',
   ProvisionedProductsAdministration = 'ProvisionedProductsAdministration',
   Pipelines = 'Pipelines',
+  CapacityAdministration = 'CapacityAdministration',
+  ProgramCapacity = 'ProgramCapacity',
 }
 
 const ALL_ROLE_ACCESS = [
@@ -262,6 +264,16 @@ const roleAccessFeatures: RoleAccessConfigItem[] = [
       ProjectRoles.Admin,
       ProjectRoles.ProgramOwner,
     ]
+  },
+  {
+    // Cedar admits only platform admins to the all-spokes capacity routes.
+    feature: RoleAccessFeatureNames.CapacityAdministration,
+    rolesWithAccess: [ProjectRoles.Admin]
+  },
+  {
+    // Program owners see their own program's capacity.
+    feature: RoleAccessFeatureNames.ProgramCapacity,
+    rolesWithAccess: [ProjectRoles.Admin, ProjectRoles.ProgramOwner]
   },
 ];
 

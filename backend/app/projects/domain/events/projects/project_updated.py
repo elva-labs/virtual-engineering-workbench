@@ -17,6 +17,9 @@ class ProjectUpdated(message_bus.Message):
     # current value, null when the portal owns the configuration.
     managed_by: Optional[str] = Field(None, alias="managedBy")
     managed_source: Optional[str] = Field(None, alias="managedSource")
+    # Consumed by the Authorization BC: a workbench-only program limits its members to their
+    # workbenches.
+    experience: str = Field("full", alias="experience")
 
 
 def from_project(proj) -> ProjectUpdated:
@@ -29,4 +32,5 @@ def from_project(proj) -> ProjectUpdated:
         remoteSupportEnabled=proj.remoteSupportEnabled,
         managedBy=proj.managedBy,
         managedSource=proj.managedSource,
+        experience=getattr(proj, "experience", None) or "full",
     )

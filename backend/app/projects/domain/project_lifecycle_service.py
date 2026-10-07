@@ -34,6 +34,7 @@ class ProjectLifecycleService:
         description: str | None,
         is_active: bool,
         remote_support_enabled: bool | None = None,
+        experience: str | None = None,
     ) -> str:
         parsed_key = UUID(key)
         if parsed_key.variant != RFC_4122:
@@ -43,6 +44,8 @@ class ProjectLifecycleService:
         if remote_support_enabled is not None:
             # Only when given, so requests from before the setting existed keep their hash.
             fields["remoteSupportEnabled"] = remote_support_enabled
+        if experience is not None:
+            fields["experience"] = experience
         body = json.dumps(fields, sort_keys=True, separators=(",", ":"))
         digest = hashlib.sha256(body.encode()).hexdigest()
         request_pk = project_create_request.ProjectCreateRequestPrimaryKey(clientId=client_id, idempotencyKey=key)
@@ -67,6 +70,8 @@ class ProjectLifecycleService:
                     isActive=is_active,
                     # Remote support is on unless the caller turns it off.
                     remoteSupportEnabled=True if remote_support_enabled is None else remote_support_enabled,
+                    # "full" unless the caller asks for workbench-only.
+                    experience=experience or project.EXPERIENCE_FULL,
                     createDate=now,
                     lastUpdateDate=now,
                 )
@@ -81,7 +86,7 @@ class ProjectLifecycleService:
                 )
             )
             self._uow.commit()
-        self._publish_created(project_id, name, description, is_active, remote_support_enabled)
+        self._publish_created(project_id, name, description, is_active, remote_support_enabled, experience)
         return project_id
 
     def _replay(self, existing, digest: str, client_id: str) -> str:
@@ -100,7 +105,7 @@ class ProjectLifecycleService:
             self._uow.commit()
         return project_id
 
-    def _publish_created(self, project_id, name, description, is_active, remote_support_enabled):
+    def _publish_created(self, project_id, name, description, is_active, remote_support_enabled, experience=None):
         self._events.publish(
             ProjectCreated(
                 projectId=project_id,
@@ -109,8 +114,9 @@ class ProjectLifecycleService:
                 isActive=is_active,
             )
         )
-        if remote_support_enabled is False:
-            # The Authorization BC assumes remote support is on until told otherwise (ProjectUpdated).
+        if remote_support_enabled is False or (experience or project.EXPERIENCE_FULL) != project.EXPERIENCE_FULL:
+            # The Authorization BC assumes remote support is on and the experience is "full" until told
+            # otherwise (ProjectUpdated).
             created = self._query.get_project_by_id(project_id)
             if created is not None:
                 self._events.publish(project_updated.from_project(created))
@@ -147,6 +153,7 @@ class ProjectLifecycleService:
         description: str | None,
         is_active: bool,
         remote_support_enabled: bool | None = None,
+        experience: str | None = None,
     ):
         with self._uow:
             repo = self._uow.get_repository(project.ProjectPrimaryKey, project.Project)
@@ -156,17 +163,27 @@ class ProjectLifecycleService:
                 raise KeyError(project_id)
             # Omitted, the remote-support setting keeps its value.
             remote_support = current.remoteSupportEnabled if remote_support_enabled is None else remote_support_enabled
-            if (current.projectName, current.projectDescription, current.isActive, current.remoteSupportEnabled) == (
+            # Experience omitted keeps its value as well.
+            new_experience = current.experience if experience is None else experience
+            if (
+                current.projectName,
+                current.projectDescription,
+                current.isActive,
+                current.remoteSupportEnabled,
+                current.experience,
+            ) == (
                 name,
                 description,
                 is_active,
                 remote_support,
+                new_experience,
             ):
                 return current
             current.projectName = name
             current.projectDescription = description
             current.isActive = is_active
             current.remoteSupportEnabled = remote_support
+            current.experience = new_experience
             current.lastUpdateDate = datetime.now(timezone.utc).isoformat()
             repo.update_entity(pk, current)
             self._uow.commit()

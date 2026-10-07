@@ -10,7 +10,7 @@ import { UserType } from '../../session-management/logged-user';
 import { Feature } from '../../feature-toggles/feature-toggle.state';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useFeatureToggles } from '../../feature-toggles/feature-toggle.hook';
-import { useRoleAccessToggle } from '../../../hooks/role-access-toggle';
+import { useRoleAccessToggle, useWorkbenchOnly } from '../../../hooks/role-access-toggle';
 import { useNavigationPaths } from './navigation-paths.logic';
 import { RouteNames } from './navigation.static';
 import { NavigationPreset } from './navigation-preset.logic';
@@ -49,6 +49,8 @@ export const Navigation: FC<Props> = ({ user }) => {
   const { getActiveItem, getPathFor } = useNavigationPaths();
   const { isFeatureEnabled } = useFeatureToggles();
   const isFeatureAccessible = useRoleAccessToggle();
+  // A workbench-only program offers its members their workbenches only.
+  const workbenchOnly = useWorkbenchOnly();
   const navigation = NavigationPreset.getInstance();
 
   function getWorkbenchAuthItems(): SideNavigationProps.Item[] {
@@ -90,12 +92,14 @@ export const Navigation: FC<Props> = ({ user }) => {
       href: getPathFor(RouteNames.MyVirtualTargets),
     };
 
-    menuItems.push({
-      type: 'section',
-      text: i18n.userNavigationHeaderVirtualTargets,
-      items: [availableVirtualTargetsLink, virtualTargetsLink],
-      defaultExpanded: navigation.getItem(i18n.userNavigationHeaderVirtualTargets),
-    });
+    if (!workbenchOnly) {
+      menuItems.push({
+        type: 'section',
+        text: i18n.userNavigationHeaderVirtualTargets,
+        items: [availableVirtualTargetsLink, virtualTargetsLink],
+        defaultExpanded: navigation.getItem(i18n.userNavigationHeaderVirtualTargets),
+      });
+    }
 
     if (isFeatureAccessible(RoleBasedFeature.ManageProducts)) {
       menuItems.push({

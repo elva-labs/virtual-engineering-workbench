@@ -39,6 +39,8 @@ class AuthorizationContext(BaseModel):
     # lives; the user APIs refuse its configuration changes (app/shared/middleware/externally_managed.py).
     project_managed_by: str | None = Field(None)
     project_managed_source: str | None = Field(None)
+    # The experience of the project in the request path; None outside a project.
+    project_experience: str | None = Field(None)
 
 
 class AuthorizationRequest(BaseModel):
@@ -128,6 +130,8 @@ class Authorizer:
                 # Context values must be strings; "" = managed in the portal.
                 "projectManagedBy": auth_context.project_managed_by or "",
                 "projectManagedSource": auth_context.project_managed_source or "",
+                # "workbench-only" makes the provisioning API offer workbenches only; "" = full.
+                "projectExperience": auth_context.project_experience or "",
             },
         )
 

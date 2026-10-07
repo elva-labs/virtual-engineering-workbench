@@ -42,6 +42,11 @@ class Project(BaseModel):
         description="The project's workbench stop policy and what its users may change; null = the deployment's defaults.",
         title="WorkbenchLifecycle",
     )
+    experience: Optional[str] = Field(
+        None,
+        description="full, or workbench-only: members other than platform admins only see their workbenches.",
+        title="Experience",
+    )
 
 
 class ProjectEnrolment(BaseModel):

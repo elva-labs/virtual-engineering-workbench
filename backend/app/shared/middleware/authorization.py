@@ -42,6 +42,15 @@ class Principal(BaseModel):
     user_roles: Optional[list[VirtualWorkbenchRoles]] = Field(None, alias="userRoles")
     user_domains: Optional[list[str]] = Field(None, alias="userDomains")
     account_id: Optional[str] = Field(None, alias="accountId")
+    # The experience of the project in the request path, from the authorizer; None = full.
+    project_experience: Optional[str] = Field(None, alias="projectExperience")
+
+    @property
+    def workbenches_only(self) -> bool:
+        """A workbench-only program: only workbenches, for everyone but an ADMIN."""
+        return self.project_experience == "workbench-only" and VirtualWorkbenchRoles.Admin not in (
+            self.user_roles or []
+        )
 
 
 class APIGatewayProxyEventWithPrincipal(APIGatewayProxyEventModel):
@@ -72,6 +81,7 @@ def require_auth_context(app: APIGatewayRestResolver, next_middleware: NextMiddl
                 userDomains=list(json.loads(authorizer_auth_context["userDomains"])),
                 # Entra groups of the sign-in; absent from older authorizers.
                 userGroups=set(json.loads(authorizer_auth_context.get("userGroups") or "[]")),
+                projectExperience=authorizer_auth_context.get("projectExperience") or None,
             )
         # service to service OAuth API request
         elif "claims" in authorizer_auth_context:

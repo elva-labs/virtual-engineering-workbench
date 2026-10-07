@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -40,6 +40,11 @@ class Project(BaseModel):
     managedSource: Optional[str] = Field(
         None, description="Where the project's configuration lives, if externally managed.", title="ManagedSource"
     )
+    experience: Optional[str] = Field(
+        None,
+        description="full, or workbench-only: members other than platform admins only see their workbenches.",
+        title="Experience",
+    )
 
 
 class ProjectManagement(BaseModel):
@@ -67,6 +72,8 @@ class ProjectMutationRequest(BaseModel):
     isActive: bool
     # Omitted keeps the current value; a new project has remote support on.
     remoteSupportEnabled: Optional[bool] = None
+    # Omitted keeps the current value; a new project is "full".
+    experience: Optional[Literal["full", "workbench-only"]] = None
 
 
 class CreateProjectResponse(BaseModel):

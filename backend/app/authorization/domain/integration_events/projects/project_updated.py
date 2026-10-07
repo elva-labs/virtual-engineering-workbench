@@ -11,3 +11,5 @@ class ProjectUpdated(BaseModel):
     # before the management mode existed (model_fields_set tells them apart).
     managedBy: Optional[str] = Field(None, alias="managedBy")
     managedSource: Optional[str] = Field(None, alias="managedSource")
+    # "full" or "workbench-only"; absent in events from before the setting existed.
+    experience: Optional[str] = Field(None, alias="experience")

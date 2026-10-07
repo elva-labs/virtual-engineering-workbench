@@ -422,6 +422,22 @@ class ProductPublishingEnablementAppStack(Stack):
                     actions=["cloudwatch:GetMetricData"],
                     resources=["*"],
                 ),
+                # The hub reads the account's quotas and what uses them (instances by type, gp3
+                # volumes) and files a quota increase a platform admin asks for. Service Quotas and
+                # these EC2 describe calls have no resource-level permissions.
+                iam.PolicyStatement(
+                    effect=iam.Effect.ALLOW,
+                    actions=[
+                        "servicequotas:GetServiceQuota",
+                        "servicequotas:ListServiceQuotas",
+                        "servicequotas:GetRequestedServiceQuotaChange",
+                        "servicequotas:ListRequestedServiceQuotaChangeHistoryByQuota",
+                        "servicequotas:RequestServiceQuotaIncrease",
+                        "ec2:DescribeInstanceTypes",
+                        "ec2:DescribeVolumes",
+                    ],
+                    resources=["*"],
+                ),
                 iam.PolicyStatement(
                     effect=iam.Effect.ALLOW,
                     actions=["secretsmanager:GetSecretValue"],

@@ -185,6 +185,10 @@ class ProductProvisioningAggregate(aggregate.Aggregate):
             raise domain_exception.DomainException(
                 f"Products of type {product_read_model.productType} are not supported."
             )
+        # A workbench-only program launches workbenches, nothing else (no virtual targets).
+        if command.workbenches_only and product_read_model.productType != product.ProductType.Workbench:
+            raise domain_exception.DomainException("This program offers workbenches only")
+        # ... from its released (PROD) versions: stage access below counts as a user's.
 
         assignment = self.__get_launching_assignment(projects_qs, command)
 
@@ -2505,7 +2509,8 @@ class ProductProvisioningAggregate(aggregate.Aggregate):
             )
         # Enforced here, not only in the listing: every launch path (portal, internal, S2S) passes
         # through this check with the user's project roles.
-        if not stage_access.is_allowed(assignment.roles, command.stage.value):
+        stage_roles = ["PLATFORM_USER"] if command.workbenches_only else assignment.roles
+        if not stage_access.is_allowed(stage_roles, command.stage.value):
             raise domain_exception.DomainException(
                 f"User role does not allow launching products from the {command.stage.value} stage"
             )

@@ -1882,7 +1882,9 @@ def _lifecycle_dependencies(mocked_dependencies, owner: str, program: dict | Non
     pp = pp.model_copy(update={"userId": owner, "projectId": "proj-12345"})
     mocked_dependencies.virtual_targets_domain_qry_srv.get_provisioned_product.return_value = (pp, version_metadata)
     projects = unittest.mock.Mock()
-    projects.get_projects.return_value = [project_read_model.Project(projectId="proj-12345", workbenchLifecycle=program)]
+    projects.get_projects.return_value = [
+        project_read_model.Project(projectId="proj-12345", workbenchLifecycle=program)
+    ]
     uow = unittest.mock.MagicMock()
     uow.get_repository.return_value.get.return_value = pp
     instances = unittest.mock.Mock()
@@ -1902,7 +1904,9 @@ LIFECYCLE_PATH = "/projects/proj-12345/products/provisioned/vt-1/lifecycle"
 ALLOWING = {"allowUserDisableNightlyStop": True, "allowUserIdleTimeout": True, "userIdleTimeoutMinMinutes": 10}
 
 
-def test_get_workbench_lifecycle_shows_effective_values_and_sources(lambda_context, authenticated_event, mocked_dependencies):
+def test_get_workbench_lifecycle_shows_effective_values_and_sources(
+    lambda_context, authenticated_event, mocked_dependencies
+):
     from app.provisioning.entrypoints.api import handler
 
     handler.dependencies, _, _ = _lifecycle_dependencies(mocked_dependencies, owner="T00123122", program=ALLOWING)
@@ -1932,7 +1936,9 @@ def test_put_workbench_lifecycle_stores_the_owners_choice(lambda_context, authen
     assert stored.lifecycleSettings.idleTimeoutMinutes == 15
 
 
-def test_put_workbench_lifecycle_refuses_what_the_program_does_not_allow(lambda_context, authenticated_event, mocked_dependencies):
+def test_put_workbench_lifecycle_refuses_what_the_program_does_not_allow(
+    lambda_context, authenticated_event, mocked_dependencies
+):
     from app.provisioning.entrypoints.api import handler
 
     handler.dependencies, uow, _ = _lifecycle_dependencies(mocked_dependencies, owner="T00123122", program=None)
@@ -1957,3 +1963,100 @@ def test_put_workbench_lifecycle_is_for_the_owner_only(lambda_context, authentic
     assert get["statusCode"] == 200 and json.loads(get["body"])["canEdit"] is False
     assert put["statusCode"] == 400
     uow.get_repository.return_value.update_entity.assert_not_called()
+
+
+# Workbench-only programs offer workbenches only, from released versions only.
+def _workbench_only(event, roles='["PROGRAM_OWNER"]'):
+    event["requestContext"]["authorizer"]["projectExperience"] = "workbench-only"
+    event["requestContext"]["authorizer"]["userRoles"] = roles
+    return event
+
+
+def test_workbench_only_lists_workbenches_as_a_user(
+    lambda_context, authenticated_event, mocked_dependencies, mocked_products_domain_query_service
+):
+    from app.provisioning.entrypoints.api import handler
+
+    handler.dependencies = mocked_dependencies
+    event = _workbench_only(
+        authenticated_event(None, "/projects/proj-1/products/available", "GET", {"productType": "Workbench"})
+    )
+
+    result = handler.handler(event, lambda_context)
+
+    assertpy.assert_that(result["statusCode"]).is_equal_to(200)
+    call = mocked_products_domain_query_service.get_available_products.call_args.kwargs
+    assertpy.assert_that(call["product_type"].value).is_equal_to("WORKBENCH")
+    assertpy.assert_that([role.value for role in call["user_roles"]]).is_equal_to(["PLATFORM_USER"])
+
+
+def test_workbench_only_lists_no_virtual_targets(
+    lambda_context, authenticated_event, mocked_dependencies, mocked_products_domain_query_service
+):
+    from app.provisioning.entrypoints.api import handler
+
+    handler.dependencies = mocked_dependencies
+    event = _workbench_only(
+        authenticated_event(None, "/projects/proj-1/products/available", "GET", {"productType": "VirtualTarget"})
+    )
+
+    result = handler.handler(event, lambda_context)
+
+    assertpy.assert_that(json.loads(result["body"])["availableProducts"]).is_empty()
+    mocked_products_domain_query_service.get_available_products.assert_not_called()
+
+
+def test_workbench_only_keeps_the_full_listing_for_an_admin(
+    lambda_context, authenticated_event, mocked_dependencies, mocked_products_domain_query_service
+):
+    from app.provisioning.entrypoints.api import handler
+
+    handler.dependencies = mocked_dependencies
+    event = _workbench_only(
+        authenticated_event(None, "/projects/proj-1/products/available", "GET", {"productType": "VirtualTarget"}),
+        roles='["ADMIN"]',
+    )
+
+    handler.handler(event, lambda_context)
+
+    call = mocked_products_domain_query_service.get_available_products.call_args.kwargs
+    assertpy.assert_that(call["product_type"].value).is_equal_to("VIRTUAL_TARGET")
+
+
+def test_workbench_only_versions_are_released_ones(
+    lambda_context, authenticated_event, mocked_dependencies, mocked_versions_domain_query_service
+):
+    from app.provisioning.entrypoints.api import handler
+
+    handler.dependencies = mocked_dependencies
+    event = _workbench_only(
+        authenticated_event(None, "/projects/proj-1/products/prod-1/versions", "GET", {"stage": "DEV"})
+    )
+
+    handler.handler(event, lambda_context)
+
+    call = mocked_versions_domain_query_service.get_versions_ready_for_provisioning.call_args.kwargs
+    assertpy.assert_that(call["user_roles"]).is_equal_to(["PLATFORM_USER"])
+
+
+def test_workbench_only_launch_carries_the_limit(
+    lambda_context, authenticated_event, mocked_dependencies, mocked_launch_provisioned_product_handler
+):
+    from app.provisioning.entrypoints.api import handler
+
+    handler.dependencies = mocked_dependencies
+    body = json.dumps(
+        {
+            "productId": "prod-1",
+            "versionId": "vers-1",
+            "provisioningParameters": [],
+            "stage": "PROD",
+            "region": "eu-north-1",
+        }
+    )
+    event = _workbench_only(authenticated_event(body, "/projects/proj-1/products/provisioned", "POST", None))
+
+    handler.handler(event, lambda_context)
+
+    command = mocked_launch_provisioned_product_handler.call_args.args[0]
+    assertpy.assert_that(command.workbenches_only).is_true()

@@ -43,6 +43,7 @@ import {
   ProvisionedProductsTranslations,
 } from './interface.ts';
 import { useState } from 'react';
+import { useWorkbenchOnly } from '../../../hooks/role-access-toggle.ts';
 import { ProvisionedProductLogin } from './provisioned-product-actions/page';
 import { useCommonProvisionedProductState } from './common.logic.ts';
 import { PopoverOnHover } from '../shared/popover-on-hover.tsx';
@@ -402,6 +403,8 @@ export function ProvisionedProductList({
   const [selectedProvisionedProduct, setSelectedProvisionedProduct] =
     useState<ProvisionedProduct>(targets[0]);
   const [updateType, setUpdateType] = useState<string>('instance type');
+  // A workbench-only program has one stage, so the card shows only the region.
+  const workbenchOnly = useWorkbenchOnly();
 
   const getJobNameValue = (vvAdditionalConfiguration: AdditionalConfiguration) => {
     const jobName = vvAdditionalConfiguration.parameters!.find(parameter =>
@@ -530,8 +533,8 @@ export function ProvisionedProductList({
           content: (e: ProvisionedProduct) => {
             return (
               <SpaceBetween size={'xxs'} direction='horizontal'>
-                <Badge color="blue">{e.stage?.toUpperCase() ?? 'n/a'}</Badge>
-                /
+                {!workbenchOnly && <Badge color="blue">{e.stage?.toUpperCase() ?? 'n/a'}</Badge>}
+                {!workbenchOnly && '/'}
                 <Box>
                   {REGION_NAMES[
                     (e.region as EnabledRegion) || 'unspecified'

@@ -15,7 +15,8 @@ import {
   ProductParameterMetaData
 } from '../../services/API/proserve-wb-provisioning-api/index.ts';
 import { ProductParameterState, visibleParameters } from './index.ts';
-import { useRoleAccessToggle } from '../role-access-toggle.ts';
+import { useRoleAccessToggle, useWorkbenchOnly } from '../role-access-toggle.ts';
+import { compareSemanticVersions } from './provisioning.helpers.ts';
 import { useUserProfile } from '../../components/user-preferences/user-profile.hook.ts';
 import { useFeatureToggles } from '../../components/feature-toggles/feature-toggle.hook.ts';
 import { Feature } from '../../components/feature-toggles/feature-toggle.state.ts';
@@ -68,6 +69,8 @@ export function useProvisionProduct({
     [key: string]: ProductParameterMetaData,
   }>();
   const isFeatureAccessible = useRoleAccessToggle();
+  // A workbench-only program pre-selects the version, so its members can just launch.
+  const workbenchOnly = useWorkbenchOnly();
   const [selectedAvailableProduct, setSelectedAvailableProduct] = useState<AvailableProduct | undefined>();
 
   // eslint-disable-next-line complexity
@@ -91,6 +94,14 @@ export function useProvisionProduct({
     }
   }, [isFeatureAccessible]);
 
+  // The recommended version, otherwise the newest released one.
+  function preselectedVersion(
+    versions: AvailableVersionDistribution[]
+  ): AvailableVersionDistribution | undefined {
+    const recommended = versions.find(v => v.isRecommendedVersion);
+    return recommended ?? [...versions].sort(compareSemanticVersions()).pop();
+  }
+
   function defaultSelectedRegion() {
     const defaultRegion = availableRegions.some(region => region === userProfile.preferredRegion) ?
       userProfile.preferredRegion : availableRegions[0];
@@ -111,7 +122,12 @@ export function useProvisionProduct({
       selectedVersionStage,
       selectedVersionRegion
     ).then(response => {
-      setProductVersions(response.availableProductVersions ?? []);
+      const versions = response.availableProductVersions ?? [];
+      setProductVersions(versions);
+      const preselected = workbenchOnly ? preselectedVersion(versions) : undefined;
+      if (preselected) {
+        setSelectedVersion(preselected);
+      }
     }).catch(async e => {
       showErrorNotification({
         header: i18n.productVersionsFetchErrorTitle,

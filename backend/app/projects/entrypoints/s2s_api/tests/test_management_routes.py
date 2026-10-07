@@ -94,7 +94,7 @@ def test_project_create_exact_inactive_update_and_deactivate(lambda_context, aut
     )
     assert response["statusCode"] == 201
     assert json.loads(response["body"]) == {"projectId": "project-id"}
-    lifecycle.create.assert_called_once_with("fake_client_id", key, "New", None, True, None)
+    lifecycle.create.assert_called_once_with("fake_client_id", key, "New", None, True, None, None)
     response = invoke(deps, authenticated_event, lambda_context, "GET", "/projects/project-id")
     assert response["statusCode"] == 200
     assert json.loads(response["body"])["isActive"] is False

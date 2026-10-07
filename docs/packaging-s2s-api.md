@@ -54,13 +54,33 @@ recipes use `CREATED`/`ARCHIVED`; component and recipe versions use
 or `FAILED`; pipelines use `CREATING`, `CREATED`, `UPDATING`, `RETIRED`, or
 `FAILED`; images use `CREATED`, `CREATING`, `FAILED`, `RETIRED`, or `DELETED`.
 
-## Assign the client to a project
+## OAuth clients and project access
+
+Deploying the backend CDK `IntegrationOauthStack` creates the Cognito app clients
+and generates their client IDs and secrets. Client creation is separate from
+granting those clients access to a project. The stack provisions one set of
+clients per deployed environment; the same clients can be assigned to multiple
+projects.
+
+| Client | Projects scopes | Packaging scopes |
+| --- | --- | --- |
+| `projects-assignment-management` | `program.read`, `program.write`, `client_assignment.read`, `client_assignment.write` | None |
+| `sample-s2s` | Existing read and other Projects scopes, without `client_assignment.write` or bootstrap | Packaging operation scopes |
+| `platform-projects-bootstrap` | `client_assignment.read`, `client_assignment.write`, `client_assignment.bootstrap` | None |
+
+Projects scopes in the table use the `clients/projects/` prefix. Configure
+separate Terraform provider aliases or API callers with the management and
+Packaging credentials. The provider consumes existing credentials; it does not
+create these Cognito app clients.
+
+### Assign the Packaging client
 
 Use the dedicated `projects-assignment-management` OAuth client with
 `clients/projects/client_assignment.write` and an existing `ACTIVE` assignment to
 the target project to create or reactivate assignments. This client has
-assignment read/write scopes and no Packaging scopes. The `sample-s2s` client
-retains its Packaging scopes and no longer has assignment-write access.
+project and assignment read/write scopes and no Packaging scopes. The
+`sample-s2s` client retains its Packaging scopes and no longer has
+assignment-write access.
 
 A client must never hold both `clients/projects/client_assignment.write` and
 any `clients/packaging/*` scopes. Use separate credentials for assignment
@@ -79,15 +99,43 @@ curl --fail-with-body --request PUT \
 
 The response reports `ACTIVE`. A Packaging request for an unassigned project returns `403 PROJECT_ACCESS_DENIED` before Packaging looks up the requested resource. Deleting the same Projects URL revokes the assignment.
 
-For initial setup or orphan-project recovery, obtain a token from the separate
+### Create a new project with the management client
+
+Use the management client's credentials to request
+`clients/projects/program.write` for `POST /clients/projects/v1/projects`, and
+`clients/projects/program.read` for project reads. Project creation requires an
+RFC 4122 UUID `Idempotency-Key` header and returns the new `projectId` with HTTP
+`201`. VEW automatically creates an `ACTIVE` assignment for the creating client,
+so the manager can then grant access to the Packaging client using its
+assignment-write scope. This creator assignment does not require a
+self-assignment PUT or bootstrap credentials.
+
+For Terraform, use the management provider alias for the project and its
+Packaging-client assignment. Create Packaging resources with the Packaging
+alias after that assignment is active. Creating the project with the Packaging
+client instead would leave the manager unassigned, and bootstrap cannot add the
+manager while an active client assignment exists.
+
+### Recover an existing orphaned project
+
+For orphan-project recovery, obtain a token from the separate
 `platform-projects-bootstrap` client requesting both
 `clients/projects/client_assignment.write` and
 `clients/projects/client_assignment.bootstrap`. Use that token to assign the
 management client's ID to an existing project with no active service-client
 assignments. Then use the management client's token to assign the Packaging
 client. The bootstrap client cannot assign itself, and it has no Packaging
-scopes. Projects with active service clients require an already assigned
-management client to grant access.
+scopes. The successful bootstrap PUT does not give the recovery caller access
+to read or revoke assignments. Use the now-assigned management client's
+credentials for subsequent reads, grants, and revocations.
+
+Projects with active service clients require an already assigned client with
+`clients/projects/client_assignment.write` to grant the manager access;
+bootstrap cannot bypass that restriction. When migrating an existing
+deployment, provision the manager in a staged deployment that retains the old
+Packaging client's assignment-write scope, and use the assigned old client to
+grant the manager access. Verify the manager's access, then switch assignment
+operations to its credentials and deploy the scope separation.
 
 ## Component POC
 

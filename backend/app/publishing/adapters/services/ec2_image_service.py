@@ -180,7 +180,33 @@ class EC2ImageService(image_service.ImageService):
                 raise adapter_exception.StoreImageTaskBusy(
                     f"Another store of {source_ami_id} runs; {bucket} waits for it."
                 ) from error
+            # The bucket already holds the image: an earlier attempt stored it, but EC2 lists only an image's
+            # newest store task, which can be another account's when one image goes to several accounts.
+            if "already exists in the bucket" in str(error):
+                return f"{source_ami_id}.bin"
             raise
+
+    def _store_s3_client(self, region: str):
+        """An S3 client with the store's credentials (they write the import bucket)."""
+        session = self._boto_session or boto3
+        if self._store_with_own_credentials:
+            return session.client("s3", region_name=region)
+        sts = sts_api.STSAPI(
+            self._image_srv_aws_account_id, region, self._image_srv_role, SESSION_USER, self._boto_session
+        )
+        with sts:
+            key_id, secret, token = sts.get_temp_creds()
+        return session.client(
+            "s3", region_name=region, aws_access_key_id=key_id, aws_secret_access_key=secret, aws_session_token=token
+        )
+
+    def _object_stored(self, region: str, bucket: str, key: str) -> bool:
+        """Whether the import bucket holds the stored image (it appears only when its store completes)."""
+        try:
+            self._store_s3_client(region).head_object(Bucket=bucket, Key=key)
+            return True
+        except botocore.exceptions.ClientError:
+            return False
 
     @staticmethod
     def _store_task(ec2: client.EC2Client, source_ami_id: str, bucket: str | None = None) -> dict | None:
@@ -191,7 +217,16 @@ class EC2ImageService(image_service.ImageService):
     def get_store_ami_status(self, region: str, source_ami_id: str, aws_account_id: str | None = None) -> str:
         # The task for the target account's bucket: one image can be stored into several accounts at once.
         bucket = self.import_bucket(aws_account_id, region) if aws_account_id else None
-        task = self._store_task(self._store_ec2_client(region), source_ami_id, bucket)
+        ec2 = self._store_ec2_client(region)
+        task = self._store_task(ec2, source_ami_id, bucket)
+        if not task and bucket:
+            # EC2 lists only an image's newest store task: when the image is stored into several accounts at
+            # once, this bucket's task can be hidden by another's. The object tells: a stored image appears
+            # only when its store completes.
+            if self._object_stored(region, bucket, f"{source_ami_id}.bin"):
+                return "Completed"
+            if self._store_task(ec2, source_ami_id):
+                return "InProgress"
         if not task:
             raise adapter_exception.AdapterException(f"No store task found for image {source_ami_id}.")
         if task.get("StoreTaskState") == "Failed":

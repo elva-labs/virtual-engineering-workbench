@@ -1,12 +1,9 @@
 from http import HTTPStatus
 from uuid import UUID
 
-from aws_lambda_powertools.event_handler.api_gateway import Router
 from aws_lambda_powertools.event_handler import api_gateway, content_types
-from aws_lambda_powertools.event_handler.exceptions import (
-    NotFoundError,
-    BadRequestError,
-)
+from aws_lambda_powertools.event_handler.api_gateway import Router
+from aws_lambda_powertools.event_handler.exceptions import BadRequestError, NotFoundError
 
 from app.projects.entrypoints.s2s_api import bootstrapper
 from app.projects.entrypoints.s2s_api.model import api_model
@@ -31,16 +28,9 @@ def init(dependencies: bootstrapper.Dependencies) -> Router:
             project_id,
             "clients/projects/group_assignment.read",
         )
-        assignments = (
-            dependencies.projects_query_service.list_project_group_assignments(
-                project_id
-            )
-        )
+        assignments = dependencies.projects_query_service.list_project_group_assignments(project_id)
         return api_model.GetProjectGroupAssignmentsResponse(
-            assignments=[
-                api_model.ProjectGroupAssignment.model_validate(a.model_dump())
-                for a in assignments
-            ]
+            assignments=[api_model.ProjectGroupAssignment.model_validate(a.model_dump()) for a in assignments]
         )
 
     @router.get("/projects/<project_id>/groups/<group_id>")
@@ -51,9 +41,7 @@ def init(dependencies: bootstrapper.Dependencies) -> Router:
             project_id,
             "clients/projects/group_assignment.read",
         )
-        assignment = dependencies.projects_query_service.get_project_group_assignment(
-            project_id, _group_id(group_id)
-        )
+        assignment = dependencies.projects_query_service.get_project_group_assignment(project_id, _group_id(group_id))
         if assignment is None or assignment.isDeleted:
             raise NotFoundError("Group assignment not found")
         return api_model.ProjectGroupAssignment.model_validate(assignment.model_dump())
@@ -72,7 +60,7 @@ def init(dependencies: bootstrapper.Dependencies) -> Router:
         )
         try:
             assignment = dependencies.group_assignment_service.put(
-                project_id, _group_id(group_id), request.roles
+                project_id, _group_id(group_id), request.roles, request.groupName
             )
         except ValueError as exc:
             raise BadRequestError("Invalid group assignment") from exc

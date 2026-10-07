@@ -3,16 +3,9 @@ import json
 from unittest import mock
 from uuid import uuid4
 
-from app.projects.domain.model import (
-    project,
-    project_assignment,
-    project_group_assignment,
-    service_client_assignment,
-)
+from app.projects.domain.model import project, project_assignment, project_group_assignment, service_client_assignment
 from app.projects.domain.ports.projects_query_service import ProjectsQueryService
-from app.projects.domain.project_group_assignment_service import (
-    ProjectGroupAssignmentService,
-)
+from app.projects.domain.project_group_assignment_service import ProjectGroupAssignmentService
 from app.projects.domain.project_lifecycle_service import ProjectLifecycleService
 from app.projects.entrypoints.s2s_api.bootstrapper import Dependencies
 from app.projects.entrypoints.s2s_api.tests.fake_classes import (
@@ -219,3 +212,27 @@ def test_direct_user_exact_distinguishes_absent_and_empty_with_metadata(lambda_c
     assert json.loads(response["body"])["userDisplayName"] == "New User"
     command = commands.handle.call_args.args[0]
     assert command.user_email == "new@example.com" and command.user_display_name == "New User"
+
+
+def test_group_name_passes_through(lambda_context, authenticated_event):
+    deps, query, _, groups, _ = make_dependencies()
+    groups.put.return_value = project_group_assignment.ProjectGroupAssignment(
+        projectId="project-id",
+        groupId=GROUP_ID,
+        roles=["PLATFORM_USER"],
+        groupName="example-users",
+        version=1,
+        createDate="2026-09-01",
+        lastUpdateDate="2026-09-01",
+    )
+    response = invoke(
+        deps,
+        authenticated_event,
+        lambda_context,
+        "PUT",
+        f"/projects/project-id/groups/{GROUP_ID}",
+        {"roles": ["PLATFORM_USER"], "groupName": "example-users"},
+    )
+    assert response["statusCode"] == 200
+    assert json.loads(response["body"])["groupName"] == "example-users"
+    assert groups.put.call_args.args[3] == "example-users"

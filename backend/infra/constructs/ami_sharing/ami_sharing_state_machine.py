@@ -373,6 +373,14 @@ class AmiSharingStateMachine(constructs.Construct):
             {"objectKey.$": "$.Payload.objectKey"},
             "$.storeAmiResponse",
         )
+        # EC2 runs one store per image at a time: a version distributed to several accounts at once waits
+        # for the other stores (about 50 minutes in all) instead of failing.
+        store.add_retry(
+            errors=["StoreImageTaskBusy"],
+            interval=aws_cdk.Duration.minutes(1),
+            backoff_rate=1.5,
+            max_attempts=8,
+        )
         verify_store = invoke(
             "VerifyStoreLambda",
             {

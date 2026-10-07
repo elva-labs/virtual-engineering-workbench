@@ -169,11 +169,17 @@ class EC2ImageService(image_service.ImageService):
         bucket = self.import_bucket(aws_account_id, region)
         try:
             return ec2.create_store_image_task(ImageId=source_ami_id, Bucket=bucket)["ObjectKey"]
-        except botocore.exceptions.ClientError:
+        except botocore.exceptions.ClientError as error:
             # A retry after a started or finished store: the bucket holds one copy per image.
             existing = self._store_task(ec2, source_ami_id, bucket)
             if existing and existing.get("StoreTaskState") in ("InProgress", "Completed"):
                 return existing.get("S3objectKey") or f"{source_ami_id}.bin"
+            # EC2 runs one store per image at a time: a version going to several accounts at once waits
+            # for the other account's store; the state machine retries.
+            if "already in progress" in str(error):
+                raise adapter_exception.StoreImageTaskBusy(
+                    f"Another store of {source_ami_id} runs; {bucket} waits for it."
+                ) from error
             raise
 
     @staticmethod

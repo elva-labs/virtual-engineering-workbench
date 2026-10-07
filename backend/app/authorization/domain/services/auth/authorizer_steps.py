@@ -219,16 +219,27 @@ class ProjectsBCContextEnricher(authorizer.AuthorizerStep):
             if self.__is_platform_admin(context):
                 selected_assignment = self.__with_platform_admin(context, project_id, selected_assignment)
 
+            settings = self.__assignments_query_service.get_project_settings(project_id=project_id)
+            # Before the roles are set: a workbench-only program reduces them.
+            if settings.experience == WORKBENCH_ONLY_EXPERIENCE:
+                selected_assignment = self.__as_workbench_user(context, project_id, selected_assignment)
+                is_admin = bool(
+                    selected_assignment and project_assignment_model.Role.ADMIN in (selected_assignment.roles or [])
+                )
+                # No product management (packaging, publishing) in a workbench-only program,
+                # for anyone but an ADMIN.
+                if not is_admin and context.api_auth_cfg.bounded_context in WORKBENCH_ONLY_CLOSED_CONTEXTS:
+                    return False
             context.roles = selected_assignment.roles if selected_assignment and selected_assignment.roles else []
             context.domains = (
                 list({g.get("domain") for g in selected_assignment.activeDirectoryGroups if "domain" in g})
                 if selected_assignment and selected_assignment.activeDirectoryGroups
                 else []
             )
-            settings = self.__assignments_query_service.get_project_settings(project_id=project_id)
             context.remote_support_enabled = settings.remoteSupportEnabled
             context.project_managed_by = settings.managedBy
             context.project_managed_source = settings.managedSource
+            context.project_experience = settings.experience
         elif self.__is_platform_admin(context):
             # No project in the path: count as an admin somewhere, which CreateProject requires.
             context.project_assignments = context.project_assignments + [
@@ -260,12 +271,46 @@ class ProjectsBCContextEnricher(authorizer.AuthorizerStep):
         context.project_assignments = [a for a in context.project_assignments if a.projectId != project_id] + [merged]
         return merged
 
+    def __as_workbench_user(
+        self,
+        context: authorizer.AuthorizationContext,
+        project_id: str,
+        assignment: project_assignment_model.Assignment | None,
+    ) -> project_assignment_model.Assignment | None:
+        """In a workbench-only program the members keep only the roles that program has use for.
+
+        PLATFORM_USER (their own workbenches), PROGRAM_OWNER (the program's members, their access and
+        workbenches) and SUPPORT (remote support) stay; product contributors, power and beta users act as
+        users there. An ADMIN keeps everything. The reduced assignment replaces the one in
+        context.project_assignments, so the Cedar principal carries the reduced roles too. Stages and
+        product types are limited by the provisioning API (projectExperience in the authorizer context).
+        """
+        roles = project_assignment_model.Role
+        if not assignment or not assignment.roles or roles.ADMIN in assignment.roles:
+            return assignment
+        kept = [roles.PLATFORM_USER] + [
+            role for role in (roles.PROGRAM_OWNER, roles.SUPPORT) if role in assignment.roles
+        ]
+        if sorted(assignment.roles) == sorted(kept):
+            return assignment
+        reduced = assignment.model_copy(update={"roles": kept})
+        context.project_assignments = [a for a in context.project_assignments if a.projectId != project_id] + [
+            reduced
+        ]
+        return reduced
+
     def __group_assignment(
         self, context: authorizer.AuthorizationContext, project_id: str, roles: list
     ) -> project_assignment_model.Assignment:
         return project_assignment_model.Assignment(
             userId=context.user_name, projectId=project_id, roles=roles, userEmail=context.user_email
         )
+
+
+# The program experience that limits members to their workbenches (projects BC model).
+WORKBENCH_ONLY_EXPERIENCE = "workbench-only"
+# Product management (images, products) is closed in such a program for everyone but an ADMIN.
+WORKBENCH_ONLY_CLOSED_CONTEXTS = {"packaging", "publishing"}
 
 
 # Synthetic project id of a platform admin's assignment when no project is in the path; it matches

@@ -1747,6 +1747,10 @@ components:
           type: string
           nullable: true
           description: Where the project's configuration lives, if externally managed.
+        experience:
+          type: string
+          enum: [full, workbench-only]
+          description: workbench-only limits members other than platform admins to their workbenches, from PROD releases.
     ProjectManagement:
       type: object
       additionalProperties: false
@@ -2050,6 +2054,11 @@ components:
           type: boolean
           nullable: true
           description: Omitted keeps the current value; a new project has remote support on.
+        experience:
+          type: string
+          nullable: true
+          enum: [full, workbench-only, null]
+          description: Omitted keeps the current value; a new project is full.
     CreateProjectResponse:
       type: object
       required: [projectId]

@@ -1350,3 +1350,79 @@ def test_launch_of_a_platform_product_uses_the_programs_own_account(
     stored = mock_provisioned_product_repo.add.call_args.args[0]
     assertpy.assert_that(stored.awsAccountId).is_equal_to("001234567890")
     assertpy.assert_that(stored.scProductId).is_equal_to("sc-prod-123")
+
+
+def _launch(command, mock_publisher, mock_products_query_service, mock_versions_query_service, mock_logger,
+            mock_provisioned_products_qs, mock_unit_of_work, mock_be_feature_toggles_srv,
+            mock_experimental_provisioned_product_per_project_limit, mocked_projects_qs):
+    launch.handle(
+        command=command,
+        publisher=mock_publisher,
+        products_qs=mock_products_query_service,
+        versions_qs=mock_versions_query_service,
+        logger=mock_logger,
+        provisioned_products_qs=mock_provisioned_products_qs,
+        uow=mock_unit_of_work,
+        feature_toggles_srv=mock_be_feature_toggles_srv,
+        experimental_provisioned_product_per_project_limit=mock_experimental_provisioned_product_per_project_limit,
+        projects_qs=mocked_projects_qs,
+    )
+
+
+def test_a_workbench_only_program_launches_no_virtual_targets(
+    mock_logger,
+    mock_publisher,
+    mock_products_query_service,
+    mock_message_bus,
+    mock_unit_of_work,
+    mock_versions_query_service,
+    mock_provisioned_products_qs,
+    mock_be_feature_toggles_srv,
+    mock_experimental_provisioned_product_per_project_limit,
+    mocked_projects_qs,
+):
+    # ARRANGE: the test product is a virtual target
+    command = _launch_command("prod").model_copy(update={"workbenches_only": True})
+
+    # ACT
+    with pytest.raises(domain_exception.DomainException) as e:
+        _launch(command, mock_publisher, mock_products_query_service, mock_versions_query_service, mock_logger,
+                mock_provisioned_products_qs, mock_unit_of_work, mock_be_feature_toggles_srv,
+                mock_experimental_provisioned_product_per_project_limit, mocked_projects_qs)
+
+    # ASSERT
+    assertpy.assert_that(str(e.value)).is_equal_to("This program offers workbenches only")
+    mock_unit_of_work.commit.assert_not_called()
+
+
+def test_a_workbench_only_program_launches_prod_only_even_for_a_program_owner(
+    mock_logger,
+    mock_publisher,
+    mock_products_query_service,
+    mock_message_bus,
+    mock_unit_of_work,
+    mock_versions_query_service,
+    mock_provisioned_products_qs,
+    mock_be_feature_toggles_srv,
+    mock_experimental_provisioned_product_per_project_limit,
+    mocked_projects_qs,
+    get_test_product,
+):
+    # ARRANGE: a program owner may consume DEV elsewhere, but not here
+    mock_products_query_service.get_product.return_value = get_test_product(
+        product_type=product.ProductType.Workbench
+    )
+    mocked_projects_qs.get_project_assignment.return_value = project_assignment.ProjectAssignment(
+        userId="T0011AA", roles=["PROGRAM_OWNER"]
+    )
+    command = _launch_command("dev").model_copy(update={"workbenches_only": True})
+
+    # ACT
+    with pytest.raises(domain_exception.DomainException) as e:
+        _launch(command, mock_publisher, mock_products_query_service, mock_versions_query_service, mock_logger,
+                mock_provisioned_products_qs, mock_unit_of_work, mock_be_feature_toggles_srv,
+                mock_experimental_provisioned_product_per_project_limit, mocked_projects_qs)
+
+    # ASSERT
+    assertpy.assert_that(str(e.value)).is_equal_to("User role does not allow launching products from the DEV stage")
+    mock_versions_query_service.get_product_version_distributions.assert_not_called()

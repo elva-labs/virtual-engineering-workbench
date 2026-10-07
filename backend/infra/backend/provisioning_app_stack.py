@@ -338,6 +338,8 @@ class ProvisioningAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                         "WORKBENCH_LIFECYCLE_DEFAULTS": json.dumps(
                             app_config.component_specific["workbench-lifecycle"]
                         ),
+                        # The launch check, the capacity pages and quota requests.
+                        "SPOKE_CAPACITY": self._spoke_capacity_env(app_config),
                     },
                     permissions=[
                         lambda lambda_f: lambda_f.add_to_role_policy(
@@ -434,12 +436,21 @@ class ProvisioningAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                         "AVAILABLE_NETWORKS_SSM_PARAMETER_NAME": available_networks_param.parameter_name,
                         "CUSTOM_DNS": custom_api_domain,
                         "EXPERIMENTAL_PROVISIONED_PRODUCT_PER_PROJECT_LIMIT_PARAMETER_NAME": experimental_provisioned_product_per_project_limit_param.parameter_name,
+                        "SPOKE_CAPACITY": self._spoke_capacity_env(app_config),
                     },
                     permissions=[
                         lambda lambda_f: self._storage.table.grant_read_write_data(lambda_f),
                         lambda lambda_f: self._event_bus.grant_put_events_to(lambda_f),
                         lambda lambda_f: experimental_provisioned_product_per_project_limit_param.grant_read(lambda_f),
                         lambda lambda_f: available_networks_param.grant_read(lambda_f),
+                        # An operator's quota increase request runs in the spoke.
+                        lambda lambda_f: lambda_f.add_to_role_policy(
+                            statement=aws_iam.PolicyStatement(
+                                actions=["sts:AssumeRole", "sts:TagSession"],
+                                effect=aws_iam.Effect.ALLOW,
+                                resources=[f"arn:aws:iam::*:role/{PRODUCT_PROVISIONING_ROLE}"],
+                            )
+                        ),
                     ],
                     reserved_concurrency=app_config.component_specific["api-lambda-reserved-concurrency"],
                     provisioned_concurrency=None,
@@ -642,6 +653,7 @@ class ProvisioningAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                         "WORKBENCH_IDLE_STOP": json.dumps(
                             app_config.component_specific["workbench-lifecycle"].get("idleStop", {})
                         ),
+                        "SPOKE_CAPACITY": self._spoke_capacity_env(app_config),
                     },
                     permissions=[
                         lambda lambda_f: self._storage.table.grant_read_write_data(lambda_f),
@@ -668,6 +680,8 @@ class ProvisioningAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                     cross_bc_api_access={
                         bounded_contexts.BoundedContext.PROJECTS: [
                             ("GET", "/internal/projects"),
+                            # The capacity job reads every program's active accounts.
+                            ("GET", "/internal/accounts"),
                         ],
                     },
                 ),
@@ -1349,6 +1363,12 @@ class ProvisioningAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
     def provisioning_entry(self) -> backend_app_entrypoints.BackendAppEntrypoints:
         return self._backend_app
 
+    @staticmethod
+    def _spoke_capacity_env(app_config) -> str:
+        """SPOKE_CAPACITY for the provisioning functions (app/provisioning/domain/model/spoke_capacity.py)."""
+        capacity = app_config.component_specific.get("spoke-capacity", {})
+        return json.dumps({key: value for key, value in capacity.items() if key != "everyMinutes"})
+
     def _workbench_lifecycle_schedules(self, app_config) -> None:
         """The nightly workbench stop in local time, and delivering the idle timeout to workbenches."""
         lifecycle = app_config.component_specific["workbench-lifecycle"]
@@ -1423,6 +1443,46 @@ class ProvisioningAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
             ],
             rule_name=app_config.format_resource_name("workbench-idle-stop"),
         )
+        # Spoke capacity: read the spokes' quotas and what uses them, for the launch check and the pages.
+        capacity = app_config.component_specific.get("spoke-capacity", {})
+        aws_events.Rule(
+            self,
+            "spoke-capacity-rule",
+            schedule=aws_events.Schedule.rate(aws_cdk.Duration.minutes(capacity.get("everyMinutes", 10))),
+            enabled=bool(capacity.get("enabled", False)),
+            targets=[
+                aws_events_targets.LambdaFunction(
+                    jobs_fn,
+                    event=aws_events.RuleTargetInput.from_object({"jobName": "SpokeCapacityJob", "parameters": {}}),
+                )
+            ],
+            rule_name=app_config.format_resource_name("spoke-capacity"),
+        )
+        # One alarm per watched quota at its worst account (the job also emits it without the account
+        # dimension). They join the system-health composite alarm.
+        capacity_alarms = [
+            aws_cloudwatch.Alarm(
+                self,
+                f"AlarmCapacity{quota['quotaCode'].replace('-', '')}",
+                alarm_name=app_config.format_resource_name(f"capacity-{quota['quotaCode'].lower()}"),
+                alarm_description=(
+                    f"A spoke has used {capacity.get('alarmUsedPercent', 80)}% or more of its {quota['label']} "
+                    f"quota ({quota['quotaCode']}); new workbenches may not fit (docs/spoke-capacity.md)."
+                ),
+                metric=aws_cloudwatch.Metric(
+                    namespace=constants.VEW_NAMESPACE,
+                    metric_name="CapacityQuotaUsedPercent",
+                    dimensions_map={"service": VEW_SERVICE, "type": "Capacity", "quotaCode": quota["quotaCode"]},
+                    statistic="Maximum",
+                    period=aws_cdk.Duration.minutes(max(capacity.get("everyMinutes", 10), 5)),
+                ),
+                threshold=capacity.get("alarmUsedPercent", 80),
+                evaluation_periods=1,
+                comparison_operator=aws_cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+                treat_missing_data=aws_cloudwatch.TreatMissingData.NOT_BREACHING,
+            )
+            for quota in (capacity.get("quotas", []) if capacity.get("enabled", False) else [])
+        ]
         # Missing data never stops a workbench - it raises this instead. Part of the stack's
         # system-health composite alarm.
         self._idle_signal_alarms = [
@@ -1448,3 +1508,4 @@ class ProvisioningAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                 treat_missing_data=aws_cloudwatch.TreatMissingData.NOT_BREACHING,
             )
         ]
+        self._idle_signal_alarms.extend(capacity_alarms)

@@ -12,8 +12,9 @@ from app.provisioning.adapters.query_services import (
     dynamodb_versions_query_service,
     projects_api_query_service,
 )
-from app.provisioning.adapters.repository import dynamo_entity_config
+from app.provisioning.adapters.repository import dynamo_entity_config, dynamodb_spoke_capacity_store
 from app.provisioning.adapters.services import aws_parameter_service as ssm_parameter_service_v2
+from app.provisioning.adapters.services import aws_spoke_capacity_service
 from app.provisioning.domain.command_handlers.product_provisioning import (
     launch,
     remove,
@@ -30,9 +31,11 @@ from app.provisioning.domain.commands.provisioned_product_state import (
     initiate_provisioned_product_start_command,
     initiate_provisioned_product_stop_command,
 )
+from app.provisioning.domain.model import spoke_capacity
 from app.provisioning.domain.query_services import (
     products_domain_query_service,
     provisioned_products_domain_query_service,
+    spoke_capacity_domain_query_service,
     versions_domain_query_service,
 )
 from app.provisioning.domain.read_models import project_account
@@ -58,6 +61,7 @@ class Dependencies(BaseModel):
     products_domain_qry_srv: products_domain_query_service.ProductsDomainQueryService
     versions_domain_qry_srv: versions_domain_query_service.VersionsDomainQueryService
     virtual_targets_domain_qry_srv: provisioned_products_domain_query_service.ProvisionedProductsDomainQueryService
+    spoke_capacity_srv: spoke_capacity_domain_query_service.SpokeCapacityDomainQueryService | None = None
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -219,8 +223,29 @@ def bootstrap(  # noqa: C901
         uow=uow,
     )
 
+    # The same launch check as the portal, and the operators' capacity view and requests.
+    def __spoke_client(client_name: str):
+        return lambda aws_account_id, region, user_id: _get_boto_client_for(
+            client_name=client_name, aws_account_id=aws_account_id, region=region, user_id=user_id
+        )
+
+    spoke_capacity_srv = spoke_capacity_domain_query_service.SpokeCapacityDomainQueryService(
+        config=spoke_capacity.CapacityConfig.from_env(),
+        store=dynamodb_spoke_capacity_store.DynamoDBSpokeCapacityStore(dynamodb.Table(app_config.get_table_name())),
+        reader=aws_spoke_capacity_service.AWSSpokeCapacityService(
+            servicequotas_client_provider=__spoke_client("service-quotas"),
+            ec2_client_provider=__spoke_client("ec2"),
+            logger=logger,
+        ),
+        projects_qry_srv=projects_api_qs,
+        logger=logger,
+        pp_qry_srv=provisioned_products_qry_srv,
+        default_region=app_config.get_default_region(),
+    )
+
     def __launch_provisioned_product_handler(command):
         launch.handle(
+            capacity_srv=spoke_capacity_srv,
             command=command,
             publisher=publisher,
             products_qs=products_qry_srv,
@@ -285,4 +310,5 @@ def bootstrap(  # noqa: C901
         products_domain_qry_srv=products_domain_qry_srv,
         versions_domain_qry_srv=versions_domain_qry_srv,
         virtual_targets_domain_qry_srv=provisioned_products_domain_qry_srv,
+        spoke_capacity_srv=spoke_capacity_srv,
     )

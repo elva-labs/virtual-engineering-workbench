@@ -60,7 +60,8 @@ function useProjectsSwitch({ skipFetch } : Props): ProjectsSwitch {
         name: p.projectName ?? '',
         description: p.projectDescription ?? '',
         isActive: p.isActive ?? false,
-        roles: projectRoles(data, p.projectId ?? '')
+        roles: projectRoles(data, p.projectId ?? ''),
+        experience: p.experience ?? undefined,
       })));
       setEnrolments(data?.enrolments ?? []);
       setAssignments(data?.assignments ?? []);
@@ -108,6 +109,7 @@ function useProjectsSwitch({ skipFetch } : Props): ProjectsSwitch {
           projectDescription: lastProject.description,
           isActive: lastProject.isActive,
           roles: lastProject.roles,
+          experience: lastProject.experience,
         });
       }
     }
@@ -141,6 +143,7 @@ function useProjectsSwitch({ skipFetch } : Props): ProjectsSwitch {
       projectDescription: project?.description,
       isActive: project?.isActive,
       roles: project?.roles,
+      experience: project?.experience,
     });
   }
 }

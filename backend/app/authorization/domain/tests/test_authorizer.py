@@ -47,6 +47,7 @@ def test_authorize_when_all_steps_succeed_should_return_allow_policy(
                 "userGroups": "[]",
                 "projectManagedBy": "",
                 "projectManagedSource": "",
+                "projectExperience": "",
             },
             "policyDocument": {
                 "Version": "2012-10-17",

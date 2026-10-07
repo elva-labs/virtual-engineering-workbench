@@ -28,7 +28,7 @@ class ImageService(ABC):
         """Starts storing the image into the target account's import bucket; returns the S3 object key."""
 
     @abstractmethod
-    def get_store_ami_status(self, region: str, source_ami_id: str) -> str:
+    def get_store_ami_status(self, region: str, source_ami_id: str, aws_account_id: str | None = None) -> str:
         """Store task state: InProgress, Completed or Failed."""
 
     @abstractmethod

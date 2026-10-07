@@ -48,6 +48,10 @@ export enum RoleBasedFeature {
   ProvisionExperimentalWorkbench,
   ProvisionedProductsAdministration,
   Pipelines,
+  // The spokes' quotas and workbenches (platform admins).
+  CapacityAdministration,
+  // A program's own capacity (program owners and platform admins).
+  ProgramCapacity,
 }
 
 export interface RoleAccessItem {

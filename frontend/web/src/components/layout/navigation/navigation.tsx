@@ -35,6 +35,8 @@ const i18n = {
   productNavigationPipelines: 'Pipelines',
   productNavigationMandatoryComponentsLists: 'Mandatory components lists',
   provisionedProductsAdministration: 'Provisioned products',
+  capacityAdministration: 'Capacity (all programs)',
+  programCapacity: 'Capacity',
   userNavigationHeaderVirtualTargets: 'Virtual targets',
   userNavigationMyVirtualTargets: 'My virtual targets',
   userNavigationAllVirtualTargets: 'All virtual targets',
@@ -138,7 +140,9 @@ export const Navigation: FC<Props> = ({ user }) => {
     if (
       isFeatureAccessible(RoleBasedFeature.ManageEnrolments) ||
       isFeatureAccessible(RoleBasedFeature.ManageTechnologies) ||
-      isFeatureAccessible(RoleBasedFeature.ProvisionedProductsAdministration)
+      isFeatureAccessible(RoleBasedFeature.ProvisionedProductsAdministration) ||
+      isFeatureAccessible(RoleBasedFeature.CapacityAdministration) ||
+      isFeatureAccessible(RoleBasedFeature.ProgramCapacity)
     ) {
       menuItems.push({
         type: 'section',
@@ -150,6 +154,20 @@ export const Navigation: FC<Props> = ({ user }) => {
               type: 'link',
               text: i18n.provisionedProductsAdministration,
               href: getPathFor(RouteNames.ProvisionedProductsAdministration),
+            }),
+          ...tryGetLink(
+            RoleBasedFeature.CapacityAdministration,
+            {
+              type: 'link',
+              text: i18n.capacityAdministration,
+              href: getPathFor(RouteNames.CapacityAdministration),
+            }),
+          ...tryGetLink(
+            RoleBasedFeature.ProgramCapacity,
+            {
+              type: 'link',
+              text: i18n.programCapacity,
+              href: getPathFor(RouteNames.ProgramCapacity),
             }),
           ...tryGetLink(
             RoleBasedFeature.ManageEnrolments,

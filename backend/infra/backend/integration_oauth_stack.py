@@ -33,6 +33,9 @@ class IntegrationOauthStack(aws_cdk.Stack):
                     "product.read": "Read access to product catalogue",
                     "provisioned_product.write": "Allows to provision and manipulate provisioned products",
                     "provisioned_product.read": "Allows to get information about provisioned products",
+                    # The spokes' quotas and what uses them; asking AWS for more.
+                    "capacity.read": "Allows to read the spokes' service quotas and their use",
+                    "capacity.quota_increase": "Allows to request a spoke service quota increase",
                 },
             ),
         )
@@ -136,7 +139,13 @@ class IntegrationOauthStack(aws_cdk.Stack):
             resource_servers=[
                 backend_app_api_oauth_client.AppClientResourceServer(
                     resource_server=provisioning_resource_server,
-                    scopes=["product.read", "provisioned_product.write", "provisioned_product.read"],
+                    scopes=[
+                        "product.read",
+                        "provisioned_product.write",
+                        "provisioned_product.read",
+                        "capacity.read",
+                        "capacity.quota_increase",
+                    ],
                 ),
                 backend_app_api_oauth_client.AppClientResourceServer(
                     resource_server=provisioning_compound_resource_server,

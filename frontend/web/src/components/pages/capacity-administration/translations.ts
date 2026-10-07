@@ -1,0 +1,66 @@
+const NONE = 0;
+
+export const i18n = {
+  breadcrumb: 'Capacity',
+  programBreadcrumb: 'Program capacity',
+  programTitle: (name?: string) => `Capacity of ${name || 'this program'}`,
+  programDescription: 'The program account\'s quotas, what is left, and every workbench by size. ' +
+    'A platform admin can request more.',
+  fits: 'Workbenches that still fit',
+  fitsDescription: 'How many more of each size the remaining vCPUs allow.',
+  sizeS: 'S (4 vCPU)',
+  sizeM: 'M (8 vCPU)',
+  sizeL: 'L (16 vCPU)',
+  title: 'Capacity',
+  description: 'Every program account\'s service quotas, what uses them, and its workbenches.',
+  refresh: 'Refresh',
+  overview: 'Overview',
+  collectedAt: (at?: string | null) =>
+    at ? `Collected ${new Date(at).toLocaleString()} (every 10 minutes)` : 'Not collected yet',
+  programs: 'Programs',
+  accounts: 'Accounts',
+  running: 'Workbenches running',
+  stopped: 'Workbenches stopped',
+  gpuRunning: 'GPU instances running',
+  gp3: 'gp3 storage',
+  quotas: 'Quotas',
+  quotasDescription:
+    'vCPUs of running instances per family against the account\'s quota; ' +
+    'a launch that would not fit is refused.',
+  program: 'Program',
+  account: 'Account',
+  quota: 'Quota',
+  use: 'Used',
+  remaining: 'Remaining',
+  openRequest: 'Open request',
+  requestIncrease: 'Request increase',
+  unknown: 'Unknown',
+  notAvailable: (used: number) => used > NONE ? `Not available (${used} in use)` : 'Not available (quota 0)',
+  noData: 'No capacity data yet.',
+  instanceTypes: 'Instance types running',
+  instanceType: 'Instance type',
+  runningCount: 'Running',
+  noneRunning: 'Nothing is running.',
+  drillDown: 'Workbenches in a program',
+  drillDownDescription: 'Owner, version, size, disk and state of every workbench.',
+  chooseProgram: 'Choose a program',
+  noWorkbenches: 'No workbenches in this program.',
+  owner: 'Owner',
+  product: 'Product',
+  stage: 'Stage',
+  size: 'Size',
+  disk: 'Disk',
+  status: 'Status',
+  since: 'Started',
+  idleTimeout: 'Idle stop',
+  programDefault: 'program default',
+  cancel: 'Cancel',
+  submit: 'Request',
+  newTotal: (unit: string) => `New total (${unit})`,
+  requestExplanation: (label: string, account: string, limit: number | null) =>
+    `Ask AWS for more ${label} in account ${account} (now ${limit ?? 'unknown'}). ` +
+    'GPU requests usually open a support case and can take a day or more; ' +
+    'the status is refreshed every 10 minutes.',
+  requested: (status: string, id?: string | null) =>
+    `Quota increase requested: ${status}${id ? ` (${id})` : ''}.`,
+};

@@ -146,6 +146,12 @@ export const ROUTES: { [key in RouteNames]: RouteConfig } = {
   ProvisionedProductsAdministration: {
     path: '/administration/provisioned-products'
   },
+  CapacityAdministration: {
+    path: '/administration/capacity'
+  },
+  ProgramCapacity: {
+    path: '/administration/program-capacity'
+  },
   MyVirtualTargets: {
     path: '/my-virtual-targets'
   },

@@ -23,5 +23,5 @@ class ProjectSettings(unit_of_work.Entity):
     managedBy: Optional[str] = Field(None, title="ManagedBy")
     managedSource: Optional[str] = Field(None, title="ManagedSource")
     # "workbench-only" limits the program's members other than platform admins to their workbenches
-    #. None or "full" = upstream's portal.
+    # . None or "full" = upstream's portal.
     experience: Optional[str] = Field(None, title="Experience")

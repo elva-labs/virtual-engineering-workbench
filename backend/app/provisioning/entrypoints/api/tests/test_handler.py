@@ -1882,7 +1882,9 @@ def _lifecycle_dependencies(mocked_dependencies, owner: str, program: dict | Non
     pp = pp.model_copy(update={"userId": owner, "projectId": "proj-12345"})
     mocked_dependencies.virtual_targets_domain_qry_srv.get_provisioned_product.return_value = (pp, version_metadata)
     projects = unittest.mock.Mock()
-    projects.get_projects.return_value = [project_read_model.Project(projectId="proj-12345", workbenchLifecycle=program)]
+    projects.get_projects.return_value = [
+        project_read_model.Project(projectId="proj-12345", workbenchLifecycle=program)
+    ]
     uow = unittest.mock.MagicMock()
     uow.get_repository.return_value.get.return_value = pp
     instances = unittest.mock.Mock()
@@ -1902,7 +1904,9 @@ LIFECYCLE_PATH = "/projects/proj-12345/products/provisioned/vt-1/lifecycle"
 ALLOWING = {"allowUserDisableNightlyStop": True, "allowUserIdleTimeout": True, "userIdleTimeoutMinMinutes": 10}
 
 
-def test_get_workbench_lifecycle_shows_effective_values_and_sources(lambda_context, authenticated_event, mocked_dependencies):
+def test_get_workbench_lifecycle_shows_effective_values_and_sources(
+    lambda_context, authenticated_event, mocked_dependencies
+):
     from app.provisioning.entrypoints.api import handler
 
     handler.dependencies, _, _ = _lifecycle_dependencies(mocked_dependencies, owner="T00123122", program=ALLOWING)
@@ -1932,7 +1936,9 @@ def test_put_workbench_lifecycle_stores_the_owners_choice(lambda_context, authen
     assert stored.lifecycleSettings.idleTimeoutMinutes == 15
 
 
-def test_put_workbench_lifecycle_refuses_what_the_program_does_not_allow(lambda_context, authenticated_event, mocked_dependencies):
+def test_put_workbench_lifecycle_refuses_what_the_program_does_not_allow(
+    lambda_context, authenticated_event, mocked_dependencies
+):
     from app.provisioning.entrypoints.api import handler
 
     handler.dependencies, uow, _ = _lifecycle_dependencies(mocked_dependencies, owner="T00123122", program=None)

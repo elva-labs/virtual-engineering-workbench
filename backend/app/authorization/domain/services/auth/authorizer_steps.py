@@ -294,9 +294,7 @@ class ProjectsBCContextEnricher(authorizer.AuthorizerStep):
         if sorted(assignment.roles) == sorted(kept):
             return assignment
         reduced = assignment.model_copy(update={"roles": kept})
-        context.project_assignments = [a for a in context.project_assignments if a.projectId != project_id] + [
-            reduced
-        ]
+        context.project_assignments = [a for a in context.project_assignments if a.projectId != project_id] + [reduced]
         return reduced
 
     def __group_assignment(

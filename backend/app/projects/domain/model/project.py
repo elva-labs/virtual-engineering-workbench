@@ -18,6 +18,7 @@ def generate_project_id() -> str:
 class ProjectPrimaryKey(unit_of_work.PrimaryKey):
     projectId: str = Field(..., title="ProjectId")
 
+
 # What the program's members get in the portal. "full" is upstream's portal; in a
 # "workbench-only" program everyone but platform admins sees only their workbenches, consumes PROD
 # only and launches workbenches only.

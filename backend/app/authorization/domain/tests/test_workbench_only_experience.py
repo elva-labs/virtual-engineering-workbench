@@ -117,9 +117,7 @@ def test_project_updated_stores_the_experience():
     stored = project_settings.ProjectSettings(projectId="proj-1")
     uow, repo = _settings_uow(stored)
 
-    project_updated_handler.handle(
-        project_updated.ProjectUpdated(projectId="proj-1", experience="workbench-only"), uow
-    )
+    project_updated_handler.handle(project_updated.ProjectUpdated(projectId="proj-1", experience="workbench-only"), uow)
 
     assert stored.experience == "workbench-only"
     repo.update_entity.assert_called_once()

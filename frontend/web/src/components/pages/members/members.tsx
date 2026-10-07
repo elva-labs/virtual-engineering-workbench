@@ -134,6 +134,8 @@ export const Members = () => {
                   content: <SpaceBetween size="l">
                     <ProjectUsers
                       projectUsers={projectUsers}
+                      groupNames={Object.fromEntries(projectGroups
+                        .filter(g => !!g.groupName).map(g => [g.groupId, g.groupName as string]))}
                       usersLoading={usersLoading}
                       loadProjectUsers={loadProjectUsers}
                       unassignUsers={unassignUsers}

@@ -26,6 +26,25 @@ class ProjectsQueryService(ABC):
         self, project_id: str, include_deleted: bool = False
     ) -> list[project_group_assignment.ProjectGroupAssignment]: ...
 
+    # Members through a group binding: VEW only learns of them when they sign in, so the
+    # sign-in records them per program and Members lists them. Not abstract: test doubles may skip it.
+    def record_group_member(
+        self,
+        project_id: str,
+        user_id: str,
+        user_email: str | None,
+        group_ids: list[str],
+        roles: list[str],
+        seen_at: str,
+    ) -> None:
+        return None
+
+    def forget_group_memberships(self, user_id: str, keep_project_ids: set[str]) -> None:
+        return None
+
+    def list_group_members(self, project_id: str) -> list[dict]:
+        return []
+
     @abstractmethod
     def list_service_client_assignments(
         self, project_id: str

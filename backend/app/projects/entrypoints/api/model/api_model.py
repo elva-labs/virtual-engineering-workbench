@@ -244,9 +244,21 @@ class GetProjectAssignmentsResponseItem(BaseModel):
     )
 
 
+class ProjectGroupMember(BaseModel):
+    """A member through a group binding, known since their first sign-in."""
+
+    userId: str
+    userEmail: Optional[str] = None
+    groupIds: List[str] = []
+    roles: List[str] = []
+    firstSeen: Optional[str] = None
+    lastSeen: Optional[str] = None
+
+
 class GetProjectAssignmentsResponse(BaseModel):
     nextToken: Optional[str] = Field(None, title="LastEvaluatedKey token")
     assignments: Optional[List[GetProjectAssignmentsResponseItem]] = Field(None, title="Assignments")
+    groupMembers: Optional[List[ProjectGroupMember]] = Field(None, title="Members through a group binding")
 
 
 class ProjectGroupAssignment(BaseModel):

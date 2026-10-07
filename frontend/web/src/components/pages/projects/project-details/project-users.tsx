@@ -8,8 +8,8 @@ import {
   Table,
   TableProps,
 } from '@cloudscape-design/components';
-import { useState } from 'react';
-import { GetProjectAssignmentsResponseItem } from '../../../../services/API/proserve-wb-projects-api';
+import { useMemo, useState } from 'react';
+import { isGroupOnly, MemberRow } from './project-users.logic';
 import { ProjectRoles, RoleBasedFeature, selectedProjectState } from '../../../../state';
 import { CopyText } from '../../shared';
 import { RoleAccessToggle } from '../../shared/role-access-toggle';
@@ -35,7 +35,11 @@ const i18n = {
   tableHeaderUserId: 'User ID',
   tableHeaderRoles: 'Member role',
   tableEmptyTitle: 'No users',
-  tableEmptySubtitle: 'Program has no users.',
+  tableEmptySubtitle: 'Program has no users. Members through a group appear here after their first ' +
+    'sign-in.',
+  tableDescription: 'Members through a group appear after their first sign-in; their roles come ' +
+    'from the group.',
+  viaGroup: 'via group',
   tableEmptyActionText: 'Add new user',
   tableFilterNoResultTitle: 'No users found',
   tableFilterNoResultSubtitle: 'No users were found using your search criteria.',
@@ -97,7 +101,8 @@ const propertyFilterI18nStrings: PropertyFilterProps.I18nStrings = {
 };
 
 type ProjectUsersProps = {
-  projectUsers: GetProjectAssignmentsResponseItem[],
+  projectUsers: MemberRow[],
+  groupNames?: Record<string, string>,
   usersLoading: boolean,
   loadProjectUsers: (token?: object) => void,
   unassignUsers: (ids: string[]) => void,
@@ -118,57 +123,63 @@ function joinRoleNames(roles?: string[]) {
   return roles?.map(r => getRoleName(r || '').toUpperCase()).join() || '';
 }
 
-const COLUMN_DEFINITIONS: TableProps.ColumnDefinition<GetProjectAssignmentsResponseItem>[] = [
-  {
-    id: 'userDisplayName',
-    header: i18n.tableHeaderDisplayName,
-    cell: u => u.userDisplayName || '—',
-    sortingField: 'userDisplayName',
-  },
-  {
-    id: 'userId',
-    header: i18n.tableHeaderUserId,
-    cell: u => <> {
-      !!u.userId &&
+function columnDefinitionsFor(groupNames: Record<string, string>): TableProps.ColumnDefinition<MemberRow>[] {
+  return [
+    {
+      id: 'userDisplayName',
+      header: i18n.tableHeaderDisplayName,
+      cell: u => u.userDisplayName || '—',
+      sortingField: 'userDisplayName',
+    },
+    {
+      id: 'userId',
+      header: i18n.tableHeaderUserId,
+      cell: u => <> {
+        !!u.userId &&
       <CopyText
         copyText={u.userId ?? ''}
         copyButtonLabel={i18n.copyButtonLabel}
         successText={i18n.copySuccess}
         errorText={i18n.copyError} />
-    } </>,
-    sortingField: 'userId',
-  },
-  {
-    id: 'userEmail',
-    header: i18n.tableHeaderEmail,
-    cell: u => <> {
-      !!u.userEmail &&
+      } </>,
+      sortingField: 'userId',
+    },
+    {
+      id: 'userEmail',
+      header: i18n.tableHeaderEmail,
+      cell: u => <> {
+        !!u.userEmail &&
       <CopyText
         copyText={u.userEmail ?? ''}
         copyButtonLabel={i18n.copyButtonLabel}
         successText={i18n.copySuccess}
         errorText={i18n.copyError} />
-    } </>,
-    sortingField: 'userEmail',
-  },
-  {
-    id: 'userRoles',
-    header: i18n.tableHeaderRoles,
-    cell: u => <SpaceBetween size={'xs'} direction='horizontal'>
-      {/* eslint-disable-next-line @stylistic/max-len */}
-      {u.roles?.map(r => <Badge color="blue" key={r}><b>{getRoleName((r || '').toUpperCase())}</b></Badge>) ?? []}
-    </SpaceBetween>,
-    sortingComparator: (a, b) => {
-      const rolesOfA = joinRoleNames(a.roles);
-      const rolesOfB = joinRoleNames(b.roles);
-      return rolesOfA < rolesOfB ? LESS_THAN : rolesOfA > rolesOfB ? GREATER_THAN : EQUAL;
-    }
-  },
-];
+      } </>,
+      sortingField: 'userEmail',
+    },
+    {
+      id: 'userRoles',
+      header: i18n.tableHeaderRoles,
+      // Members through a group binding carry the group's roles and say which group.
+      cell: u => <SpaceBetween size={'xs'} direction='horizontal'>
+        {u.roles?.map(r =>
+          <Badge color="blue" key={r}><b>{getRoleName((r || '').toUpperCase())}</b></Badge>) ?? []}
+        {(u.viaGroupIds ?? []).map(g =>
+          <Badge color="grey" key={g}>{i18n.viaGroup} {groupNames[g] || g}</Badge>)}
+      </SpaceBetween>,
+      sortingComparator: (a, b) => {
+        const rolesOfA = joinRoleNames(a.roles);
+        const rolesOfB = joinRoleNames(b.roles);
+        return rolesOfA < rolesOfB ? LESS_THAN : rolesOfA > rolesOfB ? GREATER_THAN : EQUAL;
+      }
+    },
+  ];
+}
 
 // eslint-disable-next-line complexity
 export function projectUsers({
   projectUsers,
+  groupNames = {},
   usersLoading,
   loadProjectUsers,
   unassignUsers,
@@ -179,6 +190,7 @@ export function projectUsers({
   const [unassignConfirmVisible, setUnassignConfirmVisible] = useState(false);
   const [reassignConfirmVisible, setReassignConfirmVisible] = useState(false);
   const isFeatureAccessible = useRoleAccessToggle();
+  const columnDefinitions = useMemo(() => columnDefinitionsFor(groupNames), [groupNames]);
 
   if (!selectedProject) {
     navigateTo(RouteNames.Programs);
@@ -230,7 +242,7 @@ export function projectUsers({
         ]
       },
       pagination: { pageSize: DEFAULT_PAGE_SIZE },
-      sorting: { defaultState: { sortingColumn: COLUMN_DEFINITIONS[0] } },
+      sorting: { defaultState: { sortingColumn: columnDefinitions[0] } },
       selection: {
         keepSelection: true,
         trackBy: 'userId'
@@ -250,9 +262,9 @@ export function projectUsers({
     }
   );
 
-  const { onSortingChange } = useCloudscapeTablePersisentState<GetProjectAssignmentsResponseItem>({
+  const { onSortingChange } = useCloudscapeTablePersisentState<MemberRow>({
     key: 'project-user',
-    columnDefinitions: COLUMN_DEFINITIONS,
+    columnDefinitions,
     setSorting: actions.setSorting,
   });
 
@@ -262,7 +274,7 @@ export function projectUsers({
     {renderReassignedPrompt()}
     <Table
       {...collectionProps}
-      columnDefinitions={COLUMN_DEFINITIONS}
+      columnDefinitions={columnDefinitions}
       items={items}
       loading={usersLoading || userReAssignmentInProgress || userUnassignInProgress}
       loadingText={i18n.tableLoading}
@@ -272,6 +284,7 @@ export function projectUsers({
       header={
         <Header
           counter={`(${projectUsers.length})`}
+          description={i18n.tableDescription}
           actions={
             <SpaceBetween size={'xs'} direction={'horizontal'}>
               <Button
@@ -281,13 +294,13 @@ export function projectUsers({
               <RoleAccessToggle feature={RoleBasedFeature.ReassignRoleOfProgramUser}>
                 <Button
                   onClick={handleReassignAction}
-                  disabled={!canReassign()}
+                  disabled={!canReassign() || anyGroupOnlySelected()}
                   data-test="reonboard-button">{i18n.buttonEditUserRole}</Button>
               </RoleAccessToggle>
               <RoleAccessToggle feature={RoleBasedFeature.RemovePlatformUserFromProgram}>
                 <Button
                   onClick={handleUnassignAction}
-                  disabled={!canUnassign()}
+                  disabled={!canUnassign() || anyGroupOnlySelected()}
                   data-test="offboard-button"
                 >{i18n.buttonRemoveUser}</Button>
               </RoleAccessToggle>
@@ -388,6 +401,11 @@ export function projectUsers({
 
   function navigateToAssignUserScreen() {
     navigateTo(RouteNames.ProjectUserAssignment);
+  }
+
+  // Members through a group are added and removed in Entra; their roles come from Terraform.
+  function anyGroupOnlySelected() {
+    return (collectionProps.selectedItems ?? []).some(isGroupOnly);
   }
 
   function canUnassign() {

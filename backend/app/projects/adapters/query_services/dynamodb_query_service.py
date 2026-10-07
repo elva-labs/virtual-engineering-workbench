@@ -104,6 +104,84 @@ class DynamoDBProjectsQueryService(projects_query_service.ProjectsQueryService):
             params["ExclusiveStartKey"] = result["LastEvaluatedKey"]
         return assignments
 
+    # Members through a group binding: PK GROUP_MEMBER#<projectId>, SK USER#<userId>. A key of
+    # its own, so no query on PROJECT#… or USER#… partitions sees these items.
+    def record_group_member(
+        self,
+        project_id: str,
+        user_id: str,
+        user_email: str | None,
+        group_ids: list[str],
+        roles: list[str],
+        seen_at: str,
+    ) -> None:
+        names = {
+            "#g": "groupIds",
+            "#r": "roles",
+            "#l": "lastSeen",
+            "#f": "firstSeen",
+            "#u": "userId",
+            "#p": "projectId",
+        }
+        values = {
+            ":g": sorted(set(group_ids)),
+            ":r": sorted(set(roles)),
+            ":l": seen_at,
+            ":u": user_id,
+            ":p": project_id,
+        }
+        expression = "SET #g = :g, #r = :r, #l = :l, #f = if_not_exists(#f, :l), #u = :u, #p = :p"
+        if user_email:
+            names["#e"] = "userEmail"
+            values[":e"] = user_email
+            expression += ", #e = :e"
+        self._dynamodb_client.update_item(
+            TableName=self._table_name,
+            Key={"PK": f"GROUP_MEMBER#{project_id}", "SK": f"USER#{user_id}"},
+            UpdateExpression=expression,
+            ExpressionAttributeNames=names,
+            ExpressionAttributeValues=values,
+        )
+
+    def forget_group_memberships(self, user_id: str, keep_project_ids: set[str]) -> None:
+        """Drop the user's group-member records for programs their sign-in no longer grants."""
+        params = {
+            "TableName": self._table_name,
+            "IndexName": self._gsi_inverted_primary_key,
+            "KeyConditionExpression": Key("SK").eq(f"USER#{user_id}") & Key("PK").begins_with("GROUP_MEMBER#"),
+        }
+        while True:
+            result = self._dynamodb_client.query(**params)
+            for item in result.get("Items", []):
+                if item["PK"].removeprefix("GROUP_MEMBER#") not in keep_project_ids:
+                    self._dynamodb_client.delete_item(
+                        TableName=self._table_name, Key={"PK": item["PK"], "SK": item["SK"]}
+                    )
+            if not result.get("LastEvaluatedKey"):
+                break
+            params["ExclusiveStartKey"] = result["LastEvaluatedKey"]
+
+    def list_group_members(self, project_id: str) -> list[dict]:
+        members = []
+        params = {"TableName": self._table_name, "KeyConditionExpression": Key("PK").eq(f"GROUP_MEMBER#{project_id}")}
+        while True:
+            result = self._dynamodb_client.query(**params)
+            for item in result.get("Items", []):
+                members.append(
+                    {
+                        "userId": item.get("userId"),
+                        "userEmail": item.get("userEmail"),
+                        "groupIds": sorted(item.get("groupIds") or []),
+                        "roles": sorted(item.get("roles") or []),
+                        "firstSeen": item.get("firstSeen"),
+                        "lastSeen": item.get("lastSeen"),
+                    }
+                )
+            if not result.get("LastEvaluatedKey"):
+                break
+            params["ExclusiveStartKey"] = result["LastEvaluatedKey"]
+        return members
+
     def list_service_client_assignments(
         self, project_id: str
     ) -> list[service_client_assignment.ServiceClientAssignment]:

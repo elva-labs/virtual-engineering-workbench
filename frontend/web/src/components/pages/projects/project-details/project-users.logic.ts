@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { projectsAPI } from '../../../../services';
 import type { ProjectGroupAssignment } from '../../../../services/API/projects-api';
-import { GetProjectAssignmentsResponseItem } from '../../../../services/API/proserve-wb-projects-api';
+import {
+  GetProjectAssignmentsResponseItem,
+  ProjectGroupMember,
+} from '../../../../services/API/proserve-wb-projects-api';
 import { extractErrorResponseMessage } from '../../../../utils/api-helpers';
 import { useNotifications } from '../../../layout';
 
@@ -18,8 +21,38 @@ type ProjectUsersProps = {
   projectId: string,
 };
 
+/** A member row: a direct assignment, a member through a group binding, or both. */
+export type MemberRow = GetProjectAssignmentsResponseItem & { direct?: boolean, viaGroupIds?: string[] };
+
+/** Direct assignments plus members known through a bound group since their first sign-in. */
+export function withGroupMembers(
+  assignments: GetProjectAssignmentsResponseItem[], groupMembers: ProjectGroupMember[]
+): MemberRow[] {
+  const rows = new Map<string, MemberRow>(assignments.map(a => [a.userId ?? '', { ...a, direct: true }]));
+  for (const member of groupMembers) {
+    const existing = rows.get(member.userId);
+    if (existing) {
+      existing.viaGroupIds = member.groupIds;
+    } else {
+      rows.set(member.userId, {
+        userId: member.userId,
+        userEmail: member.userEmail ?? undefined,
+        roles: member.roles,
+        direct: false,
+        viaGroupIds: member.groupIds,
+      });
+    }
+  }
+  return [...rows.values()];
+}
+
+/** Only through a group: roles and removal are managed in Entra and Terraform, not here. */
+export function isGroupOnly(row: MemberRow): boolean {
+  return row.direct === false;
+}
+
 const useProjectUsers = ({ projectId }: ProjectUsersProps) => {
-  const [projectUsers, setProjectUsers] = useState<GetProjectAssignmentsResponseItem[]>([]);
+  const [projectUsers, setProjectUsers] = useState<MemberRow[]>([]);
   const [projectGroups, setProjectGroups] = useState<ProjectGroupAssignment[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [userUnassignInProgress, setUserUnassignInProgress] = useState(false);
@@ -48,7 +81,7 @@ const useProjectUsers = ({ projectId }: ProjectUsersProps) => {
     projectsAPI.
       getProjectUsers(projectId).
       then(response => {
-        setProjectUsers(response.assignments || []);
+        setProjectUsers(withGroupMembers(response.assignments || [], response.groupMembers || []));
       }).catch(async e => {
         showErrorNotification({
           header: i18n.userFetchErrorHeader,

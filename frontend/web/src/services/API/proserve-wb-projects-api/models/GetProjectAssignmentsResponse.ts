@@ -38,6 +38,21 @@ export interface GetProjectAssignmentsResponse {
      * @memberof GetProjectAssignmentsResponse
      */
     assignments?: Array<GetProjectAssignmentsResponseItem>;
+    /**
+     * Members through a group binding, known since their first sign-in.
+     * @type {Array<ProjectGroupMember>}
+     * @memberof GetProjectAssignmentsResponse
+     */
+    groupMembers?: Array<ProjectGroupMember>;
+}
+
+export interface ProjectGroupMember {
+    userId: string;
+    userEmail?: string | null;
+    groupIds: Array<string>;
+    roles: Array<string>;
+    firstSeen?: string | null;
+    lastSeen?: string | null;
 }
 
 /**
@@ -61,6 +76,7 @@ export function GetProjectAssignmentsResponseFromJSONTyped(json: any, ignoreDisc
 
         'nextToken': !exists(json, 'nextToken') ? undefined : json['nextToken'],
         'assignments': !exists(json, 'assignments') ? undefined : ((json['assignments'] as Array<any>).map(GetProjectAssignmentsResponseItemFromJSON)),
+        'groupMembers': !exists(json, 'groupMembers') ? undefined : (json['groupMembers'] as Array<ProjectGroupMember>),
     };
 }
 
@@ -75,5 +91,6 @@ export function GetProjectAssignmentsResponseToJSON(value?: GetProjectAssignment
 
         'nextToken': value.nextToken,
         'assignments': value.assignments === undefined ? undefined : ((value.assignments as Array<any>).map(GetProjectAssignmentsResponseItemToJSON)),
+        'groupMembers': value.groupMembers,
     };
 }

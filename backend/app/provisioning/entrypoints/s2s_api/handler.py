@@ -201,6 +201,42 @@ def get_provisioned_product(
     )
 
 
+def _json(status: HTTPStatus, body) -> api_gateway.Response[dict]:
+    return api_gateway.Response(
+        status_code=status, content_type=content_types.APPLICATION_JSON, body=json.dumps(body, default=str)
+    )
+
+
+@tracer.capture_method
+@app.get("/capacity", tags=[TAG_PROVISIONED_PRODUCTS])
+def get_capacity_overview() -> api_gateway.Response[dict]:
+    """(scope capacity.read): every spoke's quotas, use and quota requests."""
+    return _json(HTTPStatus.OK, dependencies.spoke_capacity_srv.overview())
+
+
+@tracer.capture_method
+@app.put("/capacity/accounts/<aws_account_id>/quotas/<quota_code>/increase", tags=[TAG_PROVISIONED_PRODUCTS])
+def request_quota_increase(aws_account_id: str, quota_code: str) -> api_gateway.Response[dict]:
+    """(scope capacity.quota_increase): an operator action, no provider resource. Idempotent."""
+    from app.provisioning.domain.query_services import spoke_capacity_domain_query_service as capacity
+
+    body = app.current_event.json_body or {}
+    try:
+        desired = float(body.get("desiredValue"))
+    except (TypeError, ValueError):
+        return _json(HTTPStatus.BAD_REQUEST, {"code": "INVALID_DESIRED_VALUE", "message": "desiredValue must be a number."})
+    region = body.get("region") or app_config.get_default_region()
+    try:
+        request = dependencies.spoke_capacity_srv.request_increase(
+            aws_account_id, region, quota_code, desired, PROVISIONING_S2S_API_USER
+        )
+    except capacity.UnknownQuota as error:
+        return _json(HTTPStatus.NOT_FOUND, {"code": "QUOTA_NOT_WATCHED", "message": str(error)})
+    except capacity.QuotaAlreadySufficient as error:
+        return _json(HTTPStatus.CONFLICT, {"code": "QUOTA_ALREADY_SUFFICIENT", "message": str(error)})
+    return _json(HTTPStatus.OK, request.model_dump())
+
+
 @tracer.capture_method
 @app.put("/projects/<project_id>/products/provisioned/<provisioned_product_id>/remove", tags=[TAG_PROVISIONED_PRODUCTS])
 def remove_provisioned_product(

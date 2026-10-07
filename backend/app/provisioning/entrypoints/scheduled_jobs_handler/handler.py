@@ -23,6 +23,7 @@ from app.provisioning.entrypoints.scheduled_jobs_handler.scheduled_job_events im
     provisioned_product_batch_stop_job,
     provisioned_product_cleanup_job,
     provisioned_product_sync_job,
+    spoke_capacity_job,
     workbench_lifecycle_job,
 )
 from app.shared.middleware import event_handler
@@ -180,6 +181,31 @@ def workbench_lifecycle_handler(event: workbench_lifecycle_job.WorkbenchLifecycl
     if event.action == "idle-stop":
         return _idle_stop(dry_run=event.dryRun)
     return dependencies.workbench_lifecycle_srv.reconcile_tags(dry_run=event.dryRun)
+
+
+@app.handle(spoke_capacity_job.SpokeCapacityJob)
+def spoke_capacity_handler(event: spoke_capacity_job.SpokeCapacityJob):
+    """CapacityQuotaUsedPercent (type Capacity, per quota) feeds one alarm per quota, at its worst
+    account; the account dimension feeds the dashboard."""
+    if dependencies.spoke_capacity_srv is None:
+        return {"disabled": True}
+    snapshots = dependencies.spoke_capacity_srv.collect()
+    for snapshot in snapshots:
+        for quota in snapshot.quotas:
+            if quota.used_percent is None:
+                continue
+            for account in (None, snapshot.awsAccountId):
+                with single_metric(
+                    name="CapacityQuotaUsedPercent", unit=MetricUnit.Percent, value=quota.used_percent
+                ) as metric:
+                    metric.add_dimension(name="type", value="Capacity")
+                    metric.add_dimension(name="quotaCode", value=quota.quotaCode)
+                    if account:
+                        metric.add_dimension(name="account", value=account)
+    failed = [s.awsAccountId for s in snapshots if s.error]
+    with single_metric(name="CapacityReadFailed", unit=MetricUnit.Count, value=len(failed)) as metric:
+        metric.add_dimension(name="type", value="Capacity")
+    return {"accounts": [s.awsAccountId for s in snapshots], "failed": failed}
 
 
 def _idle_stop(dry_run: bool) -> dict:

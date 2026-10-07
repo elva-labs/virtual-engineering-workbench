@@ -400,6 +400,32 @@ _dev_provisioning_config = {
             "missingSignalAlarmMinutes": 120,
         },
     },
+    # Spoke capacity: the hub reads each enrolled spoke's service quotas and what uses them, refuses a
+    # launch that would not fit (it fails open on missing or stale data), shows them to platform admins
+    # and program owners, and lets platform admins request an increase. Off by default. One run costs
+    # per spoke account and region one AssumeRole, one GetServiceQuota per quota (cached an hour) and a
+    # paginated DescribeInstances and DescribeVolumes. docs/spoke-capacity.md.
+    "spoke-capacity": {
+        "enabled": False,
+        "everyMinutes": 10,
+        # vCPUs kept free in a quota: a launch must leave at least this many.
+        "headroomVcpus": 0,
+        # The CapacityQuotaUsedPercent alarm, per quota at its worst account.
+        "alarmUsedPercent": 80,
+        # A snapshot older than this is not used to refuse a launch (the launch goes ahead, logged).
+        "staleAfterMinutes": 30,
+        "quotas": [
+            {
+                "serviceCode": "ec2",
+                "quotaCode": "L-1216C47A",
+                "label": "Standard vCPU",
+                "instanceFamilies": ["a", "c", "d", "h", "i", "m", "r", "t", "z"],
+            },
+            {"serviceCode": "ec2", "quotaCode": "L-DB2E81BA", "label": "GPU vCPU (G, VT)", "instanceFamilies": ["g", "vt"]},
+            {"serviceCode": "ec2", "quotaCode": "L-417A185B", "label": "GPU vCPU (P)", "instanceFamilies": ["p"]},
+            {"serviceCode": "ebs", "quotaCode": "L-7A658B76", "label": "gp3 storage (TiB)", "volumeType": "gp3"},
+        ],
+    },
 }
 
 provisioning_app_config = {

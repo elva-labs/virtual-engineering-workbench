@@ -26,6 +26,7 @@ from app.provisioning.domain.commands.user_profile import update_user_profile_co
 from app.provisioning.domain.exceptions import domain_exception
 from app.provisioning.domain.model import product_status
 from app.provisioning.domain.model import workbench_lifecycle as workbench_lifecycle_model
+from app.provisioning.domain.query_services import spoke_capacity_domain_query_service
 from app.provisioning.domain.value_objects import (
     account_id_value_object,
     additional_configurations_value_object,
@@ -852,6 +853,64 @@ def internal_get_provisioning_subnets(
         ),
         content_type=content_types.APPLICATION_JSON,
     )
+
+
+TAG_CAPACITY = "Capacity"
+
+
+def _json(status: HTTPStatus, body) -> api_gateway.Response[dict]:
+    return api_gateway.Response(
+        status_code=status, content_type=content_types.APPLICATION_JSON, body=json.dumps(body, default=str)
+    )
+
+
+@tracer.capture_method
+@app.get("/capacity", tags=[TAG_CAPACITY])
+def get_capacity_overview() -> api_gateway.Response[dict]:
+    """Platform admins (Cedar GetCapacityOverview): every spoke's quotas, use and requests."""
+    return _json(HTTPStatus.OK, dependencies.spoke_capacity_srv.overview())
+
+
+@tracer.capture_method
+@app.get("/projects/<project_id>/capacity", tags=[TAG_CAPACITY])
+def get_project_capacity(project_id: str) -> api_gateway.Response[dict]:
+    """The launch form: how many workbenches of each size still fit the program's account(s)."""
+    types = [t for t in (app.current_event.get_query_string_value("instanceTypes", "") or "").split(",") if t]
+    return _json(HTTPStatus.OK, dependencies.spoke_capacity_srv.project_capacity(project_id, types[:50]))
+
+
+@tracer.capture_method
+@app.get("/projects/<project_id>/capacity/workbenches", tags=[TAG_CAPACITY])
+def get_project_capacity_workbenches(project_id: str) -> api_gateway.Response[dict]:
+    """Platform admins (Cedar GetProjectCapacityDetails): the program's workbenches by size."""
+    return _json(HTTPStatus.OK, dependencies.spoke_capacity_srv.project_workbenches(project_id))
+
+
+@tracer.capture_method
+@app.put("/capacity/accounts/<aws_account_id>/quotas/<quota_code>/increase", tags=[TAG_CAPACITY])
+def request_quota_increase(aws_account_id: str, quota_code: str) -> api_gateway.Response[dict]:
+    """Platform admins (Cedar RequestQuotaIncrease): ask AWS for more of a spoke's quota.
+    Idempotent: an open request that asks for at least as much is returned (200)."""
+    principal = app.context.get("user_principal")
+    body = app.current_event.json_body or {}
+    return _request_quota_increase(
+        aws_account_id, quota_code, body, principal.user_email or principal.user_name
+    )
+
+
+def _request_quota_increase(aws_account_id: str, quota_code: str, body: dict, requested_by: str):
+    try:
+        desired = float(body.get("desiredValue"))
+    except (TypeError, ValueError):
+        return _json(HTTPStatus.BAD_REQUEST, {"code": "INVALID_DESIRED_VALUE", "message": "desiredValue must be a number."})
+    region = body.get("region") or default_region_name
+    try:
+        request = dependencies.spoke_capacity_srv.request_increase(aws_account_id, region, quota_code, desired, requested_by)
+    except spoke_capacity_domain_query_service.UnknownQuota as error:
+        return _json(HTTPStatus.NOT_FOUND, {"code": "QUOTA_NOT_WATCHED", "message": str(error)})
+    except spoke_capacity_domain_query_service.QuotaAlreadySufficient as error:
+        return _json(HTTPStatus.CONFLICT, {"code": "QUOTA_ALREADY_SUFFICIENT", "message": str(error)})
+    return _json(HTTPStatus.OK, request.model_dump())
 
 
 @tracer.capture_lambda_handler  # type: ignore

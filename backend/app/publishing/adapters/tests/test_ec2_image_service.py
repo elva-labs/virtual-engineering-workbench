@@ -95,6 +95,11 @@ def ec2_calls():
         ),
         "CreateRestoreImageTask": mock.MagicMock(return_value={"ImageId": "ami-target1"}),
         "DescribeImages": mock.MagicMock(return_value={"Images": []}),
+        "HeadObject": mock.MagicMock(
+            side_effect=botocore.exceptions.ClientError(
+                {"Error": {"Code": "404", "Message": "Not Found"}}, "HeadObject"
+            )
+        ),
     }
 
     def _interceptor(self, operation_name, kwarg):
@@ -241,3 +246,64 @@ def test_distributed_ami_status_available_for_any_architecture(ec2_calls, archit
     state = _distribution_service().get_distributed_ami_status("eu-west-3", "ami-target1", "322234948118")
 
     assertpy.assert_that(state).is_equal_to("available")
+
+
+# One image stored into two accounts within milliseconds: both stores ran, but EC2 lists only an image's
+# newest store task, so the other account's task hid this bucket's.
+_OTHER_ACCOUNTS_TASK = {
+    "StoreImageTaskResults": [
+        {
+            "AmiId": "ami-54321",
+            "Bucket": "vew-image-import-999999999999-eu-west-3",
+            "StoreTaskState": "Completed",
+        }
+    ]
+}
+
+
+def test_store_ami_retry_returns_the_key_when_the_bucket_already_holds_the_image(ec2_calls):
+    ec2_calls["CreateStoreImageTask"].side_effect = botocore.exceptions.ClientError(
+        {
+            "Error": {
+                "Code": "InvalidRequest",
+                "Message": "The AMI already exists in the bucket. You can't create multiple copies of an AMI in "
+                "the same S3 bucket.",
+            }
+        },
+        "CreateStoreImageTask",
+    )
+    ec2_calls["DescribeStoreImageTasks"].return_value = _OTHER_ACCOUNTS_TASK
+
+    object_key = _distribution_service().store_ami("eu-west-3", "ami-54321", "322234948118")
+
+    assertpy.assert_that(object_key).is_equal_to("ami-54321.bin")
+
+
+@pytest.mark.parametrize("own_credentials", [False, True])
+def test_store_ami_status_is_completed_when_the_object_is_in_the_bucket_but_the_task_is_hidden(
+    ec2_calls, own_credentials
+):
+    ec2_calls["DescribeStoreImageTasks"].return_value = _OTHER_ACCOUNTS_TASK
+    ec2_calls["HeadObject"].side_effect = None
+    ec2_calls["HeadObject"].return_value = {"ContentLength": 1}
+
+    status = _distribution_service(own_credentials).get_store_ami_status("eu-west-3", "ami-54321", "322234948118")
+
+    assertpy.assert_that(status).is_equal_to("Completed")
+    ec2_calls["HeadObject"].assert_called_once_with(Bucket=IMPORT_BUCKET, Key="ami-54321.bin")
+
+
+def test_store_ami_status_waits_while_another_accounts_task_hides_this_buckets(ec2_calls):
+    ec2_calls["DescribeStoreImageTasks"].return_value = _OTHER_ACCOUNTS_TASK
+
+    status = _distribution_service().get_store_ami_status("eu-west-3", "ami-54321", "322234948118")
+
+    assertpy.assert_that(status).is_equal_to("InProgress")
+
+
+def test_store_ami_status_raises_when_the_image_has_no_store_at_all(ec2_calls):
+    ec2_calls["DescribeStoreImageTasks"].return_value = {"StoreImageTaskResults": []}
+
+    assertpy.assert_that(_distribution_service().get_store_ami_status).raises(
+        adapter_exception.AdapterException
+    ).when_called_with("eu-west-3", "ami-54321", "322234948118")

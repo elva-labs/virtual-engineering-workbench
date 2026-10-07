@@ -1,5 +1,6 @@
 import json
 import os
+from datetime import datetime, timezone
 from http import HTTPStatus
 from typing import Annotated
 from urllib.parse import unquote
@@ -23,20 +24,13 @@ from app.projects.domain.commands.project_accounts import (
     on_board_project_account_command,
     reonboard_project_account_command,
 )
-from app.projects.domain.commands.projects import (
-    create_project_command,
-    update_project_command,
-)
+from app.projects.domain.commands.projects import create_project_command, update_project_command
 from app.projects.domain.commands.technologies import (
     add_technology,
     delete_technology_command,
     update_technology_command,
 )
-from app.projects.domain.commands.users import (
-    assign_user_command,
-    reassign_user_command,
-    unassign_user_command,
-)
+from app.projects.domain.commands.users import assign_user_command, reassign_user_command, unassign_user_command
 from app.projects.domain.exceptions import domain_exception
 from app.projects.domain.model import enrolment, project_account, project_assignment
 from app.projects.domain.value_objects import (
@@ -154,6 +148,35 @@ def _all_direct_projects(user_id: str) -> tuple[dict, list]:
         seen_tokens.add(token_key)
 
 
+def _record_group_members(user_id: str, groups: list) -> None:
+    """Members who get access through a group binding are known to VEW only from their sign-in. The
+    portal lists programs on every load, so this records them per program for the members list.
+    Best effort: a failed write never stops the listing."""
+    by_project: dict[str, tuple[set, set]] = {}
+    for assignment in groups:
+        group_ids, roles = by_project.setdefault(assignment.projectId, (set(), set()))
+        group_ids.add(assignment.groupId)
+        roles.update(getattr(role, "value", role) for role in assignment.roles)
+    try:
+        dependencies.projects_query_service.forget_group_memberships(user_id, set(by_project))
+    except Exception as error:  # noqa: BLE001 - recording is best effort
+        logger.warning(f"Could not refresh group memberships: {error}")
+    principal = app.context.get("user_principal")
+    seen_at = datetime.now(timezone.utc).isoformat()
+    for project_id, (group_ids, roles) in by_project.items():
+        try:
+            dependencies.projects_query_service.record_group_member(
+                project_id=project_id,
+                user_id=user_id,
+                user_email=getattr(principal, "user_email", None),
+                group_ids=sorted(group_ids),
+                roles=sorted(roles),
+                seen_at=seen_at,
+            )
+        except Exception as error:  # noqa: BLE001 - recording is best effort
+            logger.warning(f"Could not record group member for {project_id}: {error}")
+
+
 def _add_group_projects(all_projects: dict, inventory_projects: dict, groups: list) -> None:
     for assignment in groups:
         if assignment.projectId in all_projects:
@@ -192,6 +215,7 @@ def get_projects(
     all_projects.update(direct_projects)
 
     groups = dependencies.projects_query_service.get_group_assignments(trusted_groups)
+    _record_group_members(user_principal_name, groups)
     _add_group_projects(all_projects, inventory_projects, groups)
 
     roles_by_project = effective_roles(direct_assignments, groups)
@@ -456,12 +480,21 @@ def get_project_users(
         dependencies.user_directory_service,
     )
 
+    # Members through a group binding, from their sign-ins; only groups still bound count.
+    bound = {a.groupId for a in dependencies.projects_query_service.list_project_group_assignments(project_id)}
+    group_members = []
+    for member in dependencies.projects_query_service.list_group_members(project_id):
+        group_ids = [group_id for group_id in member.get("groupIds", []) if group_id in bound]
+        if group_ids and member.get("userId"):
+            group_members.append(api_model.ProjectGroupMember.model_validate({**member, "groupIds": group_ids}))
+
     return api_gateway.Response(
         status_code=HTTPStatus.OK,
         body=api_model.GetProjectAssignmentsResponse(
             assignments=[
                 api_model.GetProjectAssignmentsResponseItem.model_validate(a.model_dump()) for a in assignments
             ],
+            groupMembers=group_members,
         ),
         content_type=content_types.APPLICATION_JSON,
     )

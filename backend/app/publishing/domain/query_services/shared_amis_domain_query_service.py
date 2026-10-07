@@ -96,8 +96,11 @@ class SharedAMIsDomainQueryService:
         self,
         region: region_value_object.RegionValueObject,
         source_ami_id: ami_id_value_object.AmiIdValueObject,
+        aws_account_id: aws_account_id_value_object.AWSAccountIDValueObject | None = None,
     ) -> bool:
-        store_status = self._image_svc.get_store_ami_status(region.value, source_ami_id.value)
+        store_status = self._image_svc.get_store_ami_status(
+            region.value, source_ami_id.value, aws_account_id.value if aws_account_id else None
+        )
         if store_status == "Completed":
             return True
         elif store_status == "InProgress":

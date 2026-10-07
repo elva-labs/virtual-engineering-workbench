@@ -182,8 +182,10 @@ class EC2ImageService(image_service.ImageService):
         tasks = [t for t in tasks if bucket is None or t.get("Bucket") == bucket]
         return tasks[0] if tasks else None  # newest first
 
-    def get_store_ami_status(self, region: str, source_ami_id: str) -> str:
-        task = self._store_task(self._store_ec2_client(region), source_ami_id)
+    def get_store_ami_status(self, region: str, source_ami_id: str, aws_account_id: str | None = None) -> str:
+        # The task for the target account's bucket: one image can be stored into several accounts at once.
+        bucket = self.import_bucket(aws_account_id, region) if aws_account_id else None
+        task = self._store_task(self._store_ec2_client(region), source_ami_id, bucket)
         if not task:
             raise adapter_exception.AdapterException(f"No store task found for image {source_ami_id}.")
         if task.get("StoreTaskState") == "Failed":

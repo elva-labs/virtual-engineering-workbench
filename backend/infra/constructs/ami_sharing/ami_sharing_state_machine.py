@@ -379,6 +379,7 @@ class AmiSharingStateMachine(constructs.Construct):
                 "eventType": "VerifyStoreRequest",
                 "sourceAmiId.$": "$.copiedAmi.copiedAmiId",
                 "region.$": "$.decideActionResponse.region",
+                "awsAccountId.$": "$.awsAccountId",
             },
             {"isStoreVerified.$": "$.Payload.isStoreVerified"},
             "$.verifyStoreResponse",

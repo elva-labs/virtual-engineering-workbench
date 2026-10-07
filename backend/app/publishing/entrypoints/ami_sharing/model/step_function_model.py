@@ -59,6 +59,7 @@ class VerifyStoreRequest(BaseModel):
     event_type: str = Field("VerifyStoreRequest", alias="eventType")
     source_ami_id: str = Field(..., alias="sourceAmiId")
     region: str = Field(..., alias="region")
+    aws_account_id: str | None = Field(None, alias="awsAccountId")
 
 
 class VerifyStoreResponse(BaseModel):

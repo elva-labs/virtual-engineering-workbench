@@ -78,6 +78,8 @@ class ProvisionedProduct(unit_of_work.Entity):
     userDomains: list[str] = Field(..., title="UserDomains")
     status: product_status.ProductStatus = Field(..., title="Status")
     statusReason: str | None = Field(None, title="StatusReason")
+    # the operation whose failure statusReason explains (LAUNCH, START, UPDATE, REMOVE).
+    failedOperation: str | None = Field(None, title="FailedOperation")
     productId: str = Field(..., title="ProductId")
     productName: str = Field(..., title="ProductName")
     productDescription: Optional[str] = Field(None, title="ProductDescription")

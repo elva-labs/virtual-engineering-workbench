@@ -124,7 +124,10 @@ def __update_associated_recipes_versions_list(
                     logger=logger,
                 )
                 break
-            except repository_exception.ConditionalCheckFailedException:
+            except (
+                repository_exception.ConditionalCheckFailedException,
+                repository_exception.TransactionConflictException,
+            ):
                 if attempt == WRITE_ATTEMPTS:
                     raise
                 logger.info(

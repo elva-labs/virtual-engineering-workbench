@@ -21,6 +21,28 @@ def _draft4(schema):
     return jsonschema.Draft4Validator(schema)
 
 
+def _as_api_gateway(node):
+    """The draft 4 model API Gateway builds from a schema: it adds the `type` that `items` or `properties`
+    imply. Observed in deployed models: `{nullable, items}` without `type` came back as
+    `{"type": "array", "items": ...}` (for example the packaging S2S UpdatePipelineRequest.buildInstanceTypes)
+    and refused null."""
+    if isinstance(node, dict):
+        result = {key: _as_api_gateway(value) for key, value in node.items()}
+        if "type" not in result and "$ref" not in result:
+            if "items" in result:
+                result["type"] = "array"
+            elif "properties" in result:
+                result["type"] = "object"
+        return result
+    if isinstance(node, list):
+        return [_as_api_gateway(item) for item in node]
+    return node
+
+
+def _api_gateway(schema):
+    return _draft4(_as_api_gateway(accept_null_in_nullable_fields(schema)))
+
+
 @pytest.mark.parametrize(
     "schema,value",
     [
@@ -34,11 +56,18 @@ def _draft4(schema):
     ],
 )
 def test_nullable_schema_accepts_null_and_its_values(schema, value):
-    rewritten = accept_null_in_nullable_fields(schema)
+    assert _draft4(_as_api_gateway(schema)).is_valid(None) is False  # what API Gateway does without the rewrite
+    assert _api_gateway(schema).is_valid(None)
+    assert _api_gateway(schema).is_valid(value)
 
-    assert _draft4(schema).is_valid(None) is False  # what API Gateway does without the rewrite
-    assert _draft4(rewritten).is_valid(None)
-    assert _draft4(rewritten).is_valid(value)
+
+def test_a_nullable_array_without_type_is_still_an_array_to_api_gateway():
+    # Removing `type` alone leaves `items`, from which API Gateway infers it again.
+    schema = {"type": "array", "nullable": True, "items": {"type": "string"}}
+    only_type_removed = {"items": {"type": "string"}}
+
+    assert _draft4(_as_api_gateway(only_type_removed)).is_valid(None) is False
+    assert _api_gateway(schema).is_valid(None)
 
 
 @pytest.mark.parametrize(
@@ -46,12 +75,23 @@ def test_nullable_schema_accepts_null_and_its_values(schema, value):
     [
         ({"type": "string", "nullable": True, "maxLength": 3}, "abcd"),
         ({"type": "integer", "nullable": True, "minimum": 1}, 0),
+    ],
+)
+def test_constraints_on_non_null_values_still_apply(schema, invalid):
+    assert _api_gateway(schema).is_valid(invalid) is False
+
+
+@pytest.mark.parametrize(
+    "schema,value",
+    [
         ({"type": "array", "nullable": True, "items": {"type": "string"}}, [1]),
         ({"type": "object", "nullable": True, "properties": {"a": {"type": "string"}}}, {"a": 1}),
     ],
 )
-def test_constraints_on_non_null_values_still_apply(schema, invalid):
-    assert _draft4(accept_null_in_nullable_fields(schema)).is_valid(invalid) is False
+def test_nullable_arrays_and_objects_leave_their_contents_to_the_handler(schema, value):
+    # Their structural keywords would make API Gateway infer a type that refuses null, so the gateway
+    # accepts any value and the handler's pydantic model checks it.
+    assert _api_gateway(schema).is_valid(value)
 
 
 def test_rewrite_only_removes_keywords():
@@ -106,15 +146,19 @@ def _nullable_fields(schema, components, path, seen):  # noqa: C901
             return
         if schema.get("nullable") is True:
             yield path, schema
-        for key, value in schema.items():
-            if key == "properties":
-                for name, child in value.items():
-                    yield from _nullable_fields(child, components, f"{path}.{name}", seen)
-            elif key in ("items", "additionalProperties") and isinstance(value, dict):
-                yield from _nullable_fields(value, components, f"{path}[]", seen)
-            elif key in ("allOf", "anyOf", "oneOf"):
-                for child in value:
-                    yield from _nullable_fields(child, components, path, seen)
+        for child_path, child in _children(schema, path):
+            yield from _nullable_fields(child, components, child_path, seen)
+
+
+def _children(schema, path):
+    """(path, schema) of the subschemas a schema nests: properties, items and the combinators."""
+    for key, value in schema.items():
+        if key == "properties":
+            yield from ((f"{path}.{name}", child) for name, child in value.items())
+        elif key in ("items", "additionalProperties") and isinstance(value, dict):
+            yield f"{path}[]", value
+        elif key in ("allOf", "anyOf", "oneOf"):
+            yield from ((path, child) for child in value)
 
 
 def _cases():
@@ -129,8 +173,8 @@ def _cases():
 
 @pytest.mark.parametrize("schema", list(_cases()))
 def test_every_nullable_request_field_accepts_null(schema):
-    # The field's schema as API Gateway receives it (the rewrite is local to each schema node).
-    assert _draft4(accept_null_in_nullable_fields(schema)).is_valid(None)
+    # The field's schema as API Gateway models it (the rewrite is local to each schema node).
+    assert _api_gateway(schema).is_valid(None)
 
 
 @pytest.mark.parametrize("schema_path", SCHEMAS, ids=lambda p: p.name)

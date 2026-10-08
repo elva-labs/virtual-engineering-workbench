@@ -60,6 +60,37 @@ class ServiceCatalogProductsService(products_service.ProductsService):
 
         return False
 
+    def has_provisioned_product_unsupported_instance_type_error(
+        self,
+        provisioned_product_id: str,
+        user_id: str,
+        aws_account_id: str,
+        region: str,
+        provisioned_instance_type: str | None,
+    ) -> bool:
+        if not provisioned_instance_type:
+            return False
+        stack_events = self.__get_stack_events(
+            provisioned_product_id=provisioned_product_id,
+            user_id=user_id,
+            aws_account_id=aws_account_id,
+            region=region,
+        )
+        return any(
+            self.__is_unsupported_instance_type_reason(e.get("ResourceStatusReason"), provisioned_instance_type)
+            for e in stack_events or []
+        )
+
+    @staticmethod
+    def __is_unsupported_instance_type_reason(status_reason: str | None, instance_type: str) -> bool:
+        """EC2 Unsupported: 'Your requested instance type (g6.xlarge) is not supported in your requested
+        Availability Zone (eu-north-1c)'."""
+        if not status_reason or instance_type not in status_reason:
+            return False
+        return "not supported in your requested Availability Zone" in status_reason or (
+            "Unsupported" in status_reason and "Availability Zone" in status_reason
+        )
+
     @staticmethod
     def __is_insufficient_capacity_reason(status_reason: str | None, instance_type: str) -> bool:
         if not status_reason:

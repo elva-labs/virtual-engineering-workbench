@@ -35,6 +35,11 @@ class DynamoDBContext:
                     raise repository_exception.ConditionalCheckFailedException(
                         "A condition of the DynamoDB transaction did not hold."
                     ) from e
+                if any(reason.get("Code") == "TransactionConflict" for reason in cancellation_reasons):
+                    self._db_items = []
+                    raise repository_exception.TransactionConflictException(
+                        "Another transaction was writing an item of this one."
+                    ) from e
             else:
                 self._logger.exception("An error occurred during the transaction.")
             raise repository_exception.RepositoryException("Failed to commit a transaction to DynamoDB.") from e

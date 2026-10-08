@@ -71,6 +71,17 @@ def handle(
         if test_status == component_version_test_execution.ComponentVersionTestStatus.Success
         else component_version.ComponentVersionStatus.Failed
     )
+    # A late or duplicate test run (a retried creation event starts a second one) must not take a released
+    # or retired version back to VALIDATED: the recipe release then refuses it as unreleased (2026-10-08).
+    current_entity = component_version_qry_srv.get_component_version(
+        component_id=command.componentId.value, version_id=command.componentVersionId.value
+    )
+    if current_entity is not None and current_entity.status in (
+        component_version.ComponentVersionStatus.Released,
+        component_version.ComponentVersionStatus.Retired,
+    ):
+        return test_status
+
     # Finally we update the component version status
     with uow:
         uow.get_repository(

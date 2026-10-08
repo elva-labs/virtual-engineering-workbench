@@ -3,6 +3,8 @@ ADMIN on every project, and the authorizer passes the sign-in's groups on to the
 
 from unittest import mock
 
+import pytest
+
 from app.authorization.domain.ports import assignments_query_service
 from app.authorization.domain.read_models import project_assignment, project_group_assignment, project_settings
 from app.authorization.domain.services.auth import authorizer, authorizer_steps
@@ -97,3 +99,25 @@ def test_authorizer_passes_the_groups_on():
     ).authorize(_request({}))
 
     assert result["context"]["userGroups"] == f'["{G_USERS}"]'
+
+
+# A platform admin acting without an own admin role is marked, so backends record writes as such.
+
+
+def test_a_platform_admin_without_an_own_admin_role_is_marked():
+    context = _enrich(_query_service(assignments=[_direct(roles=["PLATFORM_USER"])]), _context([G_PLATFORM]))
+
+    assert context.platform_admin_access is True
+
+
+@pytest.mark.parametrize("own_role", ["ADMIN", "PROGRAM_OWNER"])
+def test_a_platform_admin_with_an_own_admin_role_is_not_marked(own_role):
+    context = _enrich(_query_service(grants=[_grant(G_USERS, own_role)]), _context([G_USERS, G_PLATFORM]))
+
+    assert context.platform_admin_access is False
+
+
+def test_an_ordinary_user_is_not_marked():
+    context = _enrich(_query_service(assignments=[_direct(roles=["PROGRAM_OWNER"])]), _context([G_USERS]))
+
+    assert context.platform_admin_access is False

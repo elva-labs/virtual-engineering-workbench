@@ -1,7 +1,12 @@
 import { provisioningAPI } from '../services';
+import { isPermissionError, permissionMessage } from './api-errors';
 
 /* eslint @typescript-eslint/explicit-module-boundary-types: off, @typescript-eslint/no-explicit-any: off */
 export async function extractErrorResponseMessage(e: any): Promise<string> {
+  // The authorizer's refusal says what's missing, not the gateway's explicit-deny text.
+  if (isPermissionError(e)) {
+    return permissionMessage();
+  }
   if (e.response && e.response instanceof Response) {
     const resp = await e.response.clone().json();
     return resp.message;

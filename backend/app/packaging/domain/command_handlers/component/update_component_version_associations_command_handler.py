@@ -109,7 +109,10 @@ def __update_associations(
                 )
                 uow.commit()
             return
-        except repository_exception.ConditionalCheckFailedException:
+        except (
+            repository_exception.ConditionalCheckFailedException,
+            repository_exception.TransactionConflictException,
+        ):
             if attempt == WRITE_ATTEMPTS:
                 raise
             logger.info(

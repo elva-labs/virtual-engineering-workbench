@@ -338,3 +338,43 @@ def test_handle_should_remove_old_associations_for_previous_component_version(
         expected=mock.ANY,
     )
     uow_mock.commit.assert_called()
+
+
+@mock.patch("time.sleep", mock.Mock())
+def test_handle_should_retry_after_a_transaction_conflict(
+    update_component_version_associations_command_mock,
+    component_version_query_service_mock,
+    get_test_component_version_with_specific_component_id_version_name_and_status,
+):
+    # ARRANGE: parallel component creations write the same dependency (the base) at once; DynamoDB
+    # cancels one transaction with TransactionConflict (2026-10-08, base 1.0.8)
+    from app.shared.adapters.unit_of_work_v2 import repository_exception
+
+    component_version_repo_mock = mock.create_autospec(spec=unit_of_work.GenericRepository)
+    repos_dict = {component_version.ComponentVersion: component_version_repo_mock}
+    uow_mock = mock.create_autospec(spec=unit_of_work.UnitOfWork)
+    uow_mock.get_repository.side_effect = lambda _, x: repos_dict.get(x)
+    uow_mock.commit.side_effect = [repository_exception.TransactionConflictException("conflict"), None]
+
+    def entity(component_id, version_id):
+        return get_test_component_version_with_specific_component_id_version_name_and_status(
+            component_id=component_id,
+            component_version_id=version_id,
+            version_name="1.0.0",
+            status=component_version.ComponentVersionStatus.Created,
+        )
+
+    component_version_query_service_mock.get_component_version.side_effect = lambda component_id, version_id: entity(
+        component_id, version_id
+    )
+
+    # ACT
+    update_component_version_associations_command_handler.handle(
+        command=update_component_version_associations_command_mock(),
+        component_version_qry_srv=component_version_query_service_mock,
+        logger=mock.create_autospec(spec=logging.Logger),
+        uow=uow_mock,
+    )
+
+    # ASSERT: the write was read again and committed on the second attempt
+    assertpy.assert_that(uow_mock.commit.call_count).is_equal_to(2)

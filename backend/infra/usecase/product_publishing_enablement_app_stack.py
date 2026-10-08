@@ -613,6 +613,8 @@ class ProductPublishingEnablementAppStack(Stack):
                         "ecs:DescribeTasks",
                         "ecs:DescribeServices",
                         "ecs:ListTasks",
+                        # a launch only tries AZs that offer the instance type.
+                        "ec2:DescribeInstanceTypeOfferings",
                     ],
                     resources=["*"],
                 ),
@@ -800,6 +802,7 @@ class ProductPublishingEnablementAppStack(Stack):
                     effect=iam.Effect.ALLOW,
                     actions=["ecs:StopTask"],
                     resources=[f"arn:{Aws.PARTITION}:ecs:{Aws.REGION}:{Aws.ACCOUNT_ID}:task/SC-*/*"],
+                ),
                 # The hub's idle decision reads the workbench agents' signals (namespace
                 # VEW/Workbench). GetMetricData has no resource-level permissions; it only reads metrics.
                 iam.PolicyStatement(

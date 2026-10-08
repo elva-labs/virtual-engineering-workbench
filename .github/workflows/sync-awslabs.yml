@@ -1,0 +1,72 @@
+name: Sync awslabs
+
+on:
+  schedule:
+    - cron: "17 6 * * 1" # weekly, Monday at 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-awslabs
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.repository == 'elva-labs/virtual-engineering-workbench'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      # A bare repository preserves upstream history without checking out or
+      # executing upstream code. No external actions or additional secrets.
+      - name: Create or fast-forward awslabs from official upstream main
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          sync_dir=$(mktemp -d "$RUNNER_TEMP/awslabs-sync.XXXXXX")
+          trap 'rm -rf "$sync_dir"' EXIT
+          git init --bare "$sync_dir"
+          cd "$sync_dir"
+
+          git remote add upstream https://github.com/awslabs/virtual-engineering-workbench.git
+          destination_url=https://github.com/elva-labs/virtual-engineering-workbench.git
+          git remote add origin "$destination_url"
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          echo "::add-mask::$auth"
+          git config "http.${destination_url}.extraheader" "AUTHORIZATION: basic $auth"
+          unset GH_TOKEN auth
+
+          # Fetch full history of precisely the official refs/heads/main.
+          git fetch --no-tags upstream refs/heads/main:refs/remotes/upstream/main
+          upstream_sha=$(git rev-parse refs/remotes/upstream/main)
+
+          if git ls-remote --exit-code origin refs/heads/awslabs; then
+            git fetch --no-tags origin refs/heads/awslabs:refs/remotes/origin/awslabs
+            destination_sha=$(git rev-parse refs/remotes/origin/awslabs)
+            if [ "$destination_sha" = "$upstream_sha" ]; then
+              echo "awslabs already matches upstream main at $upstream_sha."
+              exit 0
+            fi
+            if ! git merge-base --is-ancestor "$destination_sha" "$upstream_sha"; then
+              echo "::error::awslabs ($destination_sha) is ahead of or diverged from upstream main ($upstream_sha); refusing to overwrite."
+              exit 1
+            fi
+          else
+            status=$?
+            if [ "$status" -ne 2 ]; then
+              echo "::error::Cannot inspect origin awslabs (git exit $status); refusing to push."
+              exit "$status"
+            fi
+          fi
+
+          # A normal push also rejects a concurrent non-fast-forward update.
+          if ! git push origin "${upstream_sha}:refs/heads/awslabs"; then
+            echo "::error::awslabs push rejected; check for a concurrent update, branch protection, or token permissions. No force push was attempted."
+            exit 1
+          fi
+          echo "awslabs synced to upstream main at $upstream_sha."

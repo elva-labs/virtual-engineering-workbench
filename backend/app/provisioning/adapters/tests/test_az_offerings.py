@@ -81,9 +81,9 @@ def test_offerings_fail_open_when_ec2_refuses():
 
 
 UNSUPPORTED = (
-    "Resource handler returned message: \"Your requested instance type (g6.xlarge) is not supported in your "
+    'Resource handler returned message: "Your requested instance type (g6.xlarge) is not supported in your '
     "requested Availability Zone (eu-north-1c). Please retry your request by not specifying an Availability "
-    "Zone or choosing eu-north-1a, eu-north-1b. (Service: Ec2, Status Code: 400, Request ID: 1)\""
+    'Zone or choosing eu-north-1a, eu-north-1b. (Service: Ec2, Status Code: 400, Request ID: 1)"'
 )
 
 
@@ -92,7 +92,11 @@ UNSUPPORTED = (
     [
         (UNSUPPORTED, "g6.xlarge", True),
         (UNSUPPORTED, "m7i.xlarge", False),
-        ("We currently do not have sufficient g6.xlarge capacity in the Availability Zone you requested", "g6.xlarge", False),
+        (
+            "We currently do not have sufficient g6.xlarge capacity in the Availability Zone you requested",
+            "g6.xlarge",
+            False,
+        ),
         (None, "g6.xlarge", False),
     ],
 )

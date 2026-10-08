@@ -64,7 +64,13 @@ def _provision(deps, product):
 
 
 def _deps(
-    mock_publisher, mock_products_srv, mock_provisioned_products_qs, mock_parameter_srv, mock_instance_mgmt_srv, mock_logger, mock_unit_of_work
+    mock_publisher,
+    mock_products_srv,
+    mock_provisioned_products_qs,
+    mock_parameter_srv,
+    mock_instance_mgmt_srv,
+    mock_logger,
+    mock_unit_of_work,
 ):
     return {
         "publisher": mock_publisher,
@@ -98,8 +104,13 @@ def test_launch_skips_an_az_that_does_not_offer_the_instance_type(
     mock_user_profile_repo.get.return_value = None  # no preferred AZ: pick by free addresses
     mock_instance_mgmt_srv.get_offered_availability_zones.return_value = {"az-1", "az-2"}
     deps = _deps(
-        mock_publisher, mock_products_srv, mock_provisioned_products_qs, mock_parameter_srv,
-        mock_instance_mgmt_srv, mock_logger, mock_unit_of_work,
+        mock_publisher,
+        mock_products_srv,
+        mock_provisioned_products_qs,
+        mock_parameter_srv,
+        mock_instance_mgmt_srv,
+        mock_logger,
+        mock_unit_of_work,
     )
 
     _provision(deps, get_provisioned_product(provisioning_parameters=_params()))
@@ -129,8 +140,13 @@ def test_launch_uses_every_subnet_when_the_offerings_are_unknown(
     mock_user_profile_repo.get.return_value = None  # no preferred AZ: pick by free addresses
     mock_instance_mgmt_srv.get_offered_availability_zones.return_value = None
     deps = _deps(
-        mock_publisher, mock_products_srv, mock_provisioned_products_qs, mock_parameter_srv,
-        mock_instance_mgmt_srv, mock_logger, mock_unit_of_work,
+        mock_publisher,
+        mock_products_srv,
+        mock_provisioned_products_qs,
+        mock_parameter_srv,
+        mock_instance_mgmt_srv,
+        mock_logger,
+        mock_unit_of_work,
     )
 
     _provision(deps, get_provisioned_product(provisioning_parameters=_params()))
@@ -155,8 +171,13 @@ def test_launch_fails_as_unsupported_when_no_az_offers_the_instance_type(
     mock_user_profile_repo.get.return_value = None  # no preferred AZ: pick by free addresses
     mock_instance_mgmt_srv.get_offered_availability_zones.return_value = {"az-9"}
     deps = _deps(
-        mock_publisher, mock_products_srv, mock_provisioned_products_qs, mock_parameter_srv,
-        mock_instance_mgmt_srv, mock_logger, mock_unit_of_work,
+        mock_publisher,
+        mock_products_srv,
+        mock_provisioned_products_qs,
+        mock_parameter_srv,
+        mock_instance_mgmt_srv,
+        mock_logger,
+        mock_unit_of_work,
     )
 
     _provision(deps, get_provisioned_product(provisioning_parameters=_params("p5.48xlarge")))
@@ -185,8 +206,13 @@ def test_launch_moves_on_to_an_untried_az_even_when_tried_azs_are_no_longer_elig
     # az-3 failed before the offerings were known; az-1 failed on capacity; az-2 is still untried.
     mock_instance_mgmt_srv.get_offered_availability_zones.return_value = {"az-1", "az-2"}
     deps = _deps(
-        mock_publisher, mock_products_srv, mock_provisioned_products_qs, mock_parameter_srv,
-        mock_instance_mgmt_srv, mock_logger, mock_unit_of_work,
+        mock_publisher,
+        mock_products_srv,
+        mock_provisioned_products_qs,
+        mock_parameter_srv,
+        mock_instance_mgmt_srv,
+        mock_logger,
+        mock_unit_of_work,
     )
 
     _provision(
@@ -212,8 +238,13 @@ def test_all_azs_tried_fails_as_capacity_unless_every_one_was_unsupported(
 ):
     mock_user_profile_repo.get.return_value = None  # no preferred AZ: pick by free addresses
     deps = _deps(
-        mock_publisher, mock_products_srv, mock_provisioned_products_qs, mock_parameter_srv,
-        mock_instance_mgmt_srv, mock_logger, mock_unit_of_work,
+        mock_publisher,
+        mock_products_srv,
+        mock_provisioned_products_qs,
+        mock_parameter_srv,
+        mock_instance_mgmt_srv,
+        mock_logger,
+        mock_unit_of_work,
     )
     tried = ["az-3", "az-2", "az-1"]
 

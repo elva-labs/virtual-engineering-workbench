@@ -15,7 +15,6 @@ from app.provisioning.domain.model import (
 )
 from app.provisioning.domain.ports import instance_management_service
 
-
 # which AZs offer an instance type changes rarely; one lookup per account, region and type
 # every few hours is enough, and it is shared by every invocation the Lambda container serves.
 OFFERINGS_TTL_SECONDS = 6 * 60 * 60

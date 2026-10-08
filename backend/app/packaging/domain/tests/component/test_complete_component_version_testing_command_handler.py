@@ -257,3 +257,55 @@ def test_handle_should_set_component_version_status_to_failed_if_testing_fails(
         ),
         status=component_version.ComponentVersionStatus.Failed,
     )
+
+
+@pytest.mark.parametrize(
+    "current_status",
+    (component_version.ComponentVersionStatus.Released, component_version.ComponentVersionStatus.Retired),
+)
+def test_handle_should_keep_a_released_or_retired_version_when_a_late_test_completes(
+    complete_component_version_testing_command_mock,
+    component_query_service_mock,
+    component_version_test_execution_query_service_mock,
+    component_version_testing_service_mock,
+    generic_repo_mock,
+    get_test_component_with_specific_platform_architecture_and_os_version,
+    get_test_component_version_test_execution_with_specific_instance_id_and_test_command_status,
+    uow_mock,
+    component_version_query_service_mock,
+    message_bus_mock,
+    get_test_component_version,
+    current_status,
+):
+    # ARRANGE: a duplicate test run (a retried creation event) finishes after Terraform released the version.
+    component_query_service_mock.get_component.return_value = (
+        get_test_component_with_specific_platform_architecture_and_os_version(
+            platform="Linux", supported_architectures=["amd64"], supported_os_versions=["Ubuntu 24"]
+        )
+    )
+    component_version_test_execution_query_service_mock.get_component_version_test_executions_by_test_execution_id.return_value = [
+        get_test_component_version_test_execution_with_specific_instance_id_and_test_command_status(
+            instance_id="i-01234567890abcdef",
+            test_command_status=component_version_test_execution.ComponentVersionTestExecutionCommandStatus.Success,
+        )
+    ]
+    released = get_test_component_version.model_copy(update={"status": current_status})
+    component_version_query_service_mock.get_component_version.return_value = released
+
+    # ACT
+    complete_component_version_testing_command_handler.handle(
+        command=complete_component_version_testing_command_mock,
+        component_qry_srv=component_query_service_mock,
+        component_version_test_execution_qry_srv=component_version_test_execution_query_service_mock,
+        component_version_testing_srv=component_version_testing_service_mock,
+        component_version_qry_srv=component_version_query_service_mock,
+        uow=uow_mock,
+        message_bus=message_bus_mock,
+    )
+
+    # ASSERT: the test instance is torn down, the status stays and no recipe update is requested
+    component_version_testing_service_mock.teardown_testing_environment.assert_any_call(
+        instance_id="i-01234567890abcdef"
+    )
+    generic_repo_mock.update_attributes.assert_not_called()
+    message_bus_mock.publish.assert_not_called()

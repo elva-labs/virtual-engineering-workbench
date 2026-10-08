@@ -42,6 +42,44 @@ git switch -c contribution/my-change origin/awslabs
 
 Keep each contribution focused and submit it to official upstream `main`. For Elva changes, start from Elva's `main`.
 
+### Rebase Elva's main onto awslabs
+
+Work in a clean, separate checkout. Fetch `origin`, record the exact current `origin/main` SHA,
+and push a backup branch pointing to it before starting. Leave local deployment configuration
+and unrelated uncommitted work in their existing checkout.
+Use a unique backup and sync branch name for each run.
+
+```sh
+git fetch origin
+git branch backup/main-before-upstream-sync origin/main
+git push origin backup/main-before-upstream-sync
+git switch -c sync/awslabs-main origin/main
+git rebase --rebase-merges=rebase-cousins origin/awslabs
+```
+
+This retains the feature/PR merge structure while moving the feature branches onto upstream.
+Git may drop a patch already present upstream. Review each conflict: retain Elva's behavior
+and combine it with upstream fixes. Earlier merge resolutions can need applying again.
+Compare the final tree with a separately resolved merge of the original main and awslabs
+to verify that the rebase has not lost any fork changes.
+
+Run the backend tests and both frontend checks/builds before publishing. Since a rebase rewrites
+shared history, coordinate the change with maintainers and existing feature-branch owners.
+Publish only after review, with a lease against the original main SHA:
+
+```sh
+git push --force-with-lease=refs/heads/main:<original-main-sha> origin HEAD:refs/heads/main
+```
+
+If the lease fails, fetch and account for the new main commits; do not override it with a plain
+force push. Existing checkouts and open feature branches may need rebasing after main is updated.
+Keep the backup until those branches have been reconciled.
+
+For an upstream contribution, start from `awslabs` as above and cherry-pick only the relevant
+feature commits. If a commit mixes fork-specific and upstream changes, prepare a focused new
+commit on that contribution branch. A branch containing all Elva customizations is not an
+upstream contribution branch.
+
 ## Contributing via Pull Requests
 Contributions via pull requests are much appreciated. Before sending us a pull request, please ensure that:
 

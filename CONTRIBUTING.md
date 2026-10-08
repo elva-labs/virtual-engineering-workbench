@@ -20,6 +20,28 @@ reported the issue. Please try to include as much information as you can. Detail
 * Anything unusual about your environment or deployment
 
 
+## Elva and upstream branches
+
+In `elva-labs/virtual-engineering-workbench`, `main` is Elva's default working branch, including Elva's changes.
+`awslabs` preserves the exact commit history of [official upstream `main`](https://github.com/awslabs/virtual-engineering-workbench/tree/main).
+The **Sync awslabs** workflow creates or fast-forwards only `awslabs` every Monday at 06:17 UTC, or manually via
+**Actions → Sync awslabs → Run workflow**. Matching heads are a no-op; divergence fails for a maintainer to investigate.
+It never integrates changes into Elva's `main`.
+
+The workflow must first be reviewed and merged into `main` for scheduled and manual runs to be available.
+If GitHub disables Actions or the workflow on this fork, an owner must enable it in Actions before syncing can run.
+GitHub also disables scheduled workflows in public repositories after 60 days without repository activity; re-enable
+the workflow if that happens. A local Git upstream remote alone does not synchronize the remote `awslabs` branch.
+
+For individual upstream contributions, fetch `origin` and create a separate branch from `awslabs`:
+
+```sh
+git fetch origin
+git switch -c contribution/my-change origin/awslabs
+```
+
+Keep each contribution focused and submit it to official upstream `main`. For Elva changes, start from Elva's `main`.
+
 ## Contributing via Pull Requests
 Contributions via pull requests are much appreciated. Before sending us a pull request, please ensure that:
 

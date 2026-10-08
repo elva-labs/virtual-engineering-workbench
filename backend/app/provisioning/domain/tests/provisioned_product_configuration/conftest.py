@@ -176,6 +176,7 @@ def mock_system_command_service():
 @pytest.fixture
 def mock_instance_mgmt_service():
     instance_mgmt_srv = mock.create_autospec(spec=instance_management_service.InstanceManagementService)
+    instance_mgmt_srv.get_offered_availability_zones.return_value = None  # offerings unknown
     instance_mgmt_srv.get_instance_state.return_value = product_status.EC2InstanceState.Running
     instance_mgmt_srv.get_instance_details.return_value = instance_details.InstanceDetails(
         State=instance_details.InstanceState(Name=product_status.EC2InstanceState.Running),

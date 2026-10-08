@@ -52,6 +52,12 @@ class InstanceManagementService(ABC):
         self, user_id: str, aws_account_id: str, region: str, vpc_id: str
     ) -> list[network_route_table.NetworkRouteTable]: ...
 
+    def get_offered_availability_zones(
+        self, user_id: str, aws_account_id: str, region: str, instance_type: str
+    ) -> set[str] | None:
+        """the account's AZ names that offer the instance type; None when it can't be told."""
+        return None
+
     @abstractmethod
     def describe_vpc_subnets(
         self, user_id: str, aws_account_id: str, region: str, vpc_id: str

@@ -13,6 +13,7 @@ def test_get_provisioning_subnets_in_account_should_use_subnet_selector_to_filte
     ps_mock = mock.create_autospec(spec=parameter_service.ParameterService)
     ps_mock.get_parameter_value.return_value = "vpc-123"
     im_mock = mock.create_autospec(spec=instance_management_service.InstanceManagementService)
+    im_mock.get_offered_availability_zones.return_value = None  # offerings unknown
     im_mock.describe_vpc_subnets.return_value = [
         network_subnet.NetworkSubnet(
             AvailabilityZone="test-az",

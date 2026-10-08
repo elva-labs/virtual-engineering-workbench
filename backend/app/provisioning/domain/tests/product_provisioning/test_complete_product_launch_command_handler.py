@@ -27,6 +27,7 @@ from app.provisioning.domain.value_objects import provisioned_product_id_value_o
 @pytest.fixture()
 def mock_instance_mgmt_service(get_test_block_device_mappings):
     svc = mock.create_autospec(spec=instance_management_service.InstanceManagementService)
+    svc.get_offered_availability_zones.return_value = None  # offerings unknown
     svc.get_instance_state.return_value = "running"
     svc.get_instance_platform.return_value = "Windows"
     svc.get_block_device_mappings.return_value = get_test_block_device_mappings()

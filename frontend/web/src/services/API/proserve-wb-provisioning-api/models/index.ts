@@ -43,3 +43,4 @@ export * from './WorkbenchLifecycleEffective';
 export * from './WorkbenchLifecyclePermissions';
 export * from './WorkbenchLifecycleResponse';
 export * from './WorkbenchLifecycleUserSettings';
+export * from './WorkbenchFailure';

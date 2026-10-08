@@ -26,6 +26,9 @@ import { useCommonProvisionedProduct } from './common.logic.ts';
 import { ServiceAPI } from '../../../services';
 import { CompareDates } from '../shared/compare-dates.tsx';
 import { statusRefreshInterval } from './status-refresh.ts';
+import { useWorkbenchFailureNotifications } from './workbench-failure.logic.ts';
+
+const NO_PRODUCTS: ProvisionedProduct[] = [];
 
 export const fetchKey = (productType: string) =>
   `provisioning/products/${productType}`;
@@ -150,6 +153,7 @@ export function useProvisionedProducts(
         ),
     }
   );
+  useWorkbenchFailureNotifications(data?.provisionedProducts ?? NO_PRODUCTS);
   const targets = data ? data.
     provisionedProducts.
     filter((p) => p.status !== PRODUCT_INSTANCE_STATES.Terminated).

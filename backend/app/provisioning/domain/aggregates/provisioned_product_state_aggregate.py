@@ -126,6 +126,9 @@ class ProvisionedProductStateAggregate(aggregate.Aggregate):
 
         self._provisioned_product.status = product_status.ProductStatus.Starting
         self._provisioned_product.lastUpdatedBy = command.user_id.value
+        # a new attempt; a failure of this start records its own reason.
+        self._provisioned_product.statusReason = None
+        self._provisioned_product.failedOperation = None
         self._publish(
             provisioned_product_start_initiated.ProvisionedProductStartInitiated(
                 provisionedProductId=command.provisioned_product_id.value,

@@ -276,6 +276,7 @@ class WorkbenchLifecycleService:
             raise RuntimeError("Stopping workbenches needs a publisher")
         if reason:
             pp.statusReason = reason
+            pp.failedOperation = None  # an idle stop isn't a failure.
         command = initiate_provisioned_product_stop_command.InitiateProvisionedProductStopCommand(
             provisioned_product_id=provisioned_product_id_value_object.from_str(pp.provisionedProductId),
             project_id=project_id_value_object.from_str(pp.projectId),

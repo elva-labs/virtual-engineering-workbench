@@ -266,6 +266,7 @@ def test_get_provisioned_virtual_target_should_return_virtual_target(
             "stage": provisioned_product.ProvisionedProductStage.QA,
             "status": product_status.ProductStatus.Running,
             "statusReason": None,
+            "failedOperation": None,
             "technologyId": "tech-12345",
             "upgradeAvailable": None,
             "userDomains": ["mock-user-domain"],

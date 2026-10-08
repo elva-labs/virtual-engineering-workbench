@@ -1,3 +1,4 @@
+import time
 import typing
 
 from botocore.exceptions import ClientError
@@ -13,6 +14,11 @@ from app.provisioning.domain.model import (
     network_subnet,
 )
 from app.provisioning.domain.ports import instance_management_service
+
+# which AZs offer an instance type changes rarely; one lookup per account, region and type
+# every few hours is enough, and it is shared by every invocation the Lambda container serves.
+OFFERINGS_TTL_SECONDS = 6 * 60 * 60
+_offerings_cache: dict[tuple[str, str, str], tuple[float, frozenset[str]]] = {}
 
 
 class EC2InstanceManagementService(instance_management_service.InstanceManagementService):
@@ -400,6 +406,29 @@ class EC2InstanceManagementService(instance_management_service.InstanceManagemen
         route_tables.extend(response.get("RouteTables"))
 
         return [network_route_table.NetworkRouteTable.model_validate(rt) for rt in route_tables]
+
+    def get_offered_availability_zones(
+        self, user_id: str, aws_account_id: str, region: str, instance_type: str
+    ) -> set[str] | None:
+        key = (aws_account_id, region, instance_type)
+        cached = _offerings_cache.get(key)
+        if cached and cached[0] > time.monotonic():
+            return set(cached[1])
+        ec2_client = self._ec2_boto_client_provider(aws_account_id, region, user_id)
+        try:
+            zones: set[str] = set()
+            paginator = ec2_client.get_paginator("describe_instance_type_offerings")
+            for page in paginator.paginate(
+                LocationType="availability-zone",
+                Filters=[{"Name": "instance-type", "Values": [instance_type]}],
+            ):
+                zones.update(o["Location"] for o in page.get("InstanceTypeOfferings", []))
+        except ClientError:
+            # Fail open: a spoke whose role predates the permission keeps today's behaviour, and the
+            # launch still moves on from an AZ that answers Unsupported.
+            return None
+        _offerings_cache[key] = (time.monotonic() + OFFERINGS_TTL_SECONDS, frozenset(zones))
+        return zones
 
     def describe_vpc_subnets(
         self, user_id: str, aws_account_id: str, region: str, vpc_id: str

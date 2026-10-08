@@ -127,6 +127,8 @@ class ProvisionedProduct(unit_of_work.Entity):
     osVersion: str | None = Field(None, title="OsVersion")
     blockDeviceMappings: Optional[block_device_mappings.BlockDeviceMappings] = Field(None, title="BlockDeviceMappings")
     availabilityZonesTriggered: Optional[list[str]] = Field(None, title="AvailabilityZonesTriggered")
+    # the tried AZs whose launch failed because EC2 doesn't offer the instance type there.
+    availabilityZonesUnsupported: Optional[list[str]] = Field(None, title="AvailabilityZonesUnsupported")
     userIpAddress: Optional[str] = Field(None, title="UserIpAddress")
     provisionedCompoundProductId: Optional[str] = Field(None, title="ProvisionedCompoundProductId")
     startDate: Optional[str] = Field(None, title="StartDate")

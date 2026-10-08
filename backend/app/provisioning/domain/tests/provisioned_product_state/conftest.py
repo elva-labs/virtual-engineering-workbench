@@ -22,10 +22,7 @@ from app.provisioning.domain.ports import (
     provisioned_products_query_service,
 )
 from app.provisioning.domain.read_models import version
-from app.provisioning.domain.tests.product_provisioning.conftest import (
-    TEST_COMPONENT_VERSION_DETAILS,
-    TEST_OS_VERSION,
-)
+from app.provisioning.domain.tests.product_provisioning.conftest import TEST_COMPONENT_VERSION_DETAILS, TEST_OS_VERSION
 from app.shared.adapters.boto.boto_provider import BotoProviderOptions
 from app.shared.adapters.message_bus import message_bus
 from app.shared.adapters.unit_of_work_v2 import unit_of_work
@@ -278,6 +275,7 @@ def mock_virtual_targets_qs(get_virtual_target):
 @pytest.fixture()
 def mock_products_srv():
     products_srv = mock.create_autospec(spec=products_service.ProductsService)
+    products_srv.has_provisioned_product_unsupported_instance_type_error.return_value = False
     products_srv.provision_product.return_value = "pp-123"
     products_srv.get_provisioned_product_outputs.return_value = [
         provisioned_product_output.ProvisionedProductOutput(
@@ -302,6 +300,7 @@ def mock_parameter_srv():
 @pytest.fixture
 def mock_instance_mgmt_srv():
     instance_mgmt_srv = mock.create_autospec(spec=instance_management_service.InstanceManagementService)
+    instance_mgmt_srv.get_offered_availability_zones.return_value = None  # offerings unknown
     instance_mgmt_srv.get_instance_state.return_value = product_status.EC2InstanceState.Stopped
     instance_mgmt_srv.start_instance.return_value = product_status.EC2InstanceState.Pending
     instance_mgmt_srv.stop_instance.return_value = product_status.EC2InstanceState.Stopping

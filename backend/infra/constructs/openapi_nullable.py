@@ -7,11 +7,15 @@ that send `null` for an unset optional field (the elva-labs/vew Terraform provid
 therefore refused before they reach the handler.
 
 `accept_null_in_nullable_fields` rewrites only the copy handed to API Gateway: each nullable schema
-loses `nullable` and the keywords that reject `null` - `type`, `enum`, `oneOf` and `anyOf` - while the type-specific
-ones such as `maxLength`, `minimum`, `properties` or `items` still apply to non-null values. It only
-removes keywords, so the import (which fails the deployment on any warning) sees nothing new. The
-published OpenAPI document keeps the original schema, and the handlers' pydantic models still check
-every value, null or not.
+loses `nullable` and the keywords that reject `null` - `type`, `enum`, `oneOf` and `anyOf` - while the scalar
+ones such as `maxLength` or `minimum` still apply to non-null values. API Gateway also infers a type from
+`items` (and from `properties`): the deployed model of `{type: array, nullable: true, items: ...}` without
+its `type` came back as `{"type": "array", "items": ...}` and refused null with 400 BAD_REQUEST_BODY.
+So a nullable schema loses those
+structural keywords too, and its elements are checked by the handler only. It only removes keywords,
+so the import (which fails the deployment on any warning) sees nothing new. The published OpenAPI
+document keeps the original schema, and the handlers' pydantic models still check every value, null
+or not.
 """
 
 import copy
@@ -20,8 +24,10 @@ import typing
 # Draft 4 keywords that make a schema reject null. `allOf` is not removed: dropping it would drop the
 # whole schema, and the tests fail if a nullable request field ever needs it.
 NULL_REJECTING_KEYWORDS = ("type", "enum", "oneOf", "anyOf")
+# Keywords API Gateway infers a `type` from when it converts the schema to its draft 4 model.
+TYPE_INFERRING_KEYWORDS = ("items", "minItems", "maxItems", "uniqueItems", "properties", "additionalProperties", "required")
 # `nullable` itself goes too: API Gateway ignores it, and without `type` it would only be noise to the import.
-REMOVED_KEYWORDS = (*NULL_REJECTING_KEYWORDS, "nullable")
+REMOVED_KEYWORDS = (*NULL_REJECTING_KEYWORDS, *TYPE_INFERRING_KEYWORDS, "nullable")
 
 
 def accept_null_in_nullable_fields(schema: typing.Any) -> typing.Any:

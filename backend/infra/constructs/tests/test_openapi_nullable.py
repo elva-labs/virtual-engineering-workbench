@@ -146,15 +146,19 @@ def _nullable_fields(schema, components, path, seen):
             return
         if schema.get("nullable") is True:
             yield path, schema
-        for key, value in schema.items():
-            if key == "properties":
-                for name, child in value.items():
-                    yield from _nullable_fields(child, components, f"{path}.{name}", seen)
-            elif key in ("items", "additionalProperties") and isinstance(value, dict):
-                yield from _nullable_fields(value, components, f"{path}[]", seen)
-            elif key in ("allOf", "anyOf", "oneOf"):
-                for child in value:
-                    yield from _nullable_fields(child, components, path, seen)
+        for child_path, child in _children(schema, path):
+            yield from _nullable_fields(child, components, child_path, seen)
+
+
+def _children(schema, path):
+    """(path, schema) of the subschemas a schema nests: properties, items and the combinators."""
+    for key, value in schema.items():
+        if key == "properties":
+            yield from ((f"{path}.{name}", child) for name, child in value.items())
+        elif key in ("items", "additionalProperties") and isinstance(value, dict):
+            yield f"{path}[]", value
+        elif key in ("allOf", "anyOf", "oneOf"):
+            yield from ((path, child) for child in value)
 
 
 def _cases():

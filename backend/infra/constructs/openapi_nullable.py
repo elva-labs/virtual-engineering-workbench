@@ -25,7 +25,15 @@ import typing
 # whole schema, and the tests fail if a nullable request field ever needs it.
 NULL_REJECTING_KEYWORDS = ("type", "enum", "oneOf", "anyOf")
 # Keywords API Gateway infers a `type` from when it converts the schema to its draft 4 model.
-TYPE_INFERRING_KEYWORDS = ("items", "minItems", "maxItems", "uniqueItems", "properties", "additionalProperties", "required")
+TYPE_INFERRING_KEYWORDS = (
+    "items",
+    "minItems",
+    "maxItems",
+    "uniqueItems",
+    "properties",
+    "additionalProperties",
+    "required",
+)
 # `nullable` itself goes too: API Gateway ignores it, and without `type` it would only be noise to the import.
 REMOVED_KEYWORDS = (*NULL_REJECTING_KEYWORDS, *TYPE_INFERRING_KEYWORDS, "nullable")
 

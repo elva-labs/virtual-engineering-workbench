@@ -801,3 +801,31 @@ def test_repository_update_entity_when_expected_should_update_only_if_it_holds(
     # ASSERT
     item = backend_app_dynamodb_table.get_item(Key={"PK": "ENTITY2#123", "SK": "ID2#321"})
     assertpy.assert_that(item["Item"]["status"]).is_equal_to("Inactive" if should_update else "Active")
+
+
+@pytest.mark.parametrize(
+    "code, expected",
+    (
+        ("ConditionalCheckFailed", repository_exception.ConditionalCheckFailedException),
+        ("TransactionConflict", repository_exception.TransactionConflictException),
+        ("ValidationError", repository_exception.RepositoryException),
+    ),
+)
+def test_context_commit_maps_cancellation_reasons(code, expected):
+    from botocore.exceptions import ClientError
+
+    ddb = mock.Mock()
+    ddb.transact_write_items.side_effect = ClientError(
+        {
+            "Error": {"Code": "TransactionCanceledException", "Message": "cancelled"},
+            "CancellationReasons": [{"Code": "None"}, {"Code": code, "Message": "x"}],
+        },
+        "TransactWriteItems",
+    )
+    context = dynamodb_repository.DynamoDBContext(dynamodb_client=ddb, logger=logging.getLogger("test"))
+    context.add_to_transaction({"Put": {}})
+
+    with pytest.raises(expected) as raised:
+        context.commit()
+
+    assertpy.assert_that(type(raised.value)).is_equal_to(expected)

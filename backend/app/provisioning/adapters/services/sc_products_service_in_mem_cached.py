@@ -41,6 +41,9 @@ class ServiceCatalogProductsServiceCachedInMemory(products_service.ProductsServi
     def has_provisioned_product_insufficient_capacity_error(self, **kwargs) -> bool:
         return self._inner.has_provisioned_product_insufficient_capacity_error(**kwargs)
 
+    def has_provisioned_product_unsupported_instance_type_error(self, **kwargs) -> bool:
+        return self._inner.has_provisioned_product_unsupported_instance_type_error(**kwargs)
+
     def has_provisioned_product_missing_removal_signal_error(self, **kwargs) -> bool:
         return self._inner.has_provisioned_product_missing_removal_signal_error(**kwargs)
 

@@ -94,3 +94,39 @@ def test_cognito_service_jwt_auth():
     # ASSERT
     assert_that(app.context["user_principal"].user_name).is_equal_to("service-client-id")
     assert_that(app.context["user_principal"].auth_type).is_equal_to(AuthType.CognitoServiceJWT)
+
+
+def _user_principal(extra: dict):
+    app = mock.MagicMock()
+    app.current_event = {
+        "requestContext": {
+            "authorizer": {
+                "userName": "test-user",
+                "userEmail": "admin@example.com",
+                "stages": "[]",
+                "userRoles": '["ADMIN"]',
+                "userDomains": "[]",
+                **extra,
+            }
+        }
+    }
+    app.context = {}
+    app.append_context = lambda **kwargs: app.context.update(kwargs)
+    require_auth_context(app, lambda resolver: None)
+    return app.context["user_principal"]
+
+
+def test_a_platform_admins_writes_are_recorded_as_such():
+    # The authorizer marks ADMIN that came only from a platform-admin group.
+    principal = _user_principal({"platformAdminAccess": "true"})
+
+    assert_that(principal.platform_admin_access).is_true()
+    assert_that(principal.actor).is_equal_to("admin@example.com (platform admin)")
+
+
+def test_an_own_admin_role_is_recorded_as_the_user():
+    for extra in ({}, {"platformAdminAccess": ""}):
+        principal = _user_principal(extra)
+
+        assert_that(principal.platform_admin_access).is_false()
+        assert_that(principal.actor).is_equal_to("admin@example.com")

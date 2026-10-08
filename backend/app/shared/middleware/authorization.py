@@ -44,6 +44,14 @@ class Principal(BaseModel):
     account_id: Optional[str] = Field(None, alias="accountId")
     # The experience of the project in the request path, from the authorizer; None = full.
     project_experience: Optional[str] = Field(None, alias="projectExperience")
+    # ADMIN only through a platform-admin group, no own admin role in the project.
+    platform_admin_access: bool = Field(False, alias="platformAdminAccess")
+
+    @property
+    def actor(self) -> str:
+        """Who a project-admin write is recorded as: the user, marked when acting as a platform admin."""
+        who = self.user_email or self.user_name
+        return f"{who} (platform admin)" if self.platform_admin_access else who
 
     @property
     def workbenches_only(self) -> bool:
@@ -82,6 +90,7 @@ def require_auth_context(app: APIGatewayRestResolver, next_middleware: NextMiddl
                 # Entra groups of the sign-in; absent from older authorizers.
                 userGroups=set(json.loads(authorizer_auth_context.get("userGroups") or "[]")),
                 projectExperience=authorizer_auth_context.get("projectExperience") or None,
+                platformAdminAccess=authorizer_auth_context.get("platformAdminAccess") == "true",
             )
         # service to service OAuth API request
         elif "claims" in authorizer_auth_context:

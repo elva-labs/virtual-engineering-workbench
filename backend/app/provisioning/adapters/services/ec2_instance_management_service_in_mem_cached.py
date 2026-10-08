@@ -90,6 +90,9 @@ class EC2InstanceManagementServiceCachedInMemory(instance_management_service.Ins
     def describe_vpc_route_tables(self, **kwargs) -> list[network_route_table.NetworkRouteTable]:
         return self._inner.describe_vpc_route_tables(**kwargs)
 
+    def get_offered_availability_zones(self, **kwargs) -> set[str] | None:
+        return self._inner.get_offered_availability_zones(**kwargs)
+
     def describe_vpc_subnets(self, **kwargs) -> list[network_subnet.NetworkSubnet]:
         return self._inner.describe_vpc_subnets(**kwargs)
 

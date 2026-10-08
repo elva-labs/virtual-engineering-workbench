@@ -154,6 +154,8 @@ class ProductProvisioningAggregate(aggregate.Aggregate):
         self._instance: instance_details.InstanceDetails | None = None
         self._container: container_details.ContainerDetails | None = None
         self._available_subnets_ordered_by_ip_count: list[network_subnet.NetworkSubnet] | None = None
+        # the spoke's AZs when none of them offers the requested instance type.
+        self._instance_type_offered_nowhere: list[str] | None = None
 
     """
     Command handlers
@@ -475,11 +477,8 @@ class ProductProvisioningAggregate(aggregate.Aggregate):
                 spoke_account_vpc_id_param_name=spoke_account_vpc_id_param_name,
                 subnet_selector=subnet_selector,
             )
-            # All subnets were triggered for provisioning already
-            # There is no capacity for provisioning
-            if self._provisioned_product.availabilityZonesTriggered and len(
-                self._provisioned_product.availabilityZonesTriggered
-            ) == len(self._available_subnets_ordered_by_ip_count):
+            # no AZ of the spoke offers the instance type - nothing to try.
+            if self._instance_type_offered_nowhere:
                 self.__fail(
                     event=product_launch_failed.ProductLaunchFailed(
                         projectId=self._provisioned_product.projectId,
@@ -489,7 +488,28 @@ class ProductProvisioningAggregate(aggregate.Aggregate):
                         productType=self._provisioned_product.provisionedProductType,
                         owner=self._provisioned_product.userId,
                     ),
-                    reason="InsufficientCapacityInAllAvailabilityZones",
+                    reason=(
+                        f"Unsupported: instance type {self.__requested_instance_type()} is not offered in any "
+                        f"Availability Zone of the spoke ({', '.join(self._instance_type_offered_nowhere)})"
+                    ),
+                )
+                return
+
+            # Every eligible subnet's AZ was tried already: no capacity (or no offering) left to try.
+            tried = self._provisioned_product.availabilityZonesTriggered or []
+            if tried and not any(
+                s.availability_zone not in tried for s in self._available_subnets_ordered_by_ip_count or []
+            ):
+                self.__fail(
+                    event=product_launch_failed.ProductLaunchFailed(
+                        projectId=self._provisioned_product.projectId,
+                        provisionedProductId=self._provisioned_product.provisionedProductId,
+                        provisionedCompoundProductId=self._provisioned_product.provisionedCompoundProductId,
+                        productName=self._provisioned_product.productName,
+                        productType=self._provisioned_product.provisionedProductType,
+                        owner=self._provisioned_product.userId,
+                    ),
+                    reason=self.__all_availability_zones_failed_reason(tried),
                 )
                 return
 
@@ -1042,6 +1062,7 @@ class ProductProvisioningAggregate(aggregate.Aggregate):
                 # If Provisioning is successful then clear triggered AZ
                 # so AZs could be retired when starting as well
                 self._provisioned_product.availabilityZonesTriggered = None
+                self._provisioned_product.availabilityZonesUnsupported = None
                 match self._provisioned_product.provisionedProductType:
                     case p if p in provisioned_product.PRODUCT_CONTAINER_TYPES:
                         self._publish(
@@ -1293,8 +1314,24 @@ class ProductProvisioningAggregate(aggregate.Aggregate):
                 provisioned_instance_type=(provisioned_instance_type.value if provisioned_instance_type else None),
             )
 
+            # an AZ where EC2 doesn't offer the type is retried elsewhere like a capacity error.
+            has_unsupported_error = (
+                not has_insufficient_capacity_error
+                and products_srv.has_provisioned_product_unsupported_instance_type_error(
+                    provisioned_product_id=self._provisioned_product.scProvisionedProductId,
+                    aws_account_id=self._provisioned_product.awsAccountId,
+                    region=self._provisioned_product.region,
+                    user_id=self._provisioned_product.userId,
+                    provisioned_instance_type=(provisioned_instance_type.value if provisioned_instance_type else None),
+                )
+            )
+            if has_unsupported_error and self._provisioned_product.availabilityZonesTriggered:
+                unsupported = self._provisioned_product.availabilityZonesUnsupported or []
+                unsupported.append(self._provisioned_product.availabilityZonesTriggered[-1])
+                self._provisioned_product.availabilityZonesUnsupported = unsupported
+
             if (
-                has_insufficient_capacity_error
+                (has_insufficient_capacity_error or has_unsupported_error)
                 and self._provisioned_product.deploymentOption != provisioned_product.DeploymentOption.SINGLE_AZ
                 and (
                     self.__get_provisioning_param_by_type(PRODUCT_PARAM_TYPE_SUBNET_ID)
@@ -1329,6 +1366,16 @@ class ProductProvisioningAggregate(aggregate.Aggregate):
             ),
             reason=self.__launch_failure_reason(products_srv),
         )
+
+    def __all_availability_zones_failed_reason(self, tried: list[str]) -> str:
+        """UNSUPPORTED_IN_AZ when every tried AZ lacked the instance type, else CAPACITY."""
+        unsupported = set(self._provisioned_product.availabilityZonesUnsupported or [])
+        if tried and set(tried) <= unsupported:
+            return (
+                f"Unsupported: instance type {self.__requested_instance_type()} is not supported in any "
+                f"Availability Zone tried ({', '.join(tried)})"
+            )
+        return "InsufficientCapacityInAllAvailabilityZones"
 
     def __launch_failure_reason(self, products_srv: products_service.ProductsService) -> str | None:
         """the stack's root cause (its first failed resource), so the owner learns why. Best effort."""
@@ -2365,17 +2412,20 @@ class ProductProvisioningAggregate(aggregate.Aggregate):
         if self._vpc_subnet_for_provisioning:
             return self._vpc_subnet_for_provisioning
 
-        self._available_subnets_ordered_by_ip_count = subnet_selector(
-            route_tables=self.__get_spoke_route_tables(
-                parameter_srv=parameter_srv,
-                instance_mgmt_srv=instance_mgmt_srv,
-                spoke_account_vpc_id_param_name=spoke_account_vpc_id_param_name,
+        self._available_subnets_ordered_by_ip_count = self.__subnets_offering_instance_type(
+            subnet_selector(
+                route_tables=self.__get_spoke_route_tables(
+                    parameter_srv=parameter_srv,
+                    instance_mgmt_srv=instance_mgmt_srv,
+                    spoke_account_vpc_id_param_name=spoke_account_vpc_id_param_name,
+                ),
+                subnets=self.__get_spoke_subnets(
+                    parameter_srv=parameter_srv,
+                    instance_mgmt_srv=instance_mgmt_srv,
+                    spoke_account_vpc_id_param_name=spoke_account_vpc_id_param_name,
+                ),
             ),
-            subnets=self.__get_spoke_subnets(
-                parameter_srv=parameter_srv,
-                instance_mgmt_srv=instance_mgmt_srv,
-                spoke_account_vpc_id_param_name=spoke_account_vpc_id_param_name,
-            ),
+            instance_mgmt_srv,
         )
         # Check which availability zones were already used for provisioning and
         # pick the next one with the highest available IPs count
@@ -2434,20 +2484,53 @@ class ProductProvisioningAggregate(aggregate.Aggregate):
         :param spoke_account_vpc_id_param_name: Spoke account VPC ID parameter name
         """
         if not self._vpc_subnet_for_provisioning:
-            self._available_subnets_ordered_by_ip_count = subnet_selector(
-                route_tables=self.__get_spoke_route_tables(
-                    parameter_srv=parameter_srv,
-                    instance_mgmt_srv=instance_mgmt_srv,
-                    spoke_account_vpc_id_param_name=spoke_account_vpc_id_param_name,
+            self._available_subnets_ordered_by_ip_count = self.__subnets_offering_instance_type(
+                subnet_selector(
+                    route_tables=self.__get_spoke_route_tables(
+                        parameter_srv=parameter_srv,
+                        instance_mgmt_srv=instance_mgmt_srv,
+                        spoke_account_vpc_id_param_name=spoke_account_vpc_id_param_name,
+                    ),
+                    subnets=self.__get_spoke_subnets(
+                        parameter_srv=parameter_srv,
+                        instance_mgmt_srv=instance_mgmt_srv,
+                        spoke_account_vpc_id_param_name=spoke_account_vpc_id_param_name,
+                    ),
                 ),
-                subnets=self.__get_spoke_subnets(
-                    parameter_srv=parameter_srv,
-                    instance_mgmt_srv=instance_mgmt_srv,
-                    spoke_account_vpc_id_param_name=spoke_account_vpc_id_param_name,
-                ),
+                instance_mgmt_srv,
             )
 
         return self._available_subnets_ordered_by_ip_count
+
+    def __requested_instance_type(self) -> str | None:
+        parameter = next(
+            (p for p in self._provisioned_product.provisioningParameters or [] if p.key == "InstanceType"), None
+        )
+        return parameter.value if parameter and parameter.value else None
+
+    def __subnets_offering_instance_type(
+        self,
+        subnets: list[network_subnet.NetworkSubnet],
+        instance_mgmt_srv: instance_management_service.InstanceManagementService,
+    ) -> list[network_subnet.NetworkSubnet]:
+        """only subnets in AZs where EC2 offers the requested instance type (g6 isn't offered in
+        every AZ of a region). When the offerings can't be read, every subnet stays: the launch then still
+        moves on from an AZ that answers Unsupported."""
+        instance_type = self.__requested_instance_type()
+        if not instance_type or not subnets:
+            return subnets
+        offered = instance_mgmt_srv.get_offered_availability_zones(
+            user_id=self._provisioned_product.userId,
+            aws_account_id=self._provisioned_product.awsAccountId,
+            region=self._provisioned_product.region,
+            instance_type=instance_type,
+        )
+        if offered is None:
+            return subnets
+        kept = [s for s in subnets if s.availability_zone in offered]
+        if not kept:
+            self._instance_type_offered_nowhere = sorted({s.availability_zone for s in subnets})
+        return kept
 
     def __get_spoke_vpc_id(
         self,

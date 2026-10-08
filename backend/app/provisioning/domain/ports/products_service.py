@@ -71,6 +71,17 @@ class ProductsService(ABC):
         provisioned_instance_type: str | None,
     ) -> bool: ...
 
+    def has_provisioned_product_unsupported_instance_type_error(
+        self,
+        provisioned_product_id: str,
+        user_id: str,
+        aws_account_id: str,
+        region: str,
+        provisioned_instance_type: str | None,
+    ) -> bool:
+        """the launch failed because EC2 doesn't offer the instance type in the chosen AZ."""
+        return False
+
     def get_provisioned_product_failure_reason(
         self,
         provisioned_product_id: str,

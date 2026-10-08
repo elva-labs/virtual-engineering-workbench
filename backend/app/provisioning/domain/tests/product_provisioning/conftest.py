@@ -337,6 +337,7 @@ def mock_products_qs():
 @pytest.fixture()
 def mock_products_srv():
     products_srv = mock.create_autospec(spec=products_service.ProductsService)
+    products_srv.has_provisioned_product_unsupported_instance_type_error.return_value = False
     products_srv.provision_product.return_value = "pp-123"
     products_srv.get_provisioned_product_outputs.return_value = [
         provisioned_product_output.ProvisionedProductOutput(
@@ -391,6 +392,7 @@ def mock_instance_mgmt_srv(
     mock_subnet,
 ):
     instance_mgmt_srv = mock.create_autospec(spec=instance_management_service.InstanceManagementService)
+    instance_mgmt_srv.get_offered_availability_zones.return_value = None  # offerings unknown
     instance_mgmt_srv.get_instance_state.return_value = product_status.EC2InstanceState.Stopped
     instance_mgmt_srv.get_instance_platform.return_value = "Windows"
     instance_mgmt_srv.start_instance.return_value = product_status.EC2InstanceState.Pending

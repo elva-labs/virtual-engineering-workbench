@@ -285,6 +285,7 @@ def test_get_provisioned_virtual_target_should_return_virtual_target(
             "osVersion": TEST_OS_VERSION,
             "blockDeviceMappings": None,
             "availabilityZonesTriggered": None,
+            "availabilityZonesUnsupported": None,
             "userIpAddress": None,
             "containerName": None,
             "containerServiceName": None,

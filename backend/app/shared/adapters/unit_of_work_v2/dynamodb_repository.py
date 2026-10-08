@@ -26,21 +26,31 @@ class DynamoDBContext:
             self._db_items = []
         except ClientError as e:
             if e.response["Error"]["Code"] == "TransactionCanceledException":
-                cancellation_reasons = e.response.get("CancellationReasons", [])
-                self._logger.error("Transaction failed due to cancellation reasons:")
-                for idx, reason in enumerate(cancellation_reasons):
-                    self._logger.error(f"Item {idx + 1}: {reason.get('Code')} - {reason.get('Message')}")
-                if any(reason.get("Code") == "ConditionalCheckFailed" for reason in cancellation_reasons):
-                    self._db_items = []
-                    raise repository_exception.ConditionalCheckFailedException(
-                        "A condition of the DynamoDB transaction did not hold."
-                    ) from e
+                self._raise_for_cancellation(e)
             else:
                 self._logger.exception("An error occurred during the transaction.")
             raise repository_exception.RepositoryException("Failed to commit a transaction to DynamoDB.") from e
         except Exception as e:
             self._logger.exception("Failed to commit a transaction to DynamoDB.")
             raise repository_exception.RepositoryException("Failed to commit a transaction to DynamoDB.") from e
+
+    def _raise_for_cancellation(self, error: ClientError) -> None:
+        """Raises the retryable exception a cancelled transaction maps to (a failed condition, a conflict)."""
+        cancellation_reasons = error.response.get("CancellationReasons", [])
+        self._logger.error("Transaction failed due to cancellation reasons:")
+        for idx, reason in enumerate(cancellation_reasons):
+            self._logger.error(f"Item {idx + 1}: {reason.get('Code')} - {reason.get('Message')}")
+        codes = {reason.get("Code") for reason in cancellation_reasons}
+        if "ConditionalCheckFailed" in codes:
+            self._db_items = []
+            raise repository_exception.ConditionalCheckFailedException(
+                "A condition of the DynamoDB transaction did not hold."
+            ) from error
+        if "TransactionConflict" in codes:
+            self._db_items = []
+            raise repository_exception.TransactionConflictException(
+                "Another transaction was writing an item of this one."
+            ) from error
 
     def add_to_transaction(self, item) -> None:
         """Adds DynamoDB modifying instructions to a pending list."""

@@ -412,6 +412,8 @@ class ProductPublishingEnablementAppStack(Stack):
                         "ecs:UpdateService",
                         "ecs:StopTask",
                         "ec2:DescribeVolumesModifications",
+                        # a launch only tries AZs that offer the instance type.
+                        "ec2:DescribeInstanceTypeOfferings",
                     ],
                     resources=["*"],
                 ),

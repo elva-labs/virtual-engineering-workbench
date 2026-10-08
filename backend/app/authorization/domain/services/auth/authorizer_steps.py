@@ -263,6 +263,8 @@ class ProjectsBCContextEnricher(authorizer.AuthorizerStep):
         admin = project_assignment_model.Role.ADMIN
         if assignment and admin in assignment.roles:
             return assignment
+        own_admin_roles = {admin, project_assignment_model.Role.PROGRAM_OWNER}
+        context.platform_admin_access = not (assignment and own_admin_roles & set(assignment.roles or []))
         merged = (
             assignment.model_copy(update={"roles": [*assignment.roles, admin]})
             if assignment

@@ -41,6 +41,9 @@ class AuthorizationContext(BaseModel):
     project_managed_source: str | None = Field(None)
     # The experience of the project in the request path; None outside a project.
     project_experience: str | None = Field(None)
+    # The request's ADMIN comes only from a platform-admin group: no own ADMIN or PROGRAM_OWNER on the
+    # project in the path. Backends record such writes as a platform admin's.
+    platform_admin_access: bool = Field(False)
 
 
 class AuthorizationRequest(BaseModel):
@@ -132,6 +135,8 @@ class Authorizer:
                 "projectManagedSource": auth_context.project_managed_source or "",
                 # "workbench-only" makes the provisioning API offer workbenches only; "" = full.
                 "projectExperience": auth_context.project_experience or "",
+                # "true" = acting as a platform admin in a project without an own admin role; "" = not.
+                "platformAdminAccess": "true" if auth_context.platform_admin_access else "",
             },
         )
 

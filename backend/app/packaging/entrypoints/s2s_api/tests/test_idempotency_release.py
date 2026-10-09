@@ -167,11 +167,13 @@ class FlakyCompletion:
     def __init__(self, service):
         self._service = service
         self.completions = 0
+        self.releases = []
 
     def reserve(self, *args):
         return self._service.reserve(*args)
 
     def release(self, *args):
+        self.releases.append(args[2])
         return self._service.release(*args)
 
     def complete(self, *args):
@@ -232,6 +234,7 @@ def test_a_same_key_retry_after_a_failed_completion_recovers_the_created_resourc
 
     assert retried.body == {"id": "comp-new"}
     create.assert_called_once_with("comp-new")
+    assert service.releases == ["comp-new"]
     assert execute(service, create=create, resource_id="comp-replay", now=NOW).body == {"id": "comp-new"}
 
 

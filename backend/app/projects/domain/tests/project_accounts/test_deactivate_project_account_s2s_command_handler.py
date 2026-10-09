@@ -38,10 +38,16 @@ def _command(account_id):
     )
 
 
+@pytest.mark.parametrize(
+    "status",
+    # Failed: a first onboarding that failed, which Terraform replaces (deactivate, then a create that
+    # reactivates the record).
+    [project_account.ProjectAccountStatusEnum.Active, project_account.ProjectAccountStatusEnum.Failed],
+)
 def test_deactivation_marks_active_account_inactive_without_publish_or_delete(
-    sample_project, handler_dependencies, mock_uow_2, mock_account_repo
+    sample_project, handler_dependencies, mock_uow_2, mock_account_repo, status
 ):
-    account = _account(project_account.ProjectAccountStatusEnum.Active)
+    account = _account(status)
     _, projects_qs, message_bus_mock = handler_dependencies
     projects_qs.get_project_by_id.return_value = sample_project
     projects_qs.get_project_account_by_id.return_value = account
@@ -91,7 +97,6 @@ def test_repeated_deactivation_of_inactive_account_is_a_noop(
         project_account.ProjectAccountStatusEnum.ReOnboarding,
         project_account.ProjectAccountStatusEnum.OffBoarding,
         project_account.ProjectAccountStatusEnum.Archived,
-        project_account.ProjectAccountStatusEnum.Failed,
     ],
 )
 def test_unsupported_status_returns_typed_conflict_without_mutation(

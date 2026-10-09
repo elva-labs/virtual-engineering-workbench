@@ -640,6 +640,8 @@ class PackagingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                 else aws_apigateway.EndpointType.REGIONAL
             ),
             vpc_endpoint=vpc_endpoint if provision_private_endpoint else None,
+            # Component definitions can carry secrets; the handler logs metadata only.
+            payload_logging_enabled=False,
         )
 
         # Component version testing step function

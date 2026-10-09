@@ -62,13 +62,19 @@ def _record_reservation(scope: IdempotencyScope, reservation: Reservation) -> No
     )
 
 
+def _log_bookkeeping_failure(message: str, scope: IdempotencyScope, error: Exception) -> None:
+    # Runs while an earlier error is handled: serialising the exception would log its chained
+    # context, which can carry the request's definition. Log metadata only.
+    logger.error(message, operation=scope.operation, exceptionClass=type(error).__name__)
+
+
 def _release(service, scope, request_hash, resource_id, now):
     # An unexpected failure (a 500) must not block the key until the lease ends: a retry recovers at
     # once, checking first whether the resource was created.
     try:
         service.release(scope, request_hash, resource_id, now)
-    except Exception:
-        logger.exception("Could not release the idempotency reservation", operation=scope.operation)
+    except Exception as error:
+        _log_bookkeeping_failure("Could not release the idempotency reservation", scope, error)
 
 
 def _replay_response(reservation: Reservation) -> StoredCreateResponse:
@@ -153,9 +159,9 @@ def _create_response(
         )
         try:
             _complete(service, scope, request_hash, resource_id, failure, now)
-        except Exception:
+        except Exception as completion_error:
             # The validation failure stays the answer; a retry re-validates instead of replaying it.
-            logger.exception("Could not store the validation failure", operation=scope.operation)
+            _log_bookkeeping_failure("Could not store the validation failure", scope, completion_error)
             _release(service, scope, request_hash, resource_id, now)
         raise
     except Exception:

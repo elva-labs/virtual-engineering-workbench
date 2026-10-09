@@ -1,3 +1,6 @@
+import io
+import json
+import logging
 from datetime import UTC, datetime, timedelta
 from http import HTTPStatus
 from unittest import mock
@@ -249,3 +252,132 @@ def test_a_stored_validation_failure_still_replays_on_a_same_key_retry(dynamodb_
     assert replayed.value.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
     assert replayed.value.retryable is False
     create.assert_called_once()
+
+
+SENSITIVE_TEXT = ("SENSITIVE_DEFINITION_COMMAND", "SENSITIVE_CHAINED_CAUSE", "SENSITIVE_BOOKKEEPING_ERROR")
+
+
+@pytest.fixture
+def rendered_logs():
+    # Render with the Powertools formatter, so any serialised exception or traceback would show.
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(idempotency.logger.registered_formatter)
+    idempotency.logger._logger.addHandler(handler)
+    yield stream
+    idempotency.logger._logger.removeHandler(handler)
+
+
+def sensitive_error(error_class=RuntimeError):
+    error = error_class("SENSITIVE_DEFINITION_COMMAND")
+    error.__cause__ = ValueError("SENSITIVE_CHAINED_CAUSE")
+    return error
+
+
+def assert_metadata_only(logs, *messages):
+    records = [json.loads(line) for line in logs.getvalue().splitlines()]
+    errors = [record for record in records if record["level"] == "ERROR"]
+    assert [record["message"] for record in errors] == list(messages)
+    for record in errors:
+        assert record["operation"] == "CREATE_COMPONENT"
+        assert record["exceptionClass"] == "RuntimeError"
+        assert "exception" not in record
+    for text in (*SENSITIVE_TEXT, "Traceback"):
+        assert text not in logs.getvalue()
+
+
+def test_a_failed_release_after_a_create_failure_logs_metadata_only(rendered_logs):
+    service = reserving(ReservationOutcome.ACQUIRED)
+    service.release.side_effect = RuntimeError("SENSITIVE_BOOKKEEPING_ERROR")
+    error = sensitive_error()
+
+    with pytest.raises(RuntimeError) as raised:
+        execute(service, create=mock.Mock(side_effect=error))
+
+    assert raised.value is error
+    service.release.assert_called_once_with(SCOPE, mock.ANY, "comp-new", NOW)
+    assert_metadata_only(rendered_logs, "Could not release the idempotency reservation")
+
+
+def test_a_failed_release_after_a_recovery_failure_logs_metadata_only(rendered_logs):
+    service = reserving(ReservationOutcome.RECOVER, "comp-earlier")
+    service.release.side_effect = RuntimeError("SENSITIVE_BOOKKEEPING_ERROR")
+    error = sensitive_error()
+
+    with pytest.raises(RuntimeError) as raised:
+        execute(
+            service, create=mock.Mock(), resource_exists=lambda _: True, resume_existing=mock.Mock(side_effect=error)
+        )
+
+    assert raised.value is error
+    service.release.assert_called_once_with(SCOPE, mock.ANY, "comp-earlier", NOW)
+    assert_metadata_only(rendered_logs, "Could not release the idempotency reservation")
+
+
+def test_a_failed_release_after_a_recovery_read_failure_logs_metadata_only(rendered_logs):
+    service = reserving(ReservationOutcome.RECOVER, "comp-earlier")
+    service.release.side_effect = RuntimeError("SENSITIVE_BOOKKEEPING_ERROR")
+    error = sensitive_error()
+
+    with pytest.raises(ResourceReadNotReady) as raised:
+        execute(service, create=mock.Mock(), resource_exists=mock.Mock(side_effect=error))
+
+    assert raised.value.__cause__ is error
+    assert_metadata_only(rendered_logs, "Could not release the idempotency reservation")
+
+
+def test_a_validation_failure_that_cannot_be_stored_or_released_logs_metadata_only(rendered_logs):
+    service = reserving(ReservationOutcome.ACQUIRED)
+    service.complete.side_effect = RuntimeError("SENSITIVE_BOOKKEEPING_ERROR")
+    service.release.side_effect = RuntimeError("SENSITIVE_BOOKKEEPING_ERROR")
+    error = sensitive_error(DomainException)
+
+    with pytest.raises(DomainException) as raised:
+        execute(service, create=mock.Mock(side_effect=error))
+
+    assert raised.value is error
+    service.release.assert_called_once_with(SCOPE, mock.ANY, "comp-new", NOW)
+    assert_metadata_only(
+        rendered_logs,
+        "Could not store the validation failure",
+        "Could not release the idempotency reservation",
+    )
+
+
+class FailingRelease(FlakyCompletion):
+    """Releases always fail, as during a DynamoDB outage; the lease then has to expire."""
+
+    def complete(self, *args):
+        return self._service.complete(*args)
+
+    def release(self, *args):
+        self.releases.append(args[2])
+        raise RuntimeError("SENSITIVE_BOOKKEEPING_ERROR")
+
+
+def test_a_same_key_retry_after_a_failed_release_creates_under_the_reserved_id(dynamodb_service, rendered_logs):
+    service = FailingRelease(dynamodb_service)
+    create = mock.Mock(side_effect=[sensitive_error(), respond("comp-new")])
+
+    with pytest.raises(RuntimeError, match="SENSITIVE_DEFINITION_COMMAND"):
+        execute(service, create=create)
+    retried = execute(service, create=create, resource_id="comp-retry", now=NOW + timedelta(seconds=61))
+
+    assert retried.body == {"id": "comp-new"}
+    assert create.call_args_list == [mock.call("comp-new"), mock.call("comp-new")]
+    assert service.releases == ["comp-new"]
+    assert_metadata_only(rendered_logs, "Could not release the idempotency reservation")
+
+
+def test_a_same_key_retry_after_an_unstored_validation_failure_validates_again(dynamodb_service, rendered_logs):
+    service = FlakyCompletion(dynamodb_service)
+    create = mock.Mock(side_effect=[sensitive_error(DomainException), respond("comp-new")])
+
+    with pytest.raises(DomainException, match="SENSITIVE_DEFINITION_COMMAND"):
+        execute(service, create=create)
+    retried = execute(service, create=create, resource_id="comp-retry", now=NOW + timedelta(seconds=1))
+
+    assert retried.body == {"id": "comp-new"}
+    assert create.call_args_list == [mock.call("comp-new"), mock.call("comp-new")]
+    assert service.releases == ["comp-new"]
+    assert_metadata_only(rendered_logs, "Could not store the validation failure")

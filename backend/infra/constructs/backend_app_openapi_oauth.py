@@ -27,6 +27,7 @@ class BackendAppOpenApiOauth(constructs.Construct):
         cache_explicit_disable: typing.List[str] = [],
         endpoint_type: aws_apigateway.EndpointType = aws_apigateway.EndpointType.REGIONAL,
         vpc_endpoint: aws_ec2.IVpcEndpoint | None = None,
+        payload_logging_enabled: bool = True,
     ) -> None:
         super().__init__(scope, id)
 
@@ -95,7 +96,8 @@ class BackendAppOpenApiOauth(constructs.Construct):
                 cache_cluster_enabled=cache_enabled,
                 cache_cluster_size="0.5" if cache_enabled else None,
                 logging_level=aws_apigateway.MethodLoggingLevel.INFO,
-                data_trace_enabled=app_config.environment == config.Environment.dev,
+                # Data tracing logs full request and response bodies before the handler can redact them.
+                data_trace_enabled=payload_logging_enabled and app_config.environment == config.Environment.dev,
                 metrics_enabled=True,
                 tracing_enabled=True,
                 access_log_destination=aws_apigateway.LogGroupLogDestination(access_log_group),

@@ -781,9 +781,7 @@ def test_internal_lookup_returns_404_for_missing_service_client_assignment(
     )
 
 
-def test_internal_lookup_returns_service_client_assignment(
-    lambda_context, authenticated_event, get_mock_dependencies
-):
+def test_internal_lookup_returns_service_client_assignment(lambda_context, authenticated_event, get_mock_dependencies):
     from app.projects.entrypoints.api import handler
 
     handler.dependencies = get_mock_dependencies

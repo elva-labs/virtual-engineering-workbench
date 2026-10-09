@@ -15,18 +15,12 @@ class Empty(BaseModel):
 
 
 class Project(BaseModel):
-    projectId: str = Field(
-        ..., description="Unique ID of the project.", title="ProjectId"
-    )
-    projectName: Optional[str] = Field(
-        None, description="Name of the project.", title="ProjectName"
-    )
+    projectId: str = Field(..., description="Unique ID of the project.", title="ProjectId")
+    projectName: Optional[str] = Field(None, description="Name of the project.", title="ProjectName")
     projectDescription: Optional[str] = Field(
         None, description="Description of the project.", title="ProjectDescription"
     )
-    createDate: Optional[str] = Field(
-        None, description="Point in time where project is created.", title="CreateDate"
-    )
+    createDate: Optional[str] = Field(None, description="Point in time where project is created.", title="CreateDate")
     lastUpdateDate: Optional[str] = Field(
         None,
         description="Point in time where project is last updated.",
@@ -53,9 +47,7 @@ class EnrolPendingUserRequest(BaseModel):
     userId: str = Field(..., description="ID of the user", title="UserId")
     userEmail: str = Field(..., description="Email of the user", title="UserEmail")
     approverId: str = Field(..., description="ID of the approver", title="ApproverId")
-    source: str = Field(
-        ..., description="Source or origin of the request", title="Source"
-    )
+    source: str = Field(..., description="Source or origin of the request", title="Source")
 
 
 class EnrolPendingUserResponse(BaseModel):
@@ -72,9 +64,7 @@ class RemoveUsersResponse(BaseModel):
 
 class AssignUserRequest(BaseModel):
     userId: Optional[str] = Field(None, description="User TID", title="UserId")
-    roles: Optional[List[str]] = Field(
-        None, description="User roles in the project", title="Roles"
-    )
+    roles: Optional[List[str]] = Field(None, description="User roles in the project", title="Roles")
 
 
 class AssignUserResponse(BaseModel):
@@ -82,12 +72,8 @@ class AssignUserResponse(BaseModel):
 
 
 class ReAssignUsersRequest(BaseModel):
-    roles: Optional[List[str]] = Field(
-        None, description="Users roles in the project", title="Roles"
-    )
-    userIds: Optional[List[str]] = Field(
-        None, description="User IDs in the project", title="UserIds"
-    )
+    roles: Optional[List[str]] = Field(None, description="Users roles in the project", title="Roles")
+    userIds: Optional[List[str]] = Field(None, description="User IDs in the project", title="UserIds")
 
 
 class ReAssignUsersResponse(BaseModel):
@@ -96,18 +82,12 @@ class ReAssignUsersResponse(BaseModel):
 
 class GetProjectAssignmentsResponseItem(BaseModel):
     userId: Optional[str] = Field(None, description="User TID", title="UserId")
-    roles: Optional[List[str]] = Field(
-        None, description="User roles in the project", title="Roles"
-    )
-    userEmail: Optional[str] = Field(
-        None, description="Email address of the user", title="UserEmail"
-    )
+    roles: Optional[List[str]] = Field(None, description="User roles in the project", title="Roles")
+    userEmail: Optional[str] = Field(None, description="Email address of the user", title="UserEmail")
 
 
 class GetProjectAssignmentsResponse(BaseModel):
-    assignments: Optional[List[GetProjectAssignmentsResponseItem]] = Field(
-        None, title="Assignments"
-    )
+    assignments: Optional[List[GetProjectAssignmentsResponseItem]] = Field(None, title="Assignments")
 
 
 class UnAssignUserResponse(BaseModel):

@@ -1,3 +1,5 @@
+from unittest import mock
+
 import assertpy
 import pytest
 
@@ -181,6 +183,18 @@ def test_get_recipe_version_returns_none_when_not_found(
 
     # ASSERT
     assertpy.assert_that(recipe_version_entity).is_equal_to(None)
+
+
+def test_get_recipe_version_uses_strong_consistency(
+    get_dynamodb_recipe_version_query_service,
+):
+    client = mock.Mock()
+    client.get_item.return_value = {}
+    get_dynamodb_recipe_version_query_service._dynamodb_client = client
+
+    get_dynamodb_recipe_version_query_service.get_recipe_version("reci-1", "vers-1")
+
+    assert client.get_item.call_args.kwargs["ConsistentRead"] is True
 
 
 def test_get_all_recipe_versions(

@@ -5,6 +5,7 @@ from urllib.parse import unquote
 
 from aws_lambda_powertools import logging, tracing
 from aws_lambda_powertools.event_handler import api_gateway, content_types
+from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 from aws_lambda_powertools.event_handler.openapi.models import Server
 from aws_lambda_powertools.event_handler.openapi.params import Query
 from aws_lambda_powertools.utilities import typing
@@ -727,6 +728,30 @@ def get_project_user_assignment_internal(
     return api_gateway.Response(
         status_code=HTTPStatus.OK,
         body=response,
+        content_type=content_types.APPLICATION_JSON,
+    )
+
+
+@tracer.capture_method
+@app.get("/internal/projects/<project_id>/clients/<client_id>")
+def get_service_client_assignment_internal(
+    project_id: str, client_id: str
+) -> api_gateway.Response[api_model.GetServiceClientAssignmentResponse]:
+    assignment = dependencies.projects_query_service.get_service_client_assignment(project_id, client_id)
+    if assignment is None:
+        raise NotFoundError("Service client assignment not found")
+
+    return api_gateway.Response(
+        status_code=HTTPStatus.OK,
+        body=api_model.GetServiceClientAssignmentResponse(
+            assignment=api_model.ServiceClientAssignment.model_validate(
+                {
+                    "clientId": assignment.clientId,
+                    "projectId": assignment.projectId,
+                    "status": assignment.status.value,
+                }
+            )
+        ),
         content_type=content_types.APPLICATION_JSON,
     )
 

@@ -116,7 +116,8 @@ retryable `409 IDEMPOTENCY_REQUEST_IN_PROGRESS` with `Retry-After: 5`.
 
 Reservations use a 60-second lease and retain the reserved resource ID. After a
 lease expires, a retry acquires recovery ownership and checks that ID. An
-attempt that fails without an answer (an unexpected `500` or a retryable error)
+attempt that fails without an answer (an unexpected `500` or a retryable error,
+including a failed workflow publication or a failed write of the stored response)
 ends its lease at once, so a same-key retry recovers immediately instead of
 receiving `409 IDEMPOTENCY_REQUEST_IN_PROGRESS` until the lease expires. If the
 resource does not exist, creation is retried using the same ID. If it exists,

@@ -120,10 +120,14 @@ def _recover_response(
         raise ResourceReadNotReady() from error
     if not exists:
         return None
-    if resume_existing is not None:
-        resume_existing(reservation.resource_id)
-    result = response_for_id(reservation.resource_id)
-    _complete(service, scope, request_hash, reservation.resource_id, result, now)
+    try:
+        if resume_existing is not None:
+            resume_existing(reservation.resource_id)
+        result = response_for_id(reservation.resource_id)
+        _complete(service, scope, request_hash, reservation.resource_id, result, now)
+    except Exception:
+        _release(service, scope, request_hash, reservation.resource_id, now)
+        raise
     return result
 
 
@@ -147,12 +151,22 @@ def _create_response(
                 "retryable": False,
             },
         )
-        _complete(service, scope, request_hash, resource_id, failure, now)
+        try:
+            _complete(service, scope, request_hash, resource_id, failure, now)
+        except Exception:
+            # The validation failure stays the answer; a retry re-validates instead of replaying it.
+            logger.exception("Could not store the validation failure", operation=scope.operation)
+            _release(service, scope, request_hash, resource_id, now)
         raise
     except Exception:
         _release(service, scope, request_hash, resource_id, now)
         raise
-    _complete(service, scope, request_hash, resource_id, result, now)
+    try:
+        _complete(service, scope, request_hash, resource_id, result, now)
+    except Exception:
+        # The resource exists: a retry recovers it under the same ID and stores the response then.
+        _release(service, scope, request_hash, resource_id, now)
+        raise
     return result
 
 

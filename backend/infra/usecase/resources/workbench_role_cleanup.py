@@ -36,7 +36,7 @@ def _send(event, context, status, reason=""):
     urllib.request.urlopen(request, timeout=30)
 
 
-def strip_foreign_policies(role_name, keep_managed, keep_inline, client=iam):
+def strip_foreign_policies(role_name, keep_managed, keep_inline, client=iam):  # noqa: C901
     """Remove every policy on role_name that its template does not declare. Returns what was removed."""
     removed = []
     try:

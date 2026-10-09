@@ -7,10 +7,7 @@ import assertpy
 from freezegun import freeze_time
 
 from app.provisioning.domain.command_handlers.product_provisioning import fail_launch, provision_product
-from app.provisioning.domain.commands.product_provisioning import (
-    fail_product_launch_command,
-    provision_product_command,
-)
+from app.provisioning.domain.commands.product_provisioning import fail_product_launch_command, provision_product_command
 from app.provisioning.domain.events.product_provisioning import insufficient_capacity_reached
 from app.provisioning.domain.model import network_subnet, product_status, provisioning_parameter
 from app.provisioning.domain.model.workbench_failure import FailureCode, classify_reason

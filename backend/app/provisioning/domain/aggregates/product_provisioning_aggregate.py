@@ -6,11 +6,7 @@ from datetime import datetime, timezone
 
 import semver
 
-from app.provisioning.domain.aggregates.internal import (
-    networking_helpers,
-    product_helpers,
-    provisioning_helpers,
-)
+from app.provisioning.domain.aggregates.internal import networking_helpers, product_helpers, provisioning_helpers
 from app.provisioning.domain.commands.product_provisioning import (
     authorize_user_ip_address_command,
     check_if_upgrade_available_command,
@@ -51,12 +47,8 @@ from app.provisioning.domain.events.product_provisioning import (
     provisioned_product_upgrade_failed,
     provisioned_product_upgraded,
 )
-from app.provisioning.domain.events.provisioned_product_configuration import (
-    provisioned_product_configuration_requested,
-)
-from app.provisioning.domain.events.provisioned_product_state import (
-    provisioned_product_stop_initiated,
-)
+from app.provisioning.domain.events.provisioned_product_configuration import provisioned_product_configuration_requested
+from app.provisioning.domain.events.provisioned_product_state import provisioned_product_stop_initiated
 from app.provisioning.domain.exceptions import domain_exception
 from app.provisioning.domain.model import (
     container_details,

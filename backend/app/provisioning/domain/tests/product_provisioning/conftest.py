@@ -27,12 +27,7 @@ from app.provisioning.domain.ports import (
     publishing_query_service,
     system_command_service,
 )
-from app.provisioning.domain.read_models import (
-    component_version_detail,
-    product,
-    project_assignment,
-    version,
-)
+from app.provisioning.domain.read_models import component_version_detail, product, project_assignment, version
 from app.shared.adapters.feature_toggling import backend_feature_toggles
 from app.shared.adapters.message_bus import message_bus
 from app.shared.adapters.unit_of_work_v2 import unit_of_work

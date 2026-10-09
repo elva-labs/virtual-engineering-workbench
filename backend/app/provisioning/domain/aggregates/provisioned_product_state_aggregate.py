@@ -17,16 +17,8 @@ from app.provisioning.domain.events.provisioned_product_state import (
 )
 from app.provisioning.domain.exceptions import domain_exception
 from app.provisioning.domain.model import product_status, provisioned_product
-from app.provisioning.domain.ports import (
-    container_management_service,
-    instance_management_service,
-    parameter_service,
-)
-from app.provisioning.domain.value_objects import (
-    project_id_value_object,
-    user_id_value_object,
-    user_role_value_object,
-)
+from app.provisioning.domain.ports import container_management_service, instance_management_service, parameter_service
+from app.provisioning.domain.value_objects import project_id_value_object, user_id_value_object, user_role_value_object
 from app.shared.ddd import aggregate
 from app.shared.middleware.authorization import VirtualWorkbenchRoles
 

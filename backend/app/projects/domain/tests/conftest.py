@@ -10,14 +10,7 @@ from app.projects.domain.commands.project_accounts import (
     on_board_project_account_command,
     reonboard_project_account_command,
 )
-from app.projects.domain.model import (
-    enrolment,
-    project,
-    project_account,
-    project_assignment,
-    technology,
-    user,
-)
+from app.projects.domain.model import enrolment, project, project_account, project_assignment, technology, user
 from app.projects.domain.ports import projects_query_service
 from app.projects.domain.value_objects import (
     account_description_value_object,
@@ -30,10 +23,7 @@ from app.projects.domain.value_objects import (
     project_id_value_object,
     region_value_object,
 )
-from app.shared.adapters.boto import (
-    parameter_service_v2,
-    resource_access_management_service,
-)
+from app.shared.adapters.boto import parameter_service_v2, resource_access_management_service
 from app.shared.adapters.message_bus import message_bus as msg_bus
 from app.shared.adapters.unit_of_work_v2 import unit_of_work as unit_of_work_v2
 from app.shared.adapters.unit_of_work_v2.repository_exception import RepositoryException

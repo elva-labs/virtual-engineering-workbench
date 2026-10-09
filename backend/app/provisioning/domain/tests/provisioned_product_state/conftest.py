@@ -22,10 +22,7 @@ from app.provisioning.domain.ports import (
     provisioned_products_query_service,
 )
 from app.provisioning.domain.read_models import version
-from app.provisioning.domain.tests.product_provisioning.conftest import (
-    TEST_COMPONENT_VERSION_DETAILS,
-    TEST_OS_VERSION,
-)
+from app.provisioning.domain.tests.product_provisioning.conftest import TEST_COMPONENT_VERSION_DETAILS, TEST_OS_VERSION
 from app.shared.adapters.boto.boto_provider import BotoProviderOptions
 from app.shared.adapters.message_bus import message_bus
 from app.shared.adapters.unit_of_work_v2 import unit_of_work

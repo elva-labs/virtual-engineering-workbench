@@ -150,7 +150,7 @@ class GenericDynamoDBRepository(unit_of_work.GenericRepository[unit_of_work.TPri
         """Updates arbitrary attributes of the entity in DynamoDB table."""
         self._update_attributes(pk, None, **kwargs)
 
-    def _update_attributes(
+    def _update_attributes(  # noqa: C901
         self, pk: unit_of_work.TPrimaryKey, expected: dict[str, typing.Any] | None, **kwargs
     ) -> None:
         if not kwargs:

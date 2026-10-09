@@ -10,9 +10,7 @@ from app.provisioning.domain.model import (
     provisioned_product_output,
     provisioning_parameter,
 )
-from app.provisioning.domain.read_models.component_version_detail import (
-    ComponentVersionDetail,
-)
+from app.provisioning.domain.read_models.component_version_detail import ComponentVersionDetail
 from app.shared.adapters.unit_of_work_v2 import unit_of_work
 
 

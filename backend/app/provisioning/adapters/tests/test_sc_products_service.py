@@ -7,10 +7,7 @@ from botocore import exceptions
 
 from app.provisioning.adapters.exceptions import adapter_exception
 from app.provisioning.adapters.services import sc_products_service
-from app.provisioning.domain.model import (
-    provisioned_product_output,
-    provisioning_parameter,
-)
+from app.provisioning.domain.model import provisioned_product_output, provisioning_parameter
 
 
 @mock.patch("uuid.uuid4", mock.MagicMock(return_value="123"))

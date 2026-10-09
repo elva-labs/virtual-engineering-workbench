@@ -27,7 +27,7 @@ from app.packaging.domain.value_objects.component_version import (
     component_version_id_value_object,
     components_versions_list_value_object,
 )
-from app.packaging.domain.value_objects.shared import user_id_value_object
+from app.packaging.domain.value_objects.shared import user_id_value_object, user_role_value_object
 
 BASE = ("comp-0000base", "vers-0000base", "base")
 DEPENDENTS = [("comp-1111aaaa", "vers-1111aaaa", "go-toolchain"), ("comp-2222bbbb", "vers-2222bbbb", "node-toolchain")]
@@ -150,11 +150,11 @@ def test_retire_ignores_a_stale_association_of_a_retired_version(
     message_bus = mock.Mock()
 
     # ACT
-    result = retire_component_version_command_handler.handle(
+    retire_component_version_command_handler.handle(
         command=retire_component_version_command.RetireComponentVersionCommand(
             componentId=component_id_value_object.from_str(BASE[0]),
             componentVersionId=component_version_id_value_object.from_str(BASE[1]),
-            serviceAuthorized=True,
+            userRoles=[user_role_value_object.from_str("ADMIN")],
             lastUpdatedBy=user_id_value_object.from_str("T000001"),
         ),
         component_version_query_service=get_dynamodb_component_version_query_service,
@@ -164,7 +164,10 @@ def test_retire_ignores_a_stale_association_of_a_retired_version(
     )
 
     # ASSERT
-    assertpy.assert_that(result).is_equal_to({"componentVersionId": BASE[1]})
+    retired = get_dynamodb_component_version_query_service.get_component_version(
+        component_id=BASE[0], version_id=BASE[1]
+    )
+    assertpy.assert_that(retired.status).is_equal_to(component_version.ComponentVersionStatus.Updating)
     message_bus.publish.assert_called_once()
 
 
@@ -188,7 +191,7 @@ def test_retire_still_refuses_a_live_dependent(
             command=retire_component_version_command.RetireComponentVersionCommand(
                 componentId=component_id_value_object.from_str(BASE[0]),
                 componentVersionId=component_version_id_value_object.from_str(BASE[1]),
-                serviceAuthorized=True,
+                userRoles=[user_role_value_object.from_str("ADMIN")],
                 lastUpdatedBy=user_id_value_object.from_str("T000001"),
             ),
             component_version_query_service=get_dynamodb_component_version_query_service,

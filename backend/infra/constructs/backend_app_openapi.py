@@ -8,17 +8,7 @@ import aws_cdk
 import cdk_nag
 import constructs
 import yaml
-from aws_cdk import (
-    Arn,
-    ArnFormat,
-    aws_apigateway,
-    aws_ec2,
-    aws_iam,
-    aws_lambda,
-    aws_logs,
-    aws_ssm,
-    aws_wafv2,
-)
+from aws_cdk import Arn, ArnFormat, aws_apigateway, aws_ec2, aws_iam, aws_lambda, aws_logs, aws_ssm, aws_wafv2
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from infra import config, constants

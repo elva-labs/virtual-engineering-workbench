@@ -6,12 +6,7 @@ from app.publishing.domain.events import product_version_creation_started
 from app.publishing.domain.exceptions import domain_exception
 from app.publishing.domain.model import portfolio, product, product_template, version
 from app.publishing.domain.model.version import VersionReleaseType
-from app.publishing.domain.ports import (
-    iac_service,
-    portfolios_query_service,
-    template_service,
-    versions_query_service,
-)
+from app.publishing.domain.ports import iac_service, portfolios_query_service, template_service, versions_query_service
 from app.publishing.domain.query_services import template_domain_query_service
 from app.publishing.domain.read_models import component_version_detail
 from app.publishing.domain.value_objects import (
@@ -22,7 +17,6 @@ from app.publishing.domain.value_objects import (
 from app.shared.adapters.message_bus import message_bus
 from app.shared.adapters.unit_of_work_v2 import unit_of_work
 from app.shared.api import parameter_service
-
 
 # The first version of a product, as for a version created in the portal (create_version_command_handler).
 INITIAL_VERSION = version.format_version_name("1", "0", "0", version.VersionType.ReleaseCandidate, "1")

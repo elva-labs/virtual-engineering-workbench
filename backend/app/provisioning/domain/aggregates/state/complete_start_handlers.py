@@ -9,10 +9,7 @@ from app.provisioning.domain.events.provisioned_product_state import (
     provisioned_product_started,
 )
 from app.provisioning.domain.model import product_status, provisioned_product, workbench_failure
-from app.provisioning.domain.ports import (
-    container_management_service,
-    instance_management_service,
-)
+from app.provisioning.domain.ports import container_management_service, instance_management_service
 from app.shared.adapters.message_bus import message_bus
 
 

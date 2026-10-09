@@ -5,11 +5,7 @@ import pytest
 from freezegun import freeze_time
 
 from app.publishing.domain.model import portfolio, product, shared_ami, version
-from app.publishing.domain.ports import (
-    amis_query_service,
-    products_query_service,
-    projects_query_service,
-)
+from app.publishing.domain.ports import amis_query_service, products_query_service, projects_query_service
 from app.publishing.domain.read_models import ami
 from app.shared.adapters.unit_of_work_v2 import unit_of_work
 

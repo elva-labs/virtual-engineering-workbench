@@ -2,10 +2,7 @@ import logging
 from datetime import datetime, timezone
 
 from app.publishing.domain.commands import publish_version_command
-from app.publishing.domain.events import (
-    product_version_published,
-    product_version_update_started,
-)
+from app.publishing.domain.events import product_version_published, product_version_update_started
 from app.publishing.domain.exceptions import domain_exception
 from app.publishing.domain.model import product, product_template, version
 from app.publishing.domain.ports import (

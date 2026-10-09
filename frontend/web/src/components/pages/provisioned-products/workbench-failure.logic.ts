@@ -8,7 +8,14 @@ import {
 } from '../../../services/API/proserve-wb-provisioning-api';
 import { ProjectRoles, selectedProjectState } from '../../../state';
 import { useNotifications } from '../../layout';
-import { isTransitional } from './status-refresh';
+const TRANSITIONAL_STATUSES: ReadonlySet<string> = new Set([
+  'STARTING', 'PROVISIONING', 'STOPPING', 'SHUTTING_DOWN',
+  'DEPROVISIONING', 'UPDATING', 'CONFIGURATION_IN_PROGRESS',
+]);
+
+function isTransitional(status?: string): boolean {
+  return status !== undefined && TRANSITIONAL_STATUSES.has(status.toUpperCase());
+}
 
 export interface FailureText {
   header: string,

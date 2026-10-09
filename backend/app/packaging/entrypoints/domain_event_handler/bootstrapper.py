@@ -39,10 +39,7 @@ from app.packaging.domain.commands.component import (
     remove_component_version_command,
     update_component_version_associations_command,
 )
-from app.packaging.domain.commands.pipeline import (
-    deploy_pipeline_command,
-    remove_pipeline_command,
-)
+from app.packaging.domain.commands.pipeline import deploy_pipeline_command, remove_pipeline_command
 from app.packaging.domain.commands.recipe import (
     deploy_recipe_version_command,
     remove_recipe_version_command,

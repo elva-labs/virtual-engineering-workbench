@@ -18,9 +18,7 @@ from app.provisioning.domain.ports import (
     provisioned_products_query_service,
     versions_query_service,
 )
-from app.provisioning.domain.query_services import (
-    provisioned_products_domain_query_service,
-)
+from app.provisioning.domain.query_services import provisioned_products_domain_query_service
 from app.provisioning.domain.read_models import version
 from app.provisioning.domain.tests.product_provisioning.conftest import (
     TEST_COMPONENT_VERSION_DETAILS,

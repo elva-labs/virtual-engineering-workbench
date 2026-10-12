@@ -33,7 +33,9 @@ class ProductsDomainQueryService:
         that reads them through /projects/{id}/... must check this first: a product id from another project
         returns nothing. The adapter raises for a missing product; that means "not in this project"."""
         try:
-            return self._products_qry_srv.get_product(project_id=project_id.value, product_id=product_id.value) is not None
+            return (
+                self._products_qry_srv.get_product(project_id=project_id.value, product_id=product_id.value) is not None
+            )
         except Exception:  # noqa: BLE001 - the adapter's not-found
             return False
 

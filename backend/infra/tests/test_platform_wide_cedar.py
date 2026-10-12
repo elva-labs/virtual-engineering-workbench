@@ -75,10 +75,14 @@ def _allowed(bc, action: str, path: str, user: str, groups: list[str], roles: li
     assert enricher.invoke(request, context)
     resolved = authorizer_steps.AVPEntityResolutionContext(
         entities=[
-            authorizer_steps.AVPEntity(identifier=authorizer_steps.AVPEntityIdentifier(entityId=user, entityType="VEW::User"))
+            authorizer_steps.AVPEntity(
+                identifier=authorizer_steps.AVPEntityIdentifier(entityId=user, entityType="VEW::User")
+            )
         ]
     )
-    authorizer_steps.VEWProjectAssignmentEntityResolver().resolve(request=request, context=context, avp_entities=resolved)
+    authorizer_steps.VEWProjectAssignmentEntityResolver().resolve(
+        request=request, context=context, avp_entities=resolved
+    )
     wire = [e.model_dump(exclude_none=True, by_alias=True) for e in resolved.entities]
     entities = [
         {

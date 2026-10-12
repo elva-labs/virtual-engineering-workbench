@@ -273,7 +273,12 @@ def test_the_program_roles_are_still_granted_through_the_s2s_api(lambda_context,
     )
     for roles in (["PROGRAM_OWNER"], ["PLATFORM_USER"], ["SUPPORT"]):
         response = invoke(
-            deps, authenticated_event, lambda_context, "PUT", f"/projects/project-id/groups/{GROUP_ID_2}", {"roles": roles}
+            deps,
+            authenticated_event,
+            lambda_context,
+            "PUT",
+            f"/projects/project-id/groups/{GROUP_ID_2}",
+            {"roles": roles},
         )
         assert response["statusCode"] == 200, response["body"]
     response = invoke(

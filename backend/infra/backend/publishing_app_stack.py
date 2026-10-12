@@ -270,7 +270,11 @@ class PublishingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                         bounded_contexts.BoundedContext.PROJECTS: [
                             ("GET", "/internal/projects/*/clients/*"),
                             ("GET", "/internal/projects/*/technologies/*"),
-                        ]
+                        ],
+                        # a version with workbenches on it is not retired without force.
+                        bounded_contexts.BoundedContext.PROVISIONING: [
+                            ("GET", "/internal/products/*/versions/*/provisioned"),
+                        ],
                     },
                 ),
                 backend_app_entrypoints.AppEntryPoint(

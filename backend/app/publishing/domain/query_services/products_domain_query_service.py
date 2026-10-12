@@ -24,6 +24,21 @@ class ProductsDomainQueryService:
     def get_products(self, project_id: project_id_value_object.ProjectIdValueObject) -> list[product.Product]:
         return self._products_qry_srv.get_products(project_id=project_id.value)
 
+    def product_in_project(
+        self,
+        project_id: project_id_value_object.ProjectIdValueObject,
+        product_id: product_id_value_object.ProductIdValueObject,
+    ) -> bool:
+        """Whether the project holds the product. Versions are keyed by product only, so a route
+        that reads them through /projects/{id}/... must check this first: a product id from another project
+        returns nothing. The adapter raises for a missing product; that means "not in this project"."""
+        try:
+            return (
+                self._products_qry_srv.get_product(project_id=project_id.value, product_id=product_id.value) is not None
+            )
+        except Exception:  # noqa: BLE001 - the adapter's not-found
+            return False
+
     def get_product(
         self,
         project_id: project_id_value_object.ProjectIdValueObject,

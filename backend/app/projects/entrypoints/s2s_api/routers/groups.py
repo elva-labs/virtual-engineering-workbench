@@ -8,6 +8,7 @@ from aws_lambda_powertools.event_handler.exceptions import BadRequestError, NotF
 from app.projects.entrypoints.s2s_api import bootstrapper
 from app.projects.entrypoints.s2s_api.model import api_model
 from app.projects.entrypoints.s2s_api.routers import access
+from app.projects.entrypoints.s2s_api.routers.assignments import _refuse_admin
 
 
 def _group_id(value: str) -> str:
@@ -58,6 +59,9 @@ def init(dependencies: bootstrapper.Dependencies) -> Router:
             project_id,
             "clients/projects/group_assignment.write",
         )
+        # A group with ADMIN would make every member a project ADMIN; platform admins come from the
+        # platform-admin-groups config, not grants.
+        _refuse_admin(request.roles)
         try:
             assignment = dependencies.group_assignment_service.put(
                 project_id, _group_id(group_id), request.roles, request.groupName

@@ -44,6 +44,9 @@ class AuthorizationContext(BaseModel):
     # The request's ADMIN comes only from a platform-admin group: no own ADMIN or PROGRAM_OWNER on the
     # project in the path. Backends record such writes as a platform admin's.
     platform_admin_access: bool = Field(False)
+    # A member of a platform-admin group. Only these reach the project-less actions (Cedar
+    # principal.platformAdmin); ADMIN on one project is not platform-wide.
+    platform_admin: bool = Field(False)
 
 
 class AuthorizationRequest(BaseModel):

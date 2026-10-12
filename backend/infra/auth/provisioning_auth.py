@@ -83,8 +83,8 @@ provisioning_bc_auth_policies: list[backend_app_api_auth.CedarPolicy] = [
     """,
     ),
     backend_app_api_auth.CedarPolicy(
-        # Not under a program, so no project entity: platform admins are counted by the authorizer as
-        # ADMIN somewhere (totalAdminAssignments), as CreateProject requires.
+        # Not under a project, so no project entity: the authorizer marks members of a platform-admin group
+        # with platformAdmin. ADMIN on one project is not platform-wide.
         description="Allows platform admins to view every spoke's capacity and request more quota.",
         statement=f"""
             permit (
@@ -95,7 +95,7 @@ provisioning_bc_auth_policies: list[backend_app_api_auth.CedarPolicy] = [
                 ])},
                 resource
             )
-            when {{ principal has {shared_auth_schema.SharedAttributes.TotalAdminAssignments} && principal.{shared_auth_schema.SharedAttributes.TotalAdminAssignments} > 0 }};
+            when {{ principal has {shared_auth_schema.SharedAttributes.PlatformAdmin} && principal.{shared_auth_schema.SharedAttributes.PlatformAdmin} }};
     """,
     ),
     backend_app_api_auth.CedarPolicy(

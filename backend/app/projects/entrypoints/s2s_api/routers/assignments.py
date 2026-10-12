@@ -3,7 +3,7 @@ from http import HTTPStatus
 from aws_lambda_powertools import Tracer
 from aws_lambda_powertools.event_handler import api_gateway, content_types
 from aws_lambda_powertools.event_handler.api_gateway import Router
-from aws_lambda_powertools.event_handler.exceptions import NotFoundError
+from aws_lambda_powertools.event_handler.exceptions import BadRequestError, NotFoundError
 
 from app.projects.domain.commands.users import (
     assign_user_command,
@@ -21,8 +21,18 @@ from app.projects.entrypoints.s2s_api.routers import access
 
 tracer = Tracer()
 
+# ADMIN is the platform's role (platform-admin groups), never a direct grant from a service client: it would
+# make the user an admin of the project and, through totalAdminAssignments, of the platform. Service clients
+# grant PROGRAM_OWNER, PLATFORM_USER and SUPPORT.
+S2S_REFUSED_ROLES = {"ADMIN"}
 
-def init(dependencies: bootstrapper.Dependencies) -> Router:
+
+def _refuse_admin(roles) -> None:
+    if S2S_REFUSED_ROLES & {str(role).upper() for role in roles or []}:
+        raise BadRequestError("ADMIN can't be granted through the S2S API")
+
+
+def init(dependencies: bootstrapper.Dependencies) -> Router:  # noqa: C901
     router = Router()
 
     @tracer.capture_method
@@ -46,10 +56,7 @@ def init(dependencies: bootstrapper.Dependencies) -> Router:
             status_code=HTTPStatus.OK,
             body=api_model.GetProjectAssignmentsResponse(
                 assignments=[
-                    api_model.GetProjectAssignmentsResponseItem.model_validate(
-                        a.model_dump()
-                    )
-                    for a in assignments
+                    api_model.GetProjectAssignmentsResponseItem.model_validate(a.model_dump()) for a in assignments
                 ],
             ),
             content_type=content_types.APPLICATION_JSON,
@@ -69,14 +76,12 @@ def init(dependencies: bootstrapper.Dependencies) -> Router:
             project_id,
             "clients/projects/assignment.write",
         )
+        _refuse_admin(request.roles)
         dependencies.command_bus.handle(
             assign_user_command.AssignUserCommand(
                 project_id=project_id_value_object.from_str(project_id),
                 user_id=user_id_value_object.from_str(request.userId.upper()),
-                roles=[
-                    user_role_value_object.from_str(role)
-                    for role in request.roles or []
-                ],
+                roles=[user_role_value_object.from_str(role) for role in request.roles or []],
                 user_email=request.userEmail,
                 user_display_name=request.userDisplayName,
             )
@@ -107,10 +112,7 @@ def init(dependencies: bootstrapper.Dependencies) -> Router:
             project_id,
             "clients/projects/assignment.write",
         )
-        user_ids = [
-            user_id_value_object.from_str(user_id.upper())
-            for user_id in request.userIds
-        ]
+        user_ids = [user_id_value_object.from_str(user_id.upper()) for user_id in request.userIds]
 
         cmd = unassign_user_command.UnAssignUserCommand(
             project_id=project_id_value_object.from_str(project_id),
@@ -138,22 +140,17 @@ def init(dependencies: bootstrapper.Dependencies) -> Router:
             project_id,
             "clients/projects/assignment.write",
         )
+        _refuse_admin(request.roles)
         user_principal_name = router.context.get("user_principal").user_name.upper()
 
         dependencies.command_bus.handle(
             reassign_user_command.ReAssignUserCommand(
                 project_id=project_id_value_object.from_str(project_id),
-                user_ids=[
-                    user_id_value_object.from_str(user_id.upper())
-                    for user_id in request.userIds or []
-                ],
+                user_ids=[user_id_value_object.from_str(user_id.upper()) for user_id in request.userIds or []],
                 initiating_user_id=user_id_value_object.from_str(
                     user_principal_name, user_id_value_object.UserIdType.Service
                 ),
-                roles=[
-                    user_role_value_object.from_str(role)
-                    for role in request.roles or []
-                ],
+                roles=[user_role_value_object.from_str(role) for role in request.roles or []],
             )
         )
 
@@ -186,26 +183,21 @@ def init(dependencies: bootstrapper.Dependencies) -> Router:
             raise NotFoundError("User assignment not found")
         return api_gateway.Response(
             status_code=HTTPStatus.OK,
-            body=api_model.GetUserRolesResponse.model_validate(
-                project_assignment.model_dump()
-            ),
+            body=api_model.GetUserRolesResponse.model_validate(project_assignment.model_dump()),
             content_type=content_types.APPLICATION_JSON,
         )
 
     @router.put("/projects/<project_id>/users/<user_id>")
-    def put_user_assignment(
-        request: api_model.PutUserAssignmentRequest, project_id: str, user_id: str
-    ):
+    def put_user_assignment(request: api_model.PutUserAssignmentRequest, project_id: str, user_id: str):
         access.require_project_access(
             router,
             dependencies.projects_query_service,
             project_id,
             "clients/projects/assignment.write",
         )
+        _refuse_admin(request.roles)
         user_id = user_id.upper()
-        existing = dependencies.projects_query_service.get_user_assignment(
-            project_id, user_id
-        )
+        existing = dependencies.projects_query_service.get_user_assignment(project_id, user_id)
         if existing is None:
             raise NotFoundError("User assignment not found")
         dependencies.command_bus.handle(
@@ -225,15 +217,9 @@ def init(dependencies: bootstrapper.Dependencies) -> Router:
             projectId=project_id,
             userId=user_id,
             roles=request.roles,
-            userEmail=(
-                request.userEmail
-                if request.userEmail is not None
-                else existing.userEmail
-            ),
+            userEmail=(request.userEmail if request.userEmail is not None else existing.userEmail),
             userDisplayName=(
-                request.userDisplayName
-                if request.userDisplayName is not None
-                else existing.userDisplayName
+                request.userDisplayName if request.userDisplayName is not None else existing.userDisplayName
             ),
         )
 

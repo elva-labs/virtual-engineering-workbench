@@ -347,6 +347,11 @@ aws cloudformation deploy \
 
 This must be deployed into the spoke account, not the main account.
 
+Onboarding delegates management authority to the hub through IAM trust, including workbench stops.
+For company deployments, use a project per company with its enrolled spoke accounts/regions and
+project-scoped policy administration. See [Workbench shutdown policy](docs/idle-stop.md) for
+inheritance, the portal controls, and the intended cross-company data and control flow.
+
 VEW comes pre-configured with a tag based VPC subnet selection strategy to provision workbenches. Subnet selection is defined in [backend/infra/config.py](backend/infra/config.py), `provisioning-subnet-selector` setting. Available subnet selection strategies are:
 
 - _TaggedSubnet_ (default) - filters for subnets tagged with a tag specified in the `provisioning-subnet-selector-tag` setting.
@@ -398,6 +403,7 @@ If you just deployed VEW and want to see it in action, start here:
 - [Build your first product](examples/freertos/README.md) — create a FreeRTOS virtual target from scratch: component, recipe, pipeline, product, and a running instance you can SSH into.
 - [Launch a product](docs/launch-a-product.md) — provision any product from the catalog.
 - [Connect to a product](docs/connect-to-a-product.md) — reach your running product via browser, DCV client, or SSH.
+- [Workbench shutdown policy](docs/idle-stop.md) — manage project defaults and owner overrides, and configure hub-managed idle stopping.
 
 More examples (Android Cuttlefish, QEMU/KVM) are in the [examples/](examples/) folder.
 

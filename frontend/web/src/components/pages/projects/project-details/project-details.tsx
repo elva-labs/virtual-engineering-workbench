@@ -21,6 +21,7 @@ import { useNavigationPaths } from '../../../layout/navigation/navigation-paths.
 import { RouteNames } from '../../../layout/navigation/navigation.static';
 import { WorkbenchAppLayout } from '../../../layout/workbench-app-layout/workbench-app-layout';
 import { ProjectAccounts } from './project-accounts';
+import { ProjectShutdownPolicy } from './project-shutdown-policy';
 
 const i18n = {
   breadcrumbLevel1: 'Administration',
@@ -39,6 +40,7 @@ const i18n = {
 };
 
 const TAB_ID_ACCOUNTS = 'accounts';
+const TAB_ID_SHUTDOWN = 'shutdown-policy';
 
 /* eslint @typescript-eslint/no-magic-numbers: "off" */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -53,7 +55,7 @@ const projectDetails: FC<SampleProps> = () => {
   const { getPathFor, navigateTo } = useNavigationPaths();
 
   useEffect(() => {
-    if (!!selectedTab && !new Set([TAB_ID_ACCOUNTS]).has(selectedTab)) {
+    if (!!selectedTab && !new Set([TAB_ID_ACCOUNTS, TAB_ID_SHUTDOWN]).has(selectedTab)) {
       setSelectedTab(TAB_ID_ACCOUNTS);
     }
   }, []);
@@ -156,10 +158,18 @@ const projectDetails: FC<SampleProps> = () => {
       );
     }
 
+    tabs.push({
+      label: 'Shutdown policy',
+      id: TAB_ID_SHUTDOWN,
+      content: selectedProject?.projectId && !loadingProjects
+        ? <ProjectShutdownPolicy projectId={selectedProject.projectId} />
+        : <Spinner />,
+    });
+
     return (
       <Tabs
         tabs={tabs}
-        activeTabId={selectedTab || TAB_ID_ACCOUNTS}
+        activeTabId={tabs.some(tab => tab.id === selectedTab) ? selectedTab ?? undefined : tabs[0]?.id}
         onChange={(e) => setSelectedTab(e.detail.activeTabId)}
       />
     );
@@ -170,6 +180,11 @@ const projectDetails: FC<SampleProps> = () => {
       <HelpPanel
         header={<h2>Program details</h2>}
       >
+        <h3>Shutdown policy</h3>
+        <p>
+          Program administrators and owners can manage idle, nightly and weekend shutdowns and the overrides
+          available to workbench owners. Always-on mode takes precedence over all automated shutdowns.
+        </p>
         <h3>Accounts</h3>
         <p>
           Users with Frontend Admin role can onboard or reonboard AWS accounts to a program.

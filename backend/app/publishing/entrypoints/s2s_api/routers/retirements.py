@@ -51,7 +51,8 @@ class VersionInUse(s2s_exception.ResourceConflict):
     def __init__(self, count: int):
         self.detail = (
             f"{count} workbench(es) are still on this version: retired, they keep running but can no longer"
-            " change size until their owners update. Update or remove them first, or set force."
+            " change size until their owners move them to another version. Move or remove them first, or pass"
+            " force."
         )
         super().__init__(self.detail)
 

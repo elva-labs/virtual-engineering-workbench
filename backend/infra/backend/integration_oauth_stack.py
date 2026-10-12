@@ -114,6 +114,7 @@ class IntegrationOauthStack(aws_cdk.Stack):
                     "product.write": "Allows service clients to create, update and archive products",
                     "version.read": "Allows service clients to read product versions and their stages",
                     "version.promote": "Allows service clients to promote a product version to a stage",
+                    "version.retire": "Allows service clients to retire a product version",
                 },
             ),
         )
@@ -188,7 +189,7 @@ class IntegrationOauthStack(aws_cdk.Stack):
                 ),
                 backend_app_api_oauth_client.AppClientResourceServer(
                     resource_server=publishing_resource_server,
-                    scopes=["product.read", "product.write", "version.read", "version.promote"],
+                    scopes=["product.read", "product.write", "version.read", "version.promote", "version.retire"],
                 ),
                 backend_app_api_oauth_client.AppClientResourceServer(
                     resource_server=publishing_compound_resource_server,

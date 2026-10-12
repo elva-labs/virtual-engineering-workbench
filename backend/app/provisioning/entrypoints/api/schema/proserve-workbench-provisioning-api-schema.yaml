@@ -806,6 +806,41 @@ paths:
         passthroughBehavior: "when_no_match"
         contentHandling: "CONVERT_TO_TEXT"
         credentials: "{{apigw_invocation_role_arn}}"
+  /internal/products/{productId}/versions/{versionId}/provisioned:
+    get:
+      description: "The non-terminated provisioned products on a product version, in every project"
+      operationId: "GetActiveProvisionedProductsOfVersionInternal"
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "200 response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetAllProvisionedProductsResponse"
+      security:
+        - sigv4: []
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        responses:
+          default:
+            statusCode: "200"
+        passthroughBehavior: "when_no_match"
+        contentHandling: "CONVERT_TO_TEXT"
+        credentials: "{{apigw_invocation_role_arn}}"
   /internal/projects/{projectId}/products/provisioned:
     post:
       description: "Launch a specific product"

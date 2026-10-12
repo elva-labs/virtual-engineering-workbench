@@ -1678,6 +1678,34 @@ def test_internal_get_provisioning_subnets(
     assertpy.assert_that(passed_args.get("region").value).is_equal_to("us-east-1")
 
 
+def test_internal_lists_the_workbenches_on_a_version(
+    lambda_context,
+    authenticated_event,
+    mocked_dependencies,
+    mocked_virtual_targets_domain_query_service,
+    mock_provisioned_product,
+):
+    # ARRANGE: Publishing's retire guard asks which workbenches are still on a version.
+    from app.provisioning.entrypoints.api import handler
+
+    mocked_virtual_targets_domain_query_service.get_active_provisioned_products_of_version.return_value = [
+        mock_provisioned_product("vew-pp-1", "prod-1", "user-1")
+    ]
+    handler.dependencies = mocked_dependencies
+    event = authenticated_event(None, "/internal/products/prod-1/versions/vers-1/provisioned", "GET", iam_auth=True)
+
+    # ACT
+    result = handler.handler(event, lambda_context)
+
+    # ASSERT
+    assertpy.assert_that(result["statusCode"]).is_equal_to(200)
+    body = json.loads(result["body"])
+    assertpy.assert_that([pp["provisionedProductId"] for pp in body["provisionedProducts"]]).is_equal_to(["vew-pp-1"])
+    mocked_virtual_targets_domain_query_service.get_active_provisioned_products_of_version.assert_called_once_with(
+        product_id="prod-1", version_id="vers-1"
+    )
+
+
 @pytest.fixture
 def construct_query_parameters():  # noqa: C901
     def __construct_query_parameters(

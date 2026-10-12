@@ -2,6 +2,7 @@ import logging
 
 import assertpy
 
+from app.projects.domain.project_lifecycle_service import ProjectLifecycleService
 from app.projects.entrypoints.api import bootstrapper, config
 
 
@@ -14,3 +15,4 @@ def test_bootstrapper():
 
     # ASSERT
     assertpy.assert_that(dependencies).is_not_none()
+    assert isinstance(dependencies.project_lifecycle_service, ProjectLifecycleService)

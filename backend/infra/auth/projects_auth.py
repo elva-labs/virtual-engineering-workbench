@@ -4,6 +4,21 @@ from infra.constructs import backend_app_api_auth
 
 projects_bc_auth_policies: list[backend_app_api_auth.CedarPolicy] = [
     backend_app_api_auth.CedarPolicy(
+        description="Allows project admins and program owners to manage their project's shutdown policy",
+        statement=f"""
+            permit (
+                principal,
+                action in {projects_auth_schema.get_full_action_names([
+                    projects_auth_schema.ProjectsBCActions.GetProjectWorkbenchLifecycle,
+                    projects_auth_schema.ProjectsBCActions.UpdateProjectWorkbenchLifecycle,
+                    projects_auth_schema.ProjectsBCActions.DeleteProjectWorkbenchLifecycle,
+                ])},
+                resource
+            )
+            when {{ principal in {config.CedarResourceAttribute.ADMINS} || principal in {config.CedarResourceAttribute.PROGRAM_OWNERS} }};
+        """,
+    ),
+    backend_app_api_auth.CedarPolicy(
         description="Allows admins to onboard accounts, manage users, and change project configuration",
         statement=f"""
             permit (
@@ -65,6 +80,7 @@ projects_bc_auth_policies: list[backend_app_api_auth.CedarPolicy] = [
                 principal,
                 action in {projects_auth_schema.get_full_action_names([
                     projects_auth_schema.ProjectsBCActions.GetProject,
+                    projects_auth_schema.ProjectsBCActions.GetProjectWorkbenchLifecycle,
                     projects_auth_schema.ProjectsBCActions.GetProjectAccountHealthEndpoints,
                     projects_auth_schema.ProjectsBCActions.GetProjectAccounts,
                 ])},
@@ -80,6 +96,7 @@ projects_bc_auth_policies: list[backend_app_api_auth.CedarPolicy] = [
                 principal,
                 action in {projects_auth_schema.get_full_action_names([
                     projects_auth_schema.ProjectsBCActions.GetProject,
+                    projects_auth_schema.ProjectsBCActions.GetProjectWorkbenchLifecycle,
                     projects_auth_schema.ProjectsBCActions.GetProjectAccounts,
                 ])},
                 resource

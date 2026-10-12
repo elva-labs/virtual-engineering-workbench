@@ -7,7 +7,7 @@ from urllib.parse import unquote
 
 from aws_lambda_powertools import logging, tracing
 from aws_lambda_powertools.event_handler import api_gateway, content_types
-from aws_lambda_powertools.event_handler.exceptions import NotFoundError
+from aws_lambda_powertools.event_handler.exceptions import ForbiddenError, NotFoundError
 from aws_lambda_powertools.event_handler.openapi.models import Server
 from aws_lambda_powertools.event_handler.openapi.params import Query
 from aws_lambda_powertools.utilities import typing
@@ -32,7 +32,7 @@ from app.projects.domain.commands.technologies import (
 )
 from app.projects.domain.commands.users import assign_user_command, reassign_user_command, unassign_user_command
 from app.projects.domain.exceptions import domain_exception
-from app.projects.domain.model import enrolment, project_account, project_assignment
+from app.projects.domain.model import enrolment, project_account, project_assignment, workbench_lifecycle
 from app.projects.domain.value_objects import (
     account_description_value_object,
     account_id_value_object,
@@ -331,6 +331,96 @@ def update_project(
         body=api_model.UpdateProjectResponse(),
         content_type=content_types.APPLICATION_JSON,
     )
+
+
+def _lifecycle_project(project_id: str):
+    project = dependencies.projects_query_service.get_project_by_id(id=project_id)
+    if project is None:
+        raise NotFoundError("Project not found")
+    return project
+
+
+def _can_manage_lifecycle(project) -> bool:
+    # userRoles is selected for the project in the request path by the trusted authorizer.
+    # A role on another project is never included; client headers and global role counts are ignored.
+    principal = app.context.get("user_principal")
+    roles = principal.user_roles or []
+    auth_context = app.current_event.get("requestContext", {}).get("authorizer") or {}
+    return (
+        principal.auth_type == authorization.AuthType.CognitoUserJWT
+        and any(
+            role in roles
+            for role in (authorization.VirtualWorkbenchRoles.Admin, authorization.VirtualWorkbenchRoles.ProgramOwner)
+        )
+        and not project.managedBy
+        and not auth_context.get("projectManagedBy")
+    )
+
+
+def _lifecycle_response(project) -> api_gateway.Response[api_model.ProjectWorkbenchLifecycleResponse]:
+    return api_gateway.Response(
+        status_code=HTTPStatus.OK,
+        content_type=content_types.APPLICATION_JSON,
+        body=api_model.ProjectWorkbenchLifecycleResponse(
+            projectId=project.projectId,
+            settings=project.workbenchLifecycle,
+            platformDefaults=api_model.PlatformLifecycleDefaults.model_validate(
+                app_config.get_workbench_lifecycle_defaults()
+            ),
+            deployment=api_model.LifecycleDeployment.model_validate(app_config.get_workbench_lifecycle_deployment()),
+            canEdit=_can_manage_lifecycle(project),
+            managedBy=project.managedBy,
+            managedSource=project.managedSource,
+        ),
+    )
+
+
+def _set_lifecycle(project_id: str, settings: workbench_lifecycle.WorkbenchLifecycle | None):
+    project = _lifecycle_project(project_id)
+    # Also check persisted ownership, so a stale authorizer cannot permit an external-project write.
+    if project.managedBy:
+        return api_gateway.Response(
+            status_code=HTTPStatus.CONFLICT,
+            content_type=content_types.APPLICATION_JSON,
+            body=api_model.ProjectLifecycleErrorResponse(
+                code=externally_managed.ERROR_CODE,
+                message=externally_managed.refusal_message(project.managedBy, project.managedSource or ""),
+            ),
+        )
+    if not _can_manage_lifecycle(project):
+        raise ForbiddenError("Only this project's admins and program owners may change its shutdown policy")
+    try:
+        updated = dependencies.project_lifecycle_service.set_workbench_lifecycle(project_id, settings)
+    except KeyError:
+        raise NotFoundError("Project not found") from None
+    return _lifecycle_response(updated)
+
+
+@tracer.capture_method
+@app.get("/projects/<project_id>/workbench-lifecycle")
+def get_project_workbench_lifecycle(
+    project_id: str,
+) -> api_gateway.Response[api_model.ProjectWorkbenchLifecycleResponse]:
+    """Returns the project's override and deployment settings; an absent override inherits defaults."""
+    return _lifecycle_response(_lifecycle_project(project_id))
+
+
+@tracer.capture_method
+@app.put("/projects/<project_id>/workbench-lifecycle")
+def put_project_workbench_lifecycle(
+    project_id: str, request: workbench_lifecycle.WorkbenchLifecycle
+) -> api_gateway.Response[api_model.ProjectWorkbenchLifecycleResponse | api_model.ProjectLifecycleErrorResponse]:
+    """Replaces the project's shutdown policy within the existing timeout bounds."""
+    return _set_lifecycle(project_id, request)
+
+
+@tracer.capture_method
+@app.delete("/projects/<project_id>/workbench-lifecycle")
+def delete_project_workbench_lifecycle(
+    project_id: str,
+) -> api_gateway.Response[api_model.ProjectWorkbenchLifecycleResponse | api_model.ProjectLifecycleErrorResponse]:
+    """Removes the override, restoring inheritance from the deployment."""
+    return _set_lifecycle(project_id, None)
 
 
 @tracer.capture_method

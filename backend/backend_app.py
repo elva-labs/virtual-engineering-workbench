@@ -173,6 +173,7 @@ projects_stack = projects_app_stack.ProjectsAppStack(
     app,
     "ProjectsAppStack",
     app_config=projects_app_config,
+    workbench_lifecycle_config=provisioning_app_config.component_specific["workbench-lifecycle"],
     env=aws_cdk.Environment(account=projects_app_config.account, region=projects_app_config.region),
     custom_api_domain=custom_domain if custom_domain else "",
     organization_id=organization_id,

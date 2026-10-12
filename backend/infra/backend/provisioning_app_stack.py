@@ -21,16 +21,13 @@ from aws_cdk import (
 )
 
 from app.provisioning import domain
-from app.provisioning.domain.commands.provisioned_product_state import (
-    sync_provisioned_product_state_command,
-)
-from app.provisioning.domain.events.provisioned_product_sync import (
-    provisioned_product_status_out_of_sync,
-)
+from app.provisioning.domain.commands.provisioned_product_state import sync_provisioned_product_state_command
+from app.provisioning.domain.events.provisioned_product_sync import provisioned_product_status_out_of_sync
 from app.shared.api import bounded_contexts
 from infra import config, constants
 from infra.auth import provisioning_auth, provisioning_auth_schema
 from infra.backend import vew_bounded_context_stack
+from infra.backend.workbench_lifecycle_runtime_config import NIGHTLY_STOP_SCHEDULE_ENABLED
 from infra.constructs import (
     backend_app_api_auth,
     backend_app_entrypoints,
@@ -42,9 +39,7 @@ from infra.constructs import (
 )
 from infra.constructs.eventbridge import l3_event_bus
 from infra.constructs.pipes import topic_to_event_bus_pipe
-from infra.constructs.provisioned_product_configuration import (
-    provisioned_product_configuration_state_machine,
-)
+from infra.constructs.provisioned_product_configuration import provisioned_product_configuration_state_machine
 from infra.helpers import ops_monitoring
 
 # Global variables
@@ -1398,7 +1393,7 @@ class ProvisioningAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
             schedule_expression=f"cron({int(minute)} {int(hour)} * * ? *)",
             schedule_expression_timezone=lifecycle["timezone"],
             flexible_time_window=aws_scheduler.CfnSchedule.FlexibleTimeWindowProperty(mode="OFF"),
-            state="ENABLED" if lifecycle["nightlyStop"] else "DISABLED",
+            state="ENABLED" if NIGHTLY_STOP_SCHEDULE_ENABLED else "DISABLED",
             target=aws_scheduler.CfnSchedule.TargetProperty(
                 arn=jobs_fn.function_arn,
                 role_arn=scheduler_role.role_arn,

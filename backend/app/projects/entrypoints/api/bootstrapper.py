@@ -20,10 +20,7 @@ from app.projects.domain.command_handlers.project_accounts import (
     on_board_project_account_command_handler,
     reonboard_project_account_command_handler,
 )
-from app.projects.domain.command_handlers.projects import (
-    create_project_command_handler,
-    update_project_command_handler,
-)
+from app.projects.domain.command_handlers.projects import create_project_command_handler, update_project_command_handler
 from app.projects.domain.command_handlers.technologies import (
     add_technology_command_handler,
     delete_technology_command_handler,
@@ -45,26 +42,16 @@ from app.projects.domain.commands.project_accounts import (
     on_board_project_account_command,
     reonboard_project_account_command,
 )
-from app.projects.domain.commands.projects import (
-    create_project_command,
-    update_project_command,
-)
+from app.projects.domain.commands.projects import create_project_command, update_project_command
 from app.projects.domain.commands.technologies import (
     add_technology,
     delete_technology_command,
     update_technology_command,
 )
-from app.projects.domain.commands.users import (
-    assign_user_command,
-    reassign_user_command,
-    unassign_user_command,
-)
-from app.projects.domain.ports import (
-    enrolment_query_service,
-    projects_query_service,
-    technologies_query_service,
-)
+from app.projects.domain.commands.users import assign_user_command, reassign_user_command, unassign_user_command
+from app.projects.domain.ports import enrolment_query_service, projects_query_service, technologies_query_service
 from app.projects.domain.ports import user_directory_service as user_directory_port
+from app.projects.domain.project_lifecycle_service import ProjectLifecycleService
 from app.projects.entrypoints.api import config
 from app.shared.adapters.message_bus import (
     command_bus,
@@ -73,9 +60,7 @@ from app.shared.adapters.message_bus import (
     in_memory_command_bus,
     message_bus_metrics,
 )
-from app.shared.adapters.unit_of_work_v2 import (
-    dynamodb_migrations,
-)
+from app.shared.adapters.unit_of_work_v2 import dynamodb_migrations
 from app.shared.adapters.unit_of_work_v2 import dynamodb_unit_of_work as dynamodb_unit_of_work_v2
 from app.shared.api import aws_events_api
 from app.shared.instrumentation import power_tools_metrics
@@ -87,6 +72,7 @@ class Dependencies(BaseModel):
     projects_query_service: projects_query_service.ProjectsQueryService
     technologies_query_service: technologies_query_service.TechnologiesQueryService
     enrolment_query_service: enrolment_query_service.EnrolmentQueryService
+    project_lifecycle_service: Optional[ProjectLifecycleService] = None
     user_info_client: Optional[Callable[[str], dict]] = None
     user_directory_service: Optional[user_directory_port.UserDirectoryService] = None
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -325,4 +311,5 @@ def bootstrap(
         enrolment_query_service=enrolment_qry_srv,
         user_info_client=get_user_info if user_pool_url else None,
         user_directory_service=user_directory_svc,
+        project_lifecycle_service=ProjectLifecycleService(shared_uow_v2, projects_query_service, message_bus),
     )

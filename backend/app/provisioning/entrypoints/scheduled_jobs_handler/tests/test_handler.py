@@ -197,3 +197,43 @@ def test_provisioned_product_batch_stop_handler(
 
     # ASSERT
     mock_initiate_provisioned_product_batch_stop_command_handler.assert_called_once()
+
+
+def test_idle_stop_counts_initiation_failures_separately_from_read_failures(monkeypatch, capsys):
+    from types import SimpleNamespace
+    from unittest import mock
+
+    from app.provisioning.entrypoints.scheduled_jobs_handler import handler
+
+    result = {
+        "dryRun": False,
+        "stopped": ["pp-ok"],
+        "missing": ["pp-partial"],
+        "failed": ["pp-read-error", "pp-stop-error"],
+        "stopFailed": ["pp-stop-error"],
+        "kept": {},
+    }
+    srv = mock.Mock()
+    srv.idle_stop.return_value = result
+    monkeypatch.setattr(handler, "dependencies", SimpleNamespace(workbench_lifecycle_srv=srv))
+    assert handler._idle_stop(dry_run=False) == result
+    emitted = [json.loads(line) for line in capsys.readouterr().out.splitlines() if line]
+    metrics = {
+        name: row[name][0]
+        for row in emitted
+        for name in (
+            "IdleStopStopped",
+            "IdleStopWouldStop",
+            "IdleSignalMissing",
+            "IdleSignalReadFailed",
+            "IdleStopFailed",
+        )
+        if name in row
+    }
+    assert metrics == {
+        "IdleStopStopped": 1,
+        "IdleStopWouldStop": 0,
+        "IdleSignalMissing": 1,
+        "IdleSignalReadFailed": 1,
+        "IdleStopFailed": 1,
+    }

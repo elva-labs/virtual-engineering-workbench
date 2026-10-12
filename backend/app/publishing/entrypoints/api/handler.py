@@ -3,6 +3,7 @@ from typing import Annotated
 
 from aws_lambda_powertools import logging, tracing
 from aws_lambda_powertools.event_handler import api_gateway, content_types
+from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 from aws_lambda_powertools.event_handler.openapi.models import Server
 from aws_lambda_powertools.event_handler.openapi.params import Query
 from aws_lambda_powertools.utilities import typing
@@ -86,6 +87,16 @@ TAG_PRODUCTS = "Products"
 TAG_PRODUCT_VERSIONS = "Product Versions"
 TAG_AMI = "Images"
 logger.debug("Dummy change to trigger env variable deployment.")
+
+
+def _require_product_in_project(project_id: str, product_id: str) -> None:
+    """Version reads keyed by product only answer for the project in the path, not any project's
+    product id (404 otherwise, like the other per-product routes)."""
+    if not dependencies.products_domain_qry_srv.product_in_project(
+        project_id=project_id_value_object.from_str(project_id),
+        product_id=product_id_value_object.from_str(product_id),
+    ):
+        raise NotFoundError(f"Product {product_id} not found in project {project_id}.")
 
 
 @tracer.capture_method
@@ -482,6 +493,7 @@ def get_latest_major_versions(
 ) -> api_gateway.Response[api_model.GetLatestMajorVersionsResponse]:
     """Gets the latest major versions of the product."""
 
+    _require_product_in_project(project_id, product_id)
     version_summaries = dependencies.versions_domain_qry_srv.get_latest_major_version_summaries(
         product_id=product_id_value_object.from_str(product_id)
     )
@@ -512,6 +524,7 @@ def get_available_product_versions(
     stage = stage_value_object.from_str(stage_param.pop() if stage_param else None)
     region = region_value_object.from_str(region_param.pop() if region_param else None)
 
+    _require_product_in_project(project_id, product_id)
     versions = dependencies.versions_domain_qry_srv.get_versions_ready_for_provisioning(
         product_id=product_id_value_object.from_str(product_id),
         stage=stage,

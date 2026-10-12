@@ -16,21 +16,27 @@ from app.publishing.adapters.repository import dynamo_entity_config
 from app.publishing.adapters.services.projects_api_service_client_project_access_service import (
     ProjectsApiServiceClientProjectAccessService,
 )
+from app.publishing.adapters.services.provisioning_api_version_workbenches_query_service import (
+    ProvisioningApiVersionWorkbenchesQueryService,
+)
 from app.publishing.domain.command_handlers import (
     archive_product_command_handler,
     create_product_command_handler,
     promote_version_command_handler,
+    retire_version_command_handler,
     update_product_command_handler,
 )
 from app.publishing.domain.commands import (
     archive_product_command,
     create_product_command,
     promote_version_command,
+    retire_version_command,
     update_product_command,
 )
 from app.publishing.domain.model import product
 from app.publishing.domain.ports.service_client_project_access_service import ServiceClientProjectAccessService
 from app.publishing.domain.ports.technologies_query_service import TechnologiesQueryService
+from app.publishing.domain.ports.version_workbenches_query_service import VersionWorkbenchesQueryService
 from app.publishing.entrypoints.s2s_api import config
 from app.shared.adapters.idempotency import dynamodb_idempotency_service
 from app.shared.adapters.message_bus import (
@@ -75,6 +81,8 @@ class Dependencies(BaseModel):
     project_access_service: ServiceClientProjectAccessService
     technologies_query_service: TechnologiesQueryService
     idempotency_service: IdempotencyService
+    # the workbenches still on a version, before it is retired.
+    version_workbenches_query_service: VersionWorkbenchesQueryService | None = None
     platform_program_id: str = ""
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -140,13 +148,23 @@ def bootstrap(app_config: config.AppConfig, logger: logging.Logger) -> Dependenc
                 ),
             ),
         )
+        .register_handler(
+            retire_version_command.RetireVersionCommand,
+            partial(
+                retire_version_command_handler.handle,
+                uow=uow,
+                message_bus=message_bus,
+                versions_qry_srv=versions_qry_srv,
+            ),
+        )
     )
 
-    projects_api = service_registry.ServiceRegistry.from_config(
+    registry = service_registry.ServiceRegistry.from_config(
         app_config=app_config,
         ssm_client=session.client("ssm", region_name=region),
         logger=logger,
-    ).api_for(bounded_contexts.BoundedContext.PROJECTS)
+    )
+    projects_api = registry.api_for(bounded_contexts.BoundedContext.PROJECTS)
 
     return Dependencies(
         command_bus=bus,
@@ -165,5 +183,8 @@ def bootstrap(app_config: config.AppConfig, logger: logging.Logger) -> Dependenc
         ),
         # Records live in the Publishing table (TTL on ExpireDate).
         idempotency_service=dynamodb_idempotency_service.DynamoDBIdempotencyService(table_name, dynamodb_client),
+        version_workbenches_query_service=ProvisioningApiVersionWorkbenchesQueryService(
+            api=registry.api_for(bounded_contexts.BoundedContext.PROVISIONING)
+        ),
         platform_program_id=app_config.get_platform_program_id(),
     )

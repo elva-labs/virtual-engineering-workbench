@@ -3,8 +3,8 @@ info:
   title: Virtual Engineering Workbench Publishing S2S API
   version: 1.0.0
   description: >-
-    Project-scoped products, product versions, and version promotion to a stage for service
-    clients, using internal IDs.
+    Project-scoped products, product versions, version promotion to a stage and version
+    retirement for service clients, using internal IDs.
 servers:
   - url: https://{Host}/clients/publishing
     variables:
@@ -296,6 +296,74 @@ paths:
         - ClientCredentials: [clients/publishing/version.promote]
       x-amazon-apigateway-request-validator: params-only
       x-amazon-apigateway-integration: *lambdaIntegration
+  /projects/{projectId}/products/{productId}/versions/{versionId}/retirement:
+    get:
+      operationId: GetVersionRetirement
+      tags: [ALL]
+      parameters: &retirementParameters
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ProductId'
+        - $ref: '#/components/parameters/VersionId'
+      responses:
+        '200': {$ref: '#/components/responses/VersionRetirement'}
+        '202': {$ref: '#/components/responses/VersionRetirementStarted'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '422': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
+        '500': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+      security:
+        - ClientCredentials: [clients/publishing/version.read]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration: *lambdaIntegration
+    put:
+      operationId: RetireVersion
+      tags: [ALL]
+      parameters: *retirementParameters
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RetireVersionRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/VersionRetirement'}
+        '202': {$ref: '#/components/responses/VersionRetirementStarted'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '422': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
+        '500': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+      security:
+        - ClientCredentials: [clients/publishing/version.retire]
+      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-integration: *lambdaIntegration
+    delete:
+      operationId: ForgetVersionRetirement
+      tags: [ALL]
+      parameters: *retirementParameters
+      responses:
+        '204': {$ref: '#/components/responses/NoContent'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '409': {$ref: '#/components/responses/Problem'}
+        '422': {$ref: '#/components/responses/Problem'}
+        '429': {$ref: '#/components/responses/Problem'}
+        '500': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+      security:
+        - ClientCredentials: [clients/publishing/version.retire]
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration: *lambdaIntegration
 components:
   parameters:
     ProjectId:
@@ -367,8 +435,23 @@ components:
       content:
         application/json:
           schema: {$ref: '#/components/schemas/VersionPromotion'}
+    VersionRetirement:
+      description: The version is retired in every account it was distributed to.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/VersionRetirement'}
+    VersionRetirementStarted:
+      description: Retirement started or in progress; poll until status is RETIRED.
+      headers:
+        Retry-After:
+          schema: {type: string, default: '30'}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/VersionRetirement'}
     NoContent:
-      description: The product is archived or does not exist; a promotion is forgotten, not undone.
+      description: >-
+        The product is archived or does not exist; a promotion or a retirement is forgotten, not
+        undone.
     Problem:
       description: RFC problem response.
       content:
@@ -483,6 +566,29 @@ components:
         versionName: {type: string}
         stage: {type: string, enum: [DEV, QA, PROD]}
         status: {type: string}
+        distributions:
+          type: array
+          items: {$ref: '#/components/schemas/VersionDistribution'}
+    RetireVersionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        reason: {type: string, maxLength: 500}
+        force:
+          description: >-
+            Retire even with workbenches still on the version (409 VERSION_IN_USE otherwise): they keep
+            running and starting, but can no longer change size until their owners update.
+          type: boolean
+    VersionRetirement:
+      type: object
+      required: [projectId, productId, versionId, versionName, status, distributions]
+      properties:
+        projectId: {type: string}
+        productId: {type: string}
+        versionId: {type: string}
+        versionName: {type: string}
+        status: {type: string, enum: [RETIRING, RETIRED]}
+        retireReason: {type: string, nullable: true}
         distributions:
           type: array
           items: {$ref: '#/components/schemas/VersionDistribution'}

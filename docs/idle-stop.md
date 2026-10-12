@@ -31,7 +31,8 @@ separate policies; disabling nightly shutdown does not disable weekend shutdown.
 
 ## Managing policy in the portal
 
-Open a program/project's details and its **Shutdown policy** section. Project-scoped `ADMIN` and
+Select a program in the portal's program selector, then open **Administration → Program details →
+Shutdown policy** (`/administration/program`). Project-scoped `ADMIN` and
 `PROGRAM_OWNER` users can edit portal-managed projects:
 
 | Control | Policy field | Behavior |

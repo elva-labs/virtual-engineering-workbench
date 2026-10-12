@@ -80,7 +80,7 @@ def test_amazon_verified_permissions_when_project_scoped_and_has_assignments(
             "entityList": [
                 {
                     "identifier": {"entityId": "test-user", "entityType": "VEW::User"},
-                    "attributes": {"totalAdminAssignments": {"long": 0}},
+                    "attributes": {"totalAdminAssignments": {"long": 0}, "platformAdmin": {"boolean": False}},
                     "parents": [
                         {"entityId": "project456#PLATFORM_USER", "entityType": "VEW::ProjectAssignment"},
                         {"entityId": "project456#GROUP#VEW_USERS", "entityType": "VEW::ProjectAssignment"},
@@ -255,7 +255,8 @@ def test_amazon_verified_permissions_when_project_assignment_feature_enabled_and
                     "attributes": {
                         "totalAdminAssignments": {
                             "long": 0,
-                        }
+                        },
+                        "platformAdmin": {"boolean": False}
                     },
                     "parents": [
                         {"entityId": "project456#PLATFORM_USER", "entityType": "VEW::ProjectAssignment"},
@@ -435,7 +436,8 @@ def test_amazon_verified_permissions_when_has_assignments_should_set_total_admin
                     "attributes": {
                         "totalAdminAssignments": {
                             "long": 1,
-                        }
+                        },
+                        "platformAdmin": {"boolean": False}
                     },
                     "parents": [
                         {"entityId": "project456#PLATFORM_USER", "entityType": "VEW::ProjectAssignment"},
@@ -491,7 +493,8 @@ def test_amazon_verified_permissions_when_project_id_but_no_assignments(
                     "attributes": {
                         "totalAdminAssignments": {
                             "long": 0,
-                        }
+                        },
+                        "platformAdmin": {"boolean": False}
                     },
                     "parents": [],
                 },
@@ -661,7 +664,8 @@ def test_amazon_verified_permissions_when_has_no_project_id_should_set_resource_
                     "attributes": {
                         "totalAdminAssignments": {
                             "long": 0,
-                        }
+                        },
+                        "platformAdmin": {"boolean": False}
                     },
                     "parents": [],
                 },

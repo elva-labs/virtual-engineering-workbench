@@ -3,7 +3,7 @@ from http import HTTPStatus
 from aws_lambda_powertools import Tracer
 from aws_lambda_powertools.event_handler import api_gateway, content_types
 from aws_lambda_powertools.event_handler.api_gateway import Router
-from aws_lambda_powertools.event_handler.exceptions import NotFoundError
+from aws_lambda_powertools.event_handler.exceptions import BadRequestError, NotFoundError
 
 from app.projects.domain.commands.users import (
     assign_user_command,
@@ -20,6 +20,16 @@ from app.projects.entrypoints.s2s_api.model import api_model
 from app.projects.entrypoints.s2s_api.routers import access
 
 tracer = Tracer()
+
+# ADMIN is the platform's role (platform-admin groups), never a direct grant from a service client: it would
+# make the user an admin of the project and, through totalAdminAssignments, of the platform. Service clients
+# grant PROGRAM_OWNER, PLATFORM_USER and SUPPORT.
+S2S_REFUSED_ROLES = {"ADMIN"}
+
+
+def _refuse_admin(roles) -> None:
+    if S2S_REFUSED_ROLES & {str(role).upper() for role in roles or []}:
+        raise BadRequestError("ADMIN can't be granted through the S2S API")
 
 
 def init(dependencies: bootstrapper.Dependencies) -> Router:
@@ -69,6 +79,7 @@ def init(dependencies: bootstrapper.Dependencies) -> Router:
             project_id,
             "clients/projects/assignment.write",
         )
+        _refuse_admin(request.roles)
         dependencies.command_bus.handle(
             assign_user_command.AssignUserCommand(
                 project_id=project_id_value_object.from_str(project_id),
@@ -138,6 +149,7 @@ def init(dependencies: bootstrapper.Dependencies) -> Router:
             project_id,
             "clients/projects/assignment.write",
         )
+        _refuse_admin(request.roles)
         user_principal_name = router.context.get("user_principal").user_name.upper()
 
         dependencies.command_bus.handle(
@@ -202,6 +214,7 @@ def init(dependencies: bootstrapper.Dependencies) -> Router:
             project_id,
             "clients/projects/assignment.write",
         )
+        _refuse_admin(request.roles)
         user_id = user_id.upper()
         existing = dependencies.projects_query_service.get_user_assignment(
             project_id, user_id

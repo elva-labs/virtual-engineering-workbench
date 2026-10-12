@@ -9,7 +9,7 @@ from aws_xray_sdk.core import patch_all
 
 from app.publishing.domain.exceptions import domain_exception, s2s_exception
 from app.publishing.entrypoints.s2s_api import bootstrapper, config, problem_details
-from app.publishing.entrypoints.s2s_api.routers import products, versions
+from app.publishing.entrypoints.s2s_api.routers import products, retirements, versions
 from app.shared.logging.helpers import clear_auth_headers
 from app.shared.middleware import authorization
 from app.shared.middleware.metric import metric_handlers
@@ -35,6 +35,7 @@ app = api_gateway.APIGatewayRestResolver(
 app.use(middlewares=[authorization.require_auth_context])
 app.include_router(products.init(dependencies=dependencies))
 app.include_router(versions.init(dependencies=dependencies))
+app.include_router(retirements.init(dependencies=dependencies))
 
 
 def _request_id() -> str | None:

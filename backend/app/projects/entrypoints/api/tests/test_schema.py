@@ -73,3 +73,27 @@ def test_group_routes_and_effective_access_contract(api_schema):
     assert human["operationId"] == "GetProjectGroups"
     assert internal["security"] == [{"sigv4": []}]
     assert "effectiveAccess" in api_schema["components"]["schemas"]["GetProjectsResponse"]["properties"]
+
+
+def test_shutdown_policy_actions_match_cedar_and_authenticated_user_api(api_schema):
+    from infra.auth.projects_auth_schema import ProjectsBCActions
+
+    operations = api_schema["paths"]["/projects/{projectId}/workbench-lifecycle"]
+    expected = {
+        "get": ProjectsBCActions.GetProjectWorkbenchLifecycle,
+        "put": ProjectsBCActions.UpdateProjectWorkbenchLifecycle,
+        "delete": ProjectsBCActions.DeleteProjectWorkbenchLifecycle,
+    }
+    assert api_schema["security"] == [{"AVP-Request-Authorizer": []}]
+    for method, action in expected.items():
+        operation = operations[method]
+        assert operation["operationId"] == action
+        assert "security" not in operation
+        assert operation["x-amazon-apigateway-integration"]["type"] == "aws_proxy"
+        assert operation["responses"]["200"]["content"]["application/json"]["schema"] == {
+            "$ref": "#/components/schemas/ProjectWorkbenchLifecycleResponse"
+        }
+    policy = api_schema["components"]["schemas"]["ProjectWorkbenchLifecycle"]
+    for field in ["idleStopMinutes", "userIdleTimeoutMinMinutes", "userIdleTimeoutMaxMinutes"]:
+        assert policy["properties"][field]["minimum"] == 10
+        assert policy["properties"][field]["maximum"] == 1440

@@ -9,6 +9,8 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from app.projects.domain.model.workbench_lifecycle import WorkbenchLifecycle
+
 
 class Empty(BaseModel):
     pass
@@ -424,3 +426,31 @@ class GetProjectsResponse(BaseModel):
 class GetProjectEnrolmentsResponse(BaseModel):
     nextToken: Optional[Dict[str, Any]] = Field(None, title="LastEvaluatedKey token")
     enrolments: Optional[List[GetProjectEnrolmentsResponseItem]] = Field(None, title="Enrolments")
+
+
+class PlatformLifecycleDefaults(BaseModel):
+    idleStopMinutes: int
+    nightlyStop: bool
+    nightlyStopTime: str
+    timezone: str
+    weekendStop: bool
+
+
+class LifecycleDeployment(BaseModel):
+    idleStopEnabled: bool
+    nightlyStopScheduleEnabled: bool
+
+
+class ProjectWorkbenchLifecycleResponse(BaseModel):
+    projectId: str
+    settings: Optional[WorkbenchLifecycle]
+    platformDefaults: PlatformLifecycleDefaults
+    deployment: LifecycleDeployment
+    canEdit: bool
+    managedBy: Optional[str] = None
+    managedSource: Optional[str] = None
+
+
+class ProjectLifecycleErrorResponse(BaseModel):
+    code: str
+    message: str

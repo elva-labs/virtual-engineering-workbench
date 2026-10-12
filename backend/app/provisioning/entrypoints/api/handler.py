@@ -477,6 +477,24 @@ def get_project_provisioned_products_internal(
 
 
 @tracer.capture_method
+@app.get("/internal/products/<product_id>/versions/<version_id>/provisioned", tags=[TAG_PROVISIONED_PRODUCTS])
+def get_active_provisioned_products_of_version_internal(
+    product_id: str, version_id: str
+) -> api_gateway.Response[api_model.GetAllProvisionedProductsResponse]:
+    """The workbenches still on a version, for Publishing's retire guard."""
+    provisioned_products = dependencies.virtual_targets_domain_qry_srv.get_active_provisioned_products_of_version(
+        product_id=product_id, version_id=version_id
+    )
+    return api_gateway.Response(
+        status_code=HTTPStatus.OK,
+        body=api_model.GetAllProvisionedProductsResponse(
+            provisionedProducts=[api_model_mappers.map_provisioned_product(pp) for pp in provisioned_products],
+        ),
+        content_type=content_types.APPLICATION_JSON,
+    )
+
+
+@tracer.capture_method
 @app.get(
     "/projects/<project_id>/products/provisioned/<provisioned_product_id>/ssh-key",
     tags=[TAG_PROVISIONED_PRODUCTS],

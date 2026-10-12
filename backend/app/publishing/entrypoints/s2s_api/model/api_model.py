@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 ProductType = Literal["WORKBENCH", "VIRTUAL_TARGET", "CONTAINER"]
 # PROGRAM: the program's own product. PLATFORM: released once by the releasing program, distributed to
-# and listed in every program (docs/platform-products.md).
+# and listed in every project (docs/platform-products.md).
 ProductScope = Literal["PROGRAM", "PLATFORM"]
 ProductStatus = Literal["CREATING", "CREATED", "FAILED", "PAUSED", "ARCHIVING", "ARCHIVED"]
 ProductStage = Literal["DEV", "QA", "PROD"]
@@ -80,4 +80,23 @@ class VersionPromotion(BaseModel):
     versionName: str
     stage: ProductStage
     status: str
+    distributions: list[VersionDistribution]
+
+
+class RetireVersionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str = Field("", max_length=500)
+    # Retire even with workbenches still on the version: they keep running and starting, but can no
+    # longer change size until their owners update.
+    force: bool = False
+
+
+class VersionRetirement(BaseModel):
+    projectId: str
+    productId: str
+    versionId: str
+    versionName: str
+    status: str
+    retireReason: Optional[str] = None
     distributions: list[VersionDistribution]

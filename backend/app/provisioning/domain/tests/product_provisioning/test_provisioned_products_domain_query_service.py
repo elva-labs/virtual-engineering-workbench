@@ -193,6 +193,34 @@ def test_get_all_provisioned_products_returns_all_provisioned_products(
     )
 
 
+def test_get_active_provisioned_products_of_version_asks_for_that_version_in_every_program(
+    provisioned_product_query_service_mock,
+    make_sample_provisioned_product,
+    versions_query_service_mock,
+    network_qry_srv_mock,
+    parameter_service_mock,
+):
+    # ARRANGE: the index of non-terminated workbenches by product, filtered to the version.
+    provisioned_product_query_service_mock.get_all_provisioned_products_by_product_id.return_value = iter(
+        [make_sample_provisioned_product("vt-1", "prod-1")]
+    )
+    products_domain_qry_srv = provisioned_products_domain_query_service.ProvisionedProductsDomainQueryService(
+        provisioned_products_qry_srv=provisioned_product_query_service_mock,
+        version_qry_srv=versions_query_service_mock,
+        networking_qry_srv=network_qry_srv_mock,
+        parameter_srv=parameter_service_mock,
+    )
+
+    # ACT
+    result = products_domain_qry_srv.get_active_provisioned_products_of_version(product_id="prod-1", version_id="v-1")
+
+    # ASSERT
+    assertpy.assert_that(result).is_length(1)
+    provisioned_product_query_service_mock.get_all_provisioned_products_by_product_id.assert_called_once_with(
+        product_id="prod-1", version_id="v-1"
+    )
+
+
 def test_get_provisioned_virtual_target_should_return_virtual_target(
     provisioned_product_query_service_mock,
     make_sample_provisioned_product,

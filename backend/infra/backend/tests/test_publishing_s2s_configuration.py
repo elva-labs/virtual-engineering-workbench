@@ -2,7 +2,7 @@ from infra import constants
 from infra.backend import publishing_app_stack
 from infra.backend.tests.test_packaging_s2s_configuration import packaging_oauth_template
 
-PUBLISHING_SCOPES = {"product.read", "product.write", "version.read", "version.promote"}
+PUBLISHING_SCOPES = {"product.read", "product.write", "version.read", "version.promote", "version.retire"}
 
 
 def test_publishing_s2s_path_and_entrypoint():

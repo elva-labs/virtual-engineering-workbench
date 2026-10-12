@@ -14,7 +14,9 @@ def test_schema_is_valid(api_schema):
 def test_every_operation_has_its_own_scope(api_schema):
     for path, method, operation in _operations(api_schema):
         (requirement,) = operation["security"]
-        if "/versions" in path:
+        if path.endswith("/retirement"):
+            expected = "version.read" if method == "get" else "version.retire"
+        elif "/versions" in path:
             expected = "version.read" if method == "get" else "version.promote"
         else:
             expected = "product.read" if method == "get" else "product.write"

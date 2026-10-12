@@ -4,9 +4,7 @@ from aws_lambda_powertools.utilities import typing
 from aws_lambda_powertools.utilities.data_classes import event_source
 from aws_xray_sdk.core import patch_all
 
-from app.provisioning.domain.commands.product_provisioning import (
-    cleanup_provisioned_products_command,
-)
+from app.provisioning.domain.commands.product_provisioning import cleanup_provisioned_products_command
 from app.provisioning.domain.commands.provisioned_product_state import (
     initiate_provisioned_product_batch_stop_command,
     sync_provisioned_product_state_command,
@@ -217,7 +215,8 @@ def _idle_stop(dry_run: bool) -> dict:
         ("IdleStopStopped", 0 if result["dryRun"] else len(result["stopped"])),
         ("IdleStopWouldStop", len(result["stopped"]) if result["dryRun"] else 0),
         ("IdleSignalMissing", len(result["missing"])),
-        ("IdleSignalReadFailed", len(result["failed"])),
+        ("IdleSignalReadFailed", len(result["failed"]) - len(result.get("stopFailed", []))),
+        ("IdleStopFailed", len(result.get("stopFailed", []))),
     ):
         with single_metric(name=name, unit=MetricUnit.Count, value=value) as metric:
             metric.add_dimension(name="type", value="IdleStop")

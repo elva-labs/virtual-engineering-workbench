@@ -269,3 +269,12 @@ def test_project_nightly_override_works_with_platform_default_off():
     assert result["stopped"] == ["pp-opted-in"]
     assert set(result["kept"]) == {"pp-inherited", "pp-always-on", "pp-opted-out"}
     publisher.publish.assert_called_once()
+
+
+def test_nightly_stop_initiation_failure_does_not_prevent_other_workbenches():
+    srv, _, _, publisher = _service([_pp("pp-first"), _pp("pp-second")])
+    publisher.publish.side_effect = [RuntimeError("publish failed"), None]
+    result = srv.nightly_stop()
+    assert result["failed"] == ["pp-first"]
+    assert result["stopped"] == ["pp-second"]
+    assert publisher.publish.call_count == 2

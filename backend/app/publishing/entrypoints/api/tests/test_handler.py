@@ -1341,3 +1341,26 @@ def test_get_published_amis_internal(lambda_context, authenticated_event, mocked
     response = api_model.GetPublishedAmisResponse.model_validate(json.loads(result["body"]))
     assertpy.assert_that(response).is_not_none()
     assertpy.assert_that(response.amis).is_length(5)
+
+
+@pytest.mark.parametrize(
+    "path,query",
+    [
+        ("/projects/proj-123/products/prod-other/latest-major-versions", None),
+        ("/projects/proj-123/available-products/prod-other/versions", {"region": "us-east-1", "stage": "DEV"}),
+    ],
+)
+def test_version_reads_answer_only_for_the_projects_own_products(
+    lambda_context, authenticated_event, mocked_dependencies, path, query
+):
+    """Versions are keyed by product only; a product id from another project is a 404, not its versions."""
+    from app.publishing.entrypoints.api import handler
+
+    mocked_dependencies.products_domain_qry_srv.product_in_project.return_value = False
+    handler.dependencies = mocked_dependencies
+
+    result = handler.handler(authenticated_event(None, path, "GET", query), lambda_context)
+
+    assertpy.assert_that(result["statusCode"]).is_equal_to(404)
+    mocked_dependencies.versions_domain_qry_srv.get_latest_major_version_summaries.assert_not_called()
+    mocked_dependencies.versions_domain_qry_srv.get_versions_ready_for_provisioning.assert_not_called()

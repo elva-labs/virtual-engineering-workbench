@@ -3,6 +3,9 @@ import enum
 
 class SharedAttributes(enum.StrEnum):
     TotalAdminAssignments = "totalAdminAssignments"
+    # A platform admin: a member of a platform-admin group. Gates the project-less actions; ADMIN on one
+    # project is not platform-wide.
+    PlatformAdmin = "platformAdmin"
 
 
 class SharedEntities:
@@ -46,7 +49,11 @@ cross_cutting_auth_entities = {
                 SharedAttributes.TotalAdminAssignments: {
                     "type": "Long",
                     "required": False,
-                }
+                },
+                SharedAttributes.PlatformAdmin: {
+                    "type": "Boolean",
+                    "required": False,
+                },
             },
         },
         "memberOfTypes": [SharedEntities.ProjectAssignment],

@@ -119,7 +119,9 @@ projects_bc_auth_policies: list[backend_app_api_auth.CedarPolicy] = [
     """,
     ),
     backend_app_api_auth.CedarPolicy(
-        description="Allows users that are admins in at least one project to create a new project.",
+        # Platform admins only (a platform-admin group). ADMIN on one project used to be enough
+        # (totalAdminAssignments > 0), which made a project ADMIN platform-wide.
+        description="Allows platform admins to create a new project.",
         statement=f"""
             permit (
                 principal,
@@ -128,7 +130,7 @@ projects_bc_auth_policies: list[backend_app_api_auth.CedarPolicy] = [
                 ])},
                 resource
             )
-            when {{ principal has {projects_auth_schema.UserEntityAttributes.TotalAdminAssignments} && principal.{projects_auth_schema.UserEntityAttributes.TotalAdminAssignments} > 0 }};
+            when {{ principal has {projects_auth_schema.UserEntityAttributes.PlatformAdmin} && principal.{projects_auth_schema.UserEntityAttributes.PlatformAdmin} }};
     """,
     ),
 ]

@@ -5,6 +5,7 @@ from infra import constants
 
 class UserEntityAttributes(enum.StrEnum):
     TotalAdminAssignments = "totalAdminAssignments"
+    PlatformAdmin = "platformAdmin"
 
 
 class ProjectsBCEntities(enum.StrEnum):
@@ -83,7 +84,11 @@ cross_cutting_auth_entities = {
                 UserEntityAttributes.TotalAdminAssignments: {
                     "type": "Long",
                     "required": False,
-                }
+                },
+                UserEntityAttributes.PlatformAdmin: {
+                    "type": "Boolean",
+                    "required": False,
+                },
             },
         },
         "memberOfTypes": [ProjectsBCEntities.ProjectAssignment],

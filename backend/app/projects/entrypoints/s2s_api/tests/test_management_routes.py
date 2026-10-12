@@ -236,3 +236,57 @@ def test_group_name_passes_through(lambda_context, authenticated_event):
     assert response["statusCode"] == 200
     assert json.loads(response["body"])["groupName"] == "example-users"
     assert groups.put.call_args.args[3] == "example-users"
+
+
+GROUP_ID_2 = "22222222-2222-2222-2222-222222222222"
+
+
+def test_admin_is_never_granted_through_the_s2s_api(lambda_context, authenticated_event):
+    """ADMIN is the platform's role (platform-admin groups); a service client
+    can't grant it to a user or a group."""
+    deps, query, _, groups, commands = make_dependencies()
+    query.get_user_assignment.return_value = project_assignment.Assignment(
+        projectId="project-id", userId="SOME-USER", roles=["PLATFORM_USER"]
+    )
+    writes = [
+        ("POST", "/projects/project-id/users", {"userId": "some-user", "roles": ["ADMIN"]}),
+        ("PUT", "/projects/project-id/users", {"userIds": ["some-user"], "roles": ["PLATFORM_USER", "admin"]}),
+        ("PUT", "/projects/project-id/users/SOME-USER", {"roles": ["ADMIN"]}),
+        ("PUT", f"/projects/project-id/groups/{GROUP_ID_2}", {"roles": ["ADMIN"]}),
+    ]
+    for method, path, body in writes:
+        response = invoke(deps, authenticated_event, lambda_context, method, path, body)
+        assert response["statusCode"] == 400, (method, path, response["body"])
+    commands.handle.assert_not_called()
+    groups.put.assert_not_called()
+
+
+def test_the_program_roles_are_still_granted_through_the_s2s_api(lambda_context, authenticated_event):
+    deps, _, _, groups, _ = make_dependencies()
+    groups.put.return_value = project_group_assignment.ProjectGroupAssignment(
+        projectId="project-id",
+        groupId=GROUP_ID_2,
+        roles=["PROGRAM_OWNER"],
+        version=1,
+        createDate="2026-10-10",
+        lastUpdateDate="2026-10-10",
+    )
+    for roles in (["PROGRAM_OWNER"], ["PLATFORM_USER"], ["SUPPORT"]):
+        response = invoke(
+            deps,
+            authenticated_event,
+            lambda_context,
+            "PUT",
+            f"/projects/project-id/groups/{GROUP_ID_2}",
+            {"roles": roles},
+        )
+        assert response["statusCode"] == 200, response["body"]
+    response = invoke(
+        deps,
+        authenticated_event,
+        lambda_context,
+        "POST",
+        "/projects/project-id/users",
+        {"userId": "service-user", "roles": ["PLATFORM_USER"]},
+    )
+    assert response["statusCode"] == 200

@@ -1,3 +1,4 @@
+import json
 import os
 
 from pydantic import BaseModel, Field
@@ -64,6 +65,12 @@ class AppConfig(BaseModel):
 
     def get_cognito_user_pool_id(self) -> str:
         return os.environ.get("COGNITO_USER_POOL_ID", "")
+
+    def get_workbench_lifecycle_defaults(self) -> dict:
+        return json.loads(os.environ["WORKBENCH_LIFECYCLE_DEFAULTS"])
+
+    def get_workbench_lifecycle_deployment(self) -> dict:
+        return json.loads(os.environ["WORKBENCH_LIFECYCLE_DEPLOYMENT"])
 
     def get_user_pool_url(self) -> str:
         return os.environ.get("USER_POOL_URL", "")

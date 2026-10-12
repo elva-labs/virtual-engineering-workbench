@@ -192,6 +192,9 @@ Environment-specific configuration lives in `infra/config.py`. The deploy script
 
 Resource naming follows the pattern: `{org}-{app}-{component}-{name}-{env}`
 
+See [Workbench shutdown policy and idle stop](../docs/idle-stop.md) for the Projects policy API,
+deployment opt-ins, delegated spoke permissions, collector delivery, and lifecycle jobs.
+
 ## Extending the backend
 
 ### Adding a new bounded context

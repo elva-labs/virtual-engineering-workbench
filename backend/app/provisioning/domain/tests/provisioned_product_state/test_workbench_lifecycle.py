@@ -249,3 +249,23 @@ def test_stopped_workbenches_get_the_tag_when_they_run_again():
 
     instances.set_instance_tags.assert_not_called()
     assert repo.update_entity.call_args.kwargs["entity"].lifecycleSettings.idleTimeoutMinutes == 30
+
+
+def test_project_nightly_override_works_with_platform_default_off():
+    inherited = _pp("pp-inherited")
+    opted_in = _pp("pp-opted-in", project_id="proj-opted-in")
+    protected = _pp("pp-always-on", project_id="proj-always-on")
+    opted_out = _pp("pp-opted-out", project_id="proj-opted-out")
+    srv, _, _, publisher = _service(
+        [inherited, opted_in, protected, opted_out],
+        {
+            "proj-opted-in": {"nightlyStop": True},
+            "proj-always-on": {"nightlyStop": True, "alwaysOn": True},
+            "proj-opted-out": {"nightlyStop": False},
+        },
+    )
+    srv._platform = workbench_lifecycle.PlatformLifecycleDefaults(nightlyStop=False)
+    result = srv.nightly_stop()
+    assert result["stopped"] == ["pp-opted-in"]
+    assert set(result["kept"]) == {"pp-inherited", "pp-always-on", "pp-opted-out"}
+    publisher.publish.assert_called_once()

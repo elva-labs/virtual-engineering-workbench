@@ -22,6 +22,7 @@ from infra.auth import projects_auth, projects_auth_schema
 from infra.backend import vew_bounded_context_stack
 from infra.backend.projects_s2s_permissions import permissions as projects_s2s_permissions
 from infra.backend.projects_s2s_runtime_config import account_onboarding_environment
+from infra.backend.workbench_lifecycle_runtime_config import lifecycle_environment
 from infra.constructs import (
     backend_app_api_auth,
     backend_app_ecs_cluster,
@@ -80,6 +81,7 @@ class ProjectsAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
         provision_private_endpoint: bool = False,
         vpc_endpoint: aws_ec2.IVpcEndpoint | None = None,
         resource_tags: dict[str, str] | None = None,
+        workbench_lifecycle_config: dict | None = None,
         **kwargs,
     ) -> None:
         super().__init__(scope, id, app_config=app_config, **kwargs)
@@ -222,6 +224,11 @@ class ProjectsAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                     lambda_root="app/projects",
                     entry="app/projects/entrypoints/api",
                     environment={
+                        **lifecycle_environment(
+                            workbench_lifecycle_config
+                            if workbench_lifecycle_config is not None
+                            else config.provisioning_app_config[app_config.environment]["workbench-lifecycle"]
+                        ),
                         "PLATFORM_ADMIN_GROUPS": json.dumps(
                             app_config.component_specific.get("platform-admin-groups", [])
                         ),

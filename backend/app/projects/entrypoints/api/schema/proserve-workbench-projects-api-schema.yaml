@@ -380,6 +380,188 @@ paths:
         requestTemplates:
           application/json: '{"statusCode": 200}'
         passthroughBehavior: "when_no_match"
+  /projects/{projectId}/workbench-lifecycle:
+    get:
+      description: Get the project's shutdown policy, deployment defaults and edit permissions;
+        null settings inherit defaults
+      operationId: GetProjectWorkbenchLifecycle
+      parameters:
+      - name: Authorization
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Current shutdown policy and deployment settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectWorkbenchLifecycleResponse'
+        '403':
+          description: The caller cannot access or change this project policy
+        '404':
+          description: Project not found
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations
+        responses:
+          default:
+            statusCode: '200'
+        passthroughBehavior: when_no_match
+        cacheKeyParameters:
+        - method.request.header.Authorization
+        - method.request.path.projectId
+        contentHandling: CONVERT_TO_TEXT
+        credentials: '{{apigw_invocation_role_arn}}'
+    put:
+      description: Replace the project's shutdown policy (project admins and program
+        owners)
+      operationId: UpdateProjectWorkbenchLifecycle
+      parameters:
+      - name: Authorization
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Current shutdown policy and deployment settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectWorkbenchLifecycleResponse'
+        '403':
+          description: The caller cannot access or change this project policy
+        '404':
+          description: Project not found
+        '409':
+          description: 'PROJECT_EXTERNALLY_MANAGED: change the policy in its external
+            source'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectLifecycleErrorResponse'
+        '422':
+          description: Invalid policy fields, timeout bounds or reversed user timeout
+            range
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations
+        responses:
+          default:
+            statusCode: '200'
+        passthroughBehavior: when_no_match
+        cacheKeyParameters:
+        - method.request.header.Authorization
+        - method.request.path.projectId
+        contentHandling: CONVERT_TO_TEXT
+        credentials: '{{apigw_invocation_role_arn}}'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectWorkbenchLifecycle'
+    delete:
+      description: Remove the override and inherit deployment defaults
+      operationId: DeleteProjectWorkbenchLifecycle
+      parameters:
+      - name: Authorization
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Current shutdown policy and deployment settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectWorkbenchLifecycleResponse'
+        '403':
+          description: The caller cannot access or change this project policy
+        '404':
+          description: Project not found
+        '409':
+          description: 'PROJECT_EXTERNALLY_MANAGED: change the policy in its external
+            source'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectLifecycleErrorResponse'
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations
+        responses:
+          default:
+            statusCode: '200'
+        passthroughBehavior: when_no_match
+        cacheKeyParameters:
+        - method.request.header.Authorization
+        - method.request.path.projectId
+        contentHandling: CONVERT_TO_TEXT
+        credentials: '{{apigw_invocation_role_arn}}'
+    options:
+      description: CORS
+      operationId: ProjectWorkbenchLifecycleCors
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: 200 response
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
+            Access-Control-Allow-Methods:
+              schema:
+                type: string
+            Access-Control-Allow-Headers:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Empty'
+      security: []
+      x-amazon-apigateway-integration:
+        type: mock
+        responses:
+          default:
+            statusCode: '200'
+            responseParameters:
+              method.response.header.Access-Control-Allow-Methods: '''GET,PUT,DELETE,OPTIONS'''
+              method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-amz-security-token,Cache-Control'''
+              method.response.header.Access-Control-Allow-Origin: '{{cors_origin}}'
+        requestTemplates:
+          application/json: '{"statusCode": 200}'
+        passthroughBehavior: when_no_match
   /projects/{projectId}/accounts:
     put:
       description: "Re-onboard project account"
@@ -1859,6 +2041,117 @@ paths:
           - "method.request.querystring.nextToken"
 components:
   schemas:
+    ProjectLifecycleErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+    ProjectWorkbenchLifecycle:
+      title: ProjectWorkbenchLifecycle
+      description: Project shutdown override; omitted nullable fields inherit the deployment
+        defaults. Minimum user timeout must not exceed maximum.
+      type: object
+      additionalProperties: false
+      properties:
+        alwaysOn:
+          title: AlwaysOn
+          type: boolean
+          description: Bypass idle, nightly and weekend stops (the project accepts the
+            cost).
+        idleStopMinutes:
+          title: IdleStopMinutes
+          type: integer
+          nullable: true
+          minimum: 10
+          maximum: 1440
+          description: Stop after this many idle minutes; null = the deployment's default.
+        nightlyStop:
+          title: NightlyStop
+          type: boolean
+          nullable: true
+          description: Stop running workbenches at the nightly stop time; null = the deployment's
+            default.
+        weekendStop:
+          title: WeekendStop
+          type: boolean
+          nullable: true
+        allowUserDisableNightlyStop:
+          title: AllowUserDisableNightlyStop
+          type: boolean
+          description: Users may switch off the nightly stop for their own workbench.
+        allowUserIdleTimeout:
+          title: AllowUserIdleTimeout
+          type: boolean
+          description: Users may set their own inactivity timeout, within the bounds below.
+        userIdleTimeoutMinMinutes:
+          title: UserIdleTimeoutMinMinutes
+          type: integer
+          minimum: 10
+          maximum: 1440
+        userIdleTimeoutMaxMinutes:
+          title: UserIdleTimeoutMaxMinutes
+          type: integer
+          minimum: 10
+          maximum: 1440
+    PlatformLifecycleDefaults:
+      type: object
+      required:
+      - idleStopMinutes
+      - nightlyStop
+      - nightlyStopTime
+      - timezone
+      - weekendStop
+      properties:
+        idleStopMinutes:
+          type: integer
+        nightlyStop:
+          type: boolean
+        nightlyStopTime:
+          type: string
+        timezone:
+          type: string
+        weekendStop:
+          type: boolean
+    LifecycleDeployment:
+      type: object
+      required:
+      - idleStopEnabled
+      - nightlyStopScheduleEnabled
+      properties:
+        idleStopEnabled:
+          type: boolean
+        nightlyStopScheduleEnabled:
+          type: boolean
+    ProjectWorkbenchLifecycleResponse:
+      type: object
+      required:
+      - projectId
+      - settings
+      - platformDefaults
+      - deployment
+      - canEdit
+      properties:
+        projectId:
+          type: string
+        settings:
+          allOf:
+          - $ref: '#/components/schemas/ProjectWorkbenchLifecycle'
+          nullable: true
+        platformDefaults:
+          $ref: '#/components/schemas/PlatformLifecycleDefaults'
+        deployment:
+          $ref: '#/components/schemas/LifecycleDeployment'
+        canEdit:
+          type: boolean
+        managedBy:
+          type: string
+          nullable: true
+        managedSource:
+          type: string
+          nullable: true
     Empty:
       title: "Empty Schema"
       type: "object"

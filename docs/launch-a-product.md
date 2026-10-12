@@ -23,6 +23,10 @@ You don't have to terminate a product when you're done for the day. Stopping it 
 - To stop: select the product and choose **Stop**. The underlying EC2 instance stops — no compute charges while stopped, though EBS storage charges still apply.
 - To start: select the stopped product and choose **Start**. It goes back to **Running** within a couple of minutes.
 
+For workbenches, **Settings** lets the owner use the shutdown overrides allowed by the project's
+policy. Project administrators and program owners manage those permissions and defaults in the
+program/project details **Shutdown policy** section. See [Workbench shutdown policy](idle-stop.md).
+
 ## Terminate
 
 When you no longer need the product, select it and choose **Terminate**. This deletes the underlying resources. The action is irreversible — any data on the instance that isn't backed up elsewhere is lost.

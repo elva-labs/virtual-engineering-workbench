@@ -44,6 +44,17 @@ class ProvisionedProductsDomainQueryService:
             start_key=start_key, exclude_terminated=True
         )
 
+    def get_active_provisioned_products_of_version(
+        self, product_id: str, version_id: str
+    ) -> list[provisioned_product.ProvisionedProduct]:
+        """Every non-terminated workbench on a version, in any program: retiring that version takes away its
+        size changes (an update to the same version needs the version's distribution)."""
+        return list(
+            self._provisioned_products_qry_srv.get_all_provisioned_products_by_product_id(
+                product_id=product_id, version_id=version_id
+            )
+        )
+
     def get_paginated_provisioned_products(
         self,
         project_id: project_id_value_object.ProjectIdValueObject,

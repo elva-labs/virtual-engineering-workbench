@@ -99,7 +99,7 @@ def request_of(router: api_gateway.Router) -> api_model.RetireVersionRequest:
         raise s2s_exception.InvalidRequest() from error
 
 
-def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:
+def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa: C901
     router = api_gateway.Router()
 
     def distributions_in_project(project_id: str, product_id: str, version_id: str) -> list[version.Version]:

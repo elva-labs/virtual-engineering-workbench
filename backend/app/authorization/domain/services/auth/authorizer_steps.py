@@ -188,6 +188,7 @@ class ProjectsBCContextEnricher(authorizer.AuthorizerStep):
 
         context.roles = []
         context.domains = []
+        context.platform_admin = self.__is_platform_admin(context)
 
         selected_assignment = None
 
@@ -434,6 +435,9 @@ class VEWProjectAssignmentEntityResolver(AVPEntityResolver):
             user_entity.parents.extend(user_parents_group)
 
         user_entity.attributes["totalAdminAssignments"] = {"long": total_admin_assignments}
+        # What the project-less actions (CreateProject, capacity) check: ADMIN on one project doesn't make
+        # a platform admin.
+        user_entity.attributes["platformAdmin"] = {"boolean": bool(context.platform_admin)}
 
     def __generate_project_entity(self, project_id: str, remote_support_enabled: bool = True) -> dict:
 

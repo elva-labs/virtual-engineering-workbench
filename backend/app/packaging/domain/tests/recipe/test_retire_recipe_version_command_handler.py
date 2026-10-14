@@ -285,3 +285,64 @@ def test_handle_should_retire_version(
             lastUpdatedBy=get_test_user_id,
         )
     )
+
+
+@pytest.mark.parametrize(
+    "recipe_version_status",
+    (recipe_version.RecipeVersionStatus.Failed, recipe_version.RecipeVersionStatus.Updating),
+)
+@freeze_time("2023-10-12")
+def test_handle_should_retire_version_image_builder_never_created(
+    generic_repo_mock,
+    get_retire_recipe_version_command_mock,
+    get_test_recipe_version_with_specific_version_name_and_status,
+    message_bus_mock,
+    recipe_version_query_service_mock,
+    recipe_version_status,
+    uow_mock,
+):
+    # ARRANGE: a failed deploy left no recipe ARN; UPDATING is a retirement that failed before its event.
+    recipe_version_entity = get_test_recipe_version_with_specific_version_name_and_status(
+        version_name="1.0.0-rc.1", status=recipe_version_status
+    )
+    recipe_version_entity.recipeVersionArn = None
+    recipe_version_entity.recipeVersionComponentArn = None
+    recipe_version_query_service_mock.get_recipe_version.return_value = recipe_version_entity
+
+    # ACT
+    retire_recipe_version_command_handler.handle(
+        command=get_retire_recipe_version_command_mock(),
+        uow=uow_mock,
+        message_bus=message_bus_mock,
+        recipe_version_query_service=recipe_version_query_service_mock,
+    )
+
+    # ASSERT
+    published = message_bus_mock.publish.call_args.args[0]
+    assertpy.assert_that(published.recipe_version_arn).is_none()
+    assertpy.assert_that(published.recipe_version_component_arn).is_none()
+
+
+def test_handle_should_refuse_updating_recipe_version_with_arn(
+    get_retire_recipe_version_command_mock,
+    get_test_recipe_version_with_specific_version_name_and_status,
+    message_bus_mock,
+    recipe_version_query_service_mock,
+    uow_mock,
+):
+    # ARRANGE: with an ARN, UPDATING is work in flight and stays refused.
+    recipe_version_query_service_mock.get_recipe_version.return_value = (
+        get_test_recipe_version_with_specific_version_name_and_status(
+            version_name="1.0.0-rc.1", status=recipe_version.RecipeVersionStatus.Updating
+        )
+    )
+
+    # ACT / ASSERT
+    with pytest.raises(domain_exception.DomainException):
+        retire_recipe_version_command_handler.handle(
+            command=get_retire_recipe_version_command_mock(),
+            uow=uow_mock,
+            message_bus=message_bus_mock,
+            recipe_version_query_service=recipe_version_query_service_mock,
+        )
+    message_bus_mock.publish.assert_not_called()

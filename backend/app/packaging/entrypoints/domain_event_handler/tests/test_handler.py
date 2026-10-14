@@ -293,6 +293,30 @@ def test_handler_component_version_retirement_started_event(
     )
 
 
+def test_handler_component_version_retirement_started_event_without_build_arn(
+    mock_dependencies,
+    generate_event,
+    lambda_context,
+    component_version_retirement_started_payload,
+    mock_remove_component_version_command_handler,
+    mock_update_component_version_associations_command_handler,
+):
+    # ARRANGE: a version Image Builder never created has no build ARN.
+    from app.packaging.entrypoints.domain_event_handler import handler
+
+    handler.dependencies = mock_dependencies
+    payload = {**component_version_retirement_started_payload, "componentBuildVersionArn": None}
+    event_bridge_event = generate_event(detail_type="ComponentVersionRetirementStarted", detail=payload)
+
+    # ACT
+    handler.handler(event_bridge_event, lambda_context)
+
+    # ASSERT
+    command = mock_remove_component_version_command_handler.call_args.args[0]
+    assert command.componentBuildVersionArn is None
+    mock_update_component_version_associations_command_handler.assert_called_once()
+
+
 def test_handler_component_release_completed_event(
     mock_dependencies,
     generate_event,

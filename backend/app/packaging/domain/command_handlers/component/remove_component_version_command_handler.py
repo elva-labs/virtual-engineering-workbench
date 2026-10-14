@@ -21,7 +21,9 @@ def handle(
     status = component_version.ComponentVersionStatus.Retired
 
     try:
-        component_version_service.delete(component_build_version_arn=command.componentBuildVersionArn.value)
+        # No build ARN: Image Builder never created the component, so there is nothing to delete.
+        if command.componentBuildVersionArn is not None:
+            component_version_service.delete(component_build_version_arn=command.componentBuildVersionArn.value)
 
     except:
         status = component_version.ComponentVersionStatus.Failed

@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import ConfigDict, Field
 
@@ -12,8 +12,9 @@ class RecipeVersionRetirementStarted(message_bus.Message):
     recipe_id: str = Field(..., alias="recipeId")
     recipe_name: str = Field(..., alias="recipeName")
     recipe_version_id: str = Field(..., alias="recipeVersionId")
-    recipe_version_arn: str = Field(..., alias="recipeVersionArn")
-    recipe_version_component_arn: str = Field(..., alias="recipeVersionComponentArn")
+    # None for a version Image Builder never created (a failed deploy): retired without a delete.
+    recipe_version_arn: Optional[str] = Field(None, alias="recipeVersionArn")
+    recipe_version_component_arn: Optional[str] = Field(None, alias="recipeVersionComponentArn")
     recipe_version_name: str = Field(..., alias="recipeVersionName")
     recipe_component_versions: list[component_version_entry.ComponentVersionEntry] = Field(
         ..., alias="recipeComponentsVersions"

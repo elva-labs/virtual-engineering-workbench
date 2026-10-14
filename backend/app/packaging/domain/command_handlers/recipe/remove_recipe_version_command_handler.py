@@ -18,8 +18,11 @@ def handle(
     status = recipe_version.RecipeVersionStatus.Retired
 
     try:
-        recipe_version_service.delete(recipe_version_arn=command.recipeVersionArn.value)
-        component_version_service.delete(component_build_version_arn=command.recipeVersionComponentArn.value)
+        # A failed deploy can leave either ARN unset: only what Image Builder created is deleted.
+        if command.recipeVersionArn is not None:
+            recipe_version_service.delete(recipe_version_arn=command.recipeVersionArn.value)
+        if command.recipeVersionComponentArn is not None:
+            component_version_service.delete(component_build_version_arn=command.recipeVersionComponentArn.value)
     except:
         status = recipe_version.RecipeVersionStatus.Failed
 

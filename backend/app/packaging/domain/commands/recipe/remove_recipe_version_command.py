@@ -14,7 +14,9 @@ class RemoveRecipeVersionCommand(command_bus.Command):
     recipeId: recipe_id_value_object.RecipeIdValueObject
     recipeName: recipe_name_value_object.RecipeNameValueObject
     recipeVersionId: recipe_version_id_value_object.RecipeVersionIdValueObject
-    recipeVersionArn: recipe_version_arn_value_object.RecipeVersionArnValueObject
-    recipeVersionComponentArn: component_build_version_arn_value_object.ComponentBuildVersionArnValueObject
+    recipeVersionArn: recipe_version_arn_value_object.RecipeVersionArnValueObject | None = None
+    recipeVersionComponentArn: component_build_version_arn_value_object.ComponentBuildVersionArnValueObject | None = (
+        None
+    )
     recipeVersionName: recipe_version_name_value_object.RecipeVersionNameValueObject
     lastUpdatedBy: user_id_value_object.UserIdValueObject

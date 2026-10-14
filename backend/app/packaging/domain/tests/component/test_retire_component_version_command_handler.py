@@ -556,3 +556,114 @@ def test_validate_recipe_version_associations_list_should_succeed(
     retire_component_version_command_handler.__validate_associated_recipes_versions_list(
         component_version_entity=component_version_entity,
     )
+
+
+@pytest.mark.parametrize(
+    "component_version_status",
+    (component_version.ComponentVersionStatus.Failed, component_version.ComponentVersionStatus.Updating),
+)
+@freeze_time("2023-10-12")
+def test_handle_should_retire_version_image_builder_never_created(
+    generic_repo_mock,
+    get_retire_component_version_command_mock,
+    get_test_component_version_with_specific_version_name_and_status,
+    message_bus_mock,
+    component_version_query_service_mock,
+    mandatory_components_list_query_service_mock,
+    component_version_status,
+    uow_mock,
+):
+    # ARRANGE: CreateComponent failed, so the version has no build ARN; an UPDATING one is a retirement
+    # that failed before its event was published.
+    component_version_entity = get_test_component_version_with_specific_version_name_and_status(
+        version_name="1.0.0-rc.1", status=component_version_status
+    )
+    component_version_entity.componentBuildVersionArn = None
+    component_version_query_service_mock.get_component_version.return_value = component_version_entity
+    mandatory_components_list_query_service_mock.get_mandatory_components_lists.return_value = []
+    retire_component_version_command_mock = get_retire_component_version_command_mock()
+
+    # ACT
+    retire_component_version_command_handler.handle(
+        command=retire_component_version_command_mock,
+        uow=uow_mock,
+        message_bus=message_bus_mock,
+        component_version_query_service=component_version_query_service_mock,
+        mandatory_components_list_query_service=mandatory_components_list_query_service_mock,
+    )
+
+    # ASSERT
+    message_bus_mock.publish.assert_called_once_with(
+        component_version_retirement_started.ComponentVersionRetirementStarted(
+            componentId=retire_component_version_command_mock.componentId.value,
+            componentVersionId=retire_component_version_command_mock.componentVersionId.value,
+            componentBuildVersionArn=None,
+            componentVersionDependencies=component_version_entity.componentVersionDependencies,
+        )
+    )
+
+
+def test_handle_should_refuse_updating_version_image_builder_never_created_with_associated_recipe(
+    get_retire_component_version_command_mock,
+    get_test_component_version_with_specific_version_name_and_status,
+    message_bus_mock,
+    component_version_query_service_mock,
+    mandatory_components_list_query_service_mock,
+    uow_mock,
+):
+    # ARRANGE: the recovery path keeps the normal association checks.
+    component_version_entity = get_test_component_version_with_specific_version_name_and_status(
+        version_name="1.0.0-rc.1", status=component_version.ComponentVersionStatus.Updating
+    )
+    component_version_entity.componentBuildVersionArn = None
+    component_version_entity.associatedRecipesVersions = [
+        recipe_version_entry.RecipeVersionEntry(
+            recipeId="reci-00000000",
+            recipeName="test-recipe-0000000",
+            recipeVersionId="vers-00000000",
+            recipeVersionName="1.0.0",
+        )
+    ]
+    component_version_query_service_mock.get_component_version.return_value = component_version_entity
+    mandatory_components_list_query_service_mock.get_mandatory_components_lists.return_value = []
+
+    # ACT
+    with pytest.raises(domain_exception.DomainException) as exc_info:
+        retire_component_version_command_handler.handle(
+            command=get_retire_component_version_command_mock(),
+            uow=uow_mock,
+            message_bus=message_bus_mock,
+            component_version_query_service=component_version_query_service_mock,
+            mandatory_components_list_query_service=mandatory_components_list_query_service_mock,
+        )
+
+    # ASSERT
+    assertpy.assert_that(str(exc_info.value)).contains("can't be retired if it has associated recipes versions")
+    message_bus_mock.publish.assert_not_called()
+
+
+def test_handle_should_refuse_updating_version_with_build_arn(
+    get_retire_component_version_command_mock,
+    get_test_component_version_with_specific_version_name_and_status,
+    message_bus_mock,
+    component_version_query_service_mock,
+    mandatory_components_list_query_service_mock,
+    uow_mock,
+):
+    # ARRANGE: with an ARN, UPDATING is a retirement (or an update) in flight and stays refused.
+    component_version_query_service_mock.get_component_version.return_value = (
+        get_test_component_version_with_specific_version_name_and_status(
+            version_name="1.0.0-rc.1", status=component_version.ComponentVersionStatus.Updating
+        )
+    )
+
+    # ACT / ASSERT
+    with pytest.raises(domain_exception.DomainException):
+        retire_component_version_command_handler.handle(
+            command=get_retire_component_version_command_mock(),
+            uow=uow_mock,
+            message_bus=message_bus_mock,
+            component_version_query_service=component_version_query_service_mock,
+            mandatory_components_list_query_service=mandatory_components_list_query_service_mock,
+        )
+    message_bus_mock.publish.assert_not_called()

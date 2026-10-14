@@ -164,3 +164,34 @@ def test_handle_should_retire_component_version_successfully(
         status=component_version.ComponentVersionStatus.Retired,
     )
     uow_mock.commit.assert_called()
+
+
+@freeze_time("2023-10-12")
+def test_handle_should_retire_without_delete_when_image_builder_never_created_it(
+    generic_repo_mock,
+    component_version_service_mock,
+    remove_component_version_command_mock,
+    uow_mock,
+):
+    # ARRANGE: no build ARN (CreateComponent failed), so there is nothing to delete in Image Builder.
+    command = remove_component_version_command_mock.model_copy(update={"componentBuildVersionArn": None})
+
+    # ACT
+    remove_component_version_command_handler.handle(
+        command=command,
+        uow=uow_mock,
+        component_version_service=component_version_service_mock,
+        component_version_definition_service=component_version_definition_service_mock,
+        logger=mock.create_autospec(spec=logging.Logger),
+    )
+
+    # ASSERT
+    component_version_service_mock.delete.assert_not_called()
+    generic_repo_mock.update_attributes.assert_called_once_with(
+        component_version.ComponentVersionPrimaryKey(
+            componentId=command.componentId.value,
+            componentVersionId=command.componentVersionId.value,
+        ),
+        lastUpdateDate="2023-10-12T00:00:00+00:00",
+        status=component_version.ComponentVersionStatus.Retired,
+    )

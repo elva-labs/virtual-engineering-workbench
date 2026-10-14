@@ -143,6 +143,12 @@ def handle(
         VirtualWorkbenchRoles.ProgramOwner,
         VirtualWorkbenchRoles.PowerUser,
     ]
+    # A version Image Builder never created (CreateComponent failed) has no build ARN. Its retirement event
+    # used to fail validation after the version was set to UPDATING, leaving it stuck there for good; an
+    # UPDATING version without an ARN has no retirement in flight, so it is accepted again. The removal
+    # then has nothing to delete in Image Builder.
+    if not component_version_entity.componentBuildVersionArn:
+        acceptable_states_for_retirement.append(component_version.ComponentVersionStatus.Updating)
 
     if component_version_entity.status not in acceptable_states_for_retirement:
         raise DomainException(

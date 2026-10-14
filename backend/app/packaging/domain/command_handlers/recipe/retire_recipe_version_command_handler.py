@@ -44,6 +44,12 @@ def handle(
         VirtualWorkbenchRoles.PowerUser,
     ]
 
+    # Same as for component versions: a version Image Builder never created has no recipe ARN, and its
+    # retirement used to fail after setting it to UPDATING. Without an ARN no retirement is in flight, so an
+    # UPDATING one is accepted again.
+    if not recipe_version_entity.recipeVersionArn:
+        acceptable_states_for_retirement.append(recipe_version.RecipeVersionStatus.Updating)
+
     if recipe_version_entity.status not in acceptable_states_for_retirement:
         raise DomainException(
             f"Version {command.recipeVersionId.value} of recipe {command.recipeId.value} can't be retired while in {recipe_version_entity.status} status."

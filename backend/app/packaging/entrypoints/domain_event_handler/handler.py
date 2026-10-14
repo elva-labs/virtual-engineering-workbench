@@ -173,8 +173,14 @@ def recipe_version_retirement_started_handler(
         recipeId=recipe_id_value_object.from_str(event.recipe_id),
         recipeName=recipe_name_value_object.from_str(event.recipe_name),
         recipeVersionId=recipe_version_id_value_object.from_str(event.recipe_version_id),
-        recipeVersionArn=recipe_version_arn_value_object.from_str(event.recipe_version_arn),
-        recipeVersionComponentArn=component_build_version_arn_value_object.from_str(event.recipe_version_component_arn),
+        recipeVersionArn=(
+            recipe_version_arn_value_object.from_str(event.recipe_version_arn) if event.recipe_version_arn else None
+        ),
+        recipeVersionComponentArn=(
+            component_build_version_arn_value_object.from_str(event.recipe_version_component_arn)
+            if event.recipe_version_component_arn
+            else None
+        ),
         recipeVersionName=recipe_version_name_value_object.from_str(event.recipe_version_name),
         lastUpdatedBy=user_id_value_object.from_str(event.last_updated_by),
     )
@@ -200,7 +206,11 @@ def component_version_retirement_started_handler(
     command = remove_component_version_command.RemoveComponentVersionCommand(
         componentId=component_id_value_object.from_str(event.component_id),
         componentVersionId=component_version_id_value_object.from_str(event.component_version_id),
-        componentBuildVersionArn=component_build_version_arn_value_object.from_str(event.component_build_version_arn),
+        componentBuildVersionArn=(
+            component_build_version_arn_value_object.from_str(event.component_build_version_arn)
+            if event.component_build_version_arn
+            else None
+        ),
     )
 
     dependencies.command_bus.handle(command)

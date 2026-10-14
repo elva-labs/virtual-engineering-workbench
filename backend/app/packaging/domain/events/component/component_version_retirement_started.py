@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import ConfigDict, Field
 
@@ -12,7 +12,8 @@ class ComponentVersionRetirementStarted(message_bus.Message):
     )
     component_id: str = Field(..., alias="componentId")
     component_version_id: str = Field(..., alias="componentVersionId")
-    component_build_version_arn: str = Field(..., alias="componentBuildVersionArn")
+    # None for a version Image Builder never created; retired without a delete (retire handler).
+    component_build_version_arn: Optional[str] = Field(None, alias="componentBuildVersionArn")
     component_version_dependencies: list[component_version_entry.ComponentVersionEntry] = Field(
         list(), alias="componentVersionDependencies"
     )

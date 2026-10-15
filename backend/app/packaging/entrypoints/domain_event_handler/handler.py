@@ -18,6 +18,7 @@ from app.packaging.domain.commands.recipe import (
     update_recipe_version_associations_command,
     update_recipe_version_on_component_update_command,
 )
+from app.packaging.domain.commands.shared import retire_stuck_versions_command
 from app.packaging.domain.events.component import (
     component_version_creation_started,
     component_version_release_completed,
@@ -70,6 +71,7 @@ from app.packaging.domain.value_objects.shared import (
     user_id_value_object,
 )
 from app.packaging.entrypoints.domain_event_handler import bootstrapper, config
+from app.packaging.entrypoints.domain_event_handler.integration_events import reconcile_stuck_versions
 from app.shared.middleware import event_handler
 from app.shared.middleware.metric import metric_handlers
 from app.shared.middleware.metric.types import MetricDimensionNames
@@ -358,6 +360,13 @@ def pipeline_update_started_handler(
     )
 
     dependencies.command_bus.handle(command)
+
+
+@app.handle(reconcile_stuck_versions.ReconcileStuckVersions)
+def reconcile_stuck_versions_handler(event: reconcile_stuck_versions.ReconcileStuckVersions):
+    # Hourly: a version whose create failed and whose retirement never finished is retired here, since a
+    # client that only polls an UPDATING version never sends the DELETE that would retire it.
+    dependencies.command_bus.handle(retire_stuck_versions_command.RetireStuckVersionsCommand())
 
 
 @tracer.capture_lambda_handler  # type: ignore

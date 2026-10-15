@@ -118,3 +118,21 @@ class DynamoDBRecipeVersionQueryService(recipe_version_query_service.RecipeVersi
                 recipe_version_summary.RecipeVersionSummary.model_validate(parsed_component_version.model_dump())
             )
         return recipe_versions_summary
+
+    def get_recipe_versions_in_status(self, status: str) -> list[recipe_version.RecipeVersion]:
+        """Returns every recipe version in the given status, on every recipe (the status index)."""
+
+        query_kwargs = {
+            "TableName": self._table_name,
+            "IndexName": self._gsi_custom_query_by_status,
+            "KeyConditionExpression": Key("GSI_PK").eq(f"{DBPrefix.Version}#{status}")
+            & Key("GSI_SK").begins_with(f"{DBPrefix.Recipe}#"),
+        }
+        if self._default_page_size:
+            query_kwargs[PagingParams.PAGE_SIZE] = self._default_page_size
+        items: list[dict] = []
+        while PagingParams.RESPONSE_PAGING in (result := self._dynamodb_client.query(**query_kwargs)):
+            query_kwargs[PagingParams.REQUEST_PAGING] = result.get(PagingParams.RESPONSE_PAGING)
+            items.extend(result.get("Items", []))
+        items.extend(result.get("Items", []))
+        return [recipe_version.RecipeVersion.model_validate(item) for item in items]

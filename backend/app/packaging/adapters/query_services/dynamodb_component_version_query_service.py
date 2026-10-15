@@ -126,3 +126,21 @@ class DynamoDBComponentVersionQueryService(component_version_query_service.Compo
                 component_version_summary.ComponentVersionSummary.model_validate(parsed_component_version.model_dump())
             )
         return component_versions_summary
+
+    def get_component_versions_in_status(self, status: str) -> list[component_version.ComponentVersion]:
+        """Returns every component version in the given status, on every component (the status index)."""
+
+        query_kwargs = {
+            "TableName": self._table_name,
+            "IndexName": self._gsi_custom_query_by_status,
+            "KeyConditionExpression": Key("GSI_PK").eq(f"{DBPrefix.Version}#{status}")
+            & Key("GSI_SK").begins_with(f"{DBPrefix.Component}#"),
+        }
+        if self._default_page_size:
+            query_kwargs[PagingParams.PAGE_SIZE] = self._default_page_size
+        items: list[dict] = []
+        while PagingParams.RESPONSE_PAGING in (result := self._dynamodb_client.query(**query_kwargs)):
+            query_kwargs[PagingParams.REQUEST_PAGING] = result.get(PagingParams.RESPONSE_PAGING)
+            items.extend(result.get("Items", []))
+        items.extend(result.get("Items", []))
+        return [component_version.ComponentVersion.model_validate(item) for item in items]

@@ -1,3 +1,5 @@
+from unittest import mock
+
 import pytest
 
 from app.packaging.domain.commands.component import (
@@ -642,3 +644,21 @@ def test_handler_update_recipe_version_on_component_update_event(
 
     # ASSERT
     mock_update_recipe_on_component_update_command_handler.assert_called_once
+
+
+def test_handler_reconcile_stuck_versions_event(mock_dependencies, generate_event, lambda_context):
+    # ARRANGE: the hourly schedule's event.
+    from app.packaging.domain.commands.shared import retire_stuck_versions_command
+    from app.packaging.entrypoints.domain_event_handler import handler
+
+    reconcile = mock.Mock()
+    mock_dependencies.command_bus.register_handler(retire_stuck_versions_command.RetireStuckVersionsCommand, reconcile)
+    handler.dependencies = mock_dependencies
+    event_bridge_event = generate_event(detail_type="ReconcileStuckVersions", detail={})
+
+    # ACT
+    handler.handler(event_bridge_event, lambda_context)
+
+    # ASSERT
+    reconcile.assert_called_once()
+    assert isinstance(reconcile.call_args.args[0], retire_stuck_versions_command.RetireStuckVersionsCommand)

@@ -5,7 +5,17 @@ from typing import Optional
 import aws_cdk
 import cdk_nag
 import constructs
-from aws_cdk import aws_apigateway, aws_dynamodb, aws_ec2, aws_events, aws_iam, aws_pipes_alpha, aws_scheduler, aws_ssm
+from aws_cdk import (
+    aws_apigateway,
+    aws_dynamodb,
+    aws_ec2,
+    aws_events,
+    aws_events_targets,
+    aws_iam,
+    aws_pipes_alpha,
+    aws_scheduler,
+    aws_ssm,
+)
 
 from app.packaging import domain
 from app.packaging.domain.model.recipe import base_image_channels
@@ -711,6 +721,33 @@ class PackagingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                 "RecipeVersionUpdateStarted",
                 "RecipeVersionUpdateOnComponentUpdateRequested",
             ],
+        )
+        # A version whose create failed (no build ARN) and whose retirement never finished stays UPDATING, and
+        # a client that only polls an UPDATING version never sends DELETE again. The hourly reconcile retires it.
+        # The input is shaped as an EventBridge event for the handler's resolver.
+        aws_events.Rule(
+            self,
+            "stuck-versions-reconcile-rule",
+            schedule=aws_events.Schedule.rate(aws_cdk.Duration.hours(1)),
+            targets=[
+                aws_events_targets.LambdaFunction(
+                    self._backend_app.app_entries_functions[domain_event_handler_name],
+                    event=aws_events.RuleTargetInput.from_object(
+                        {
+                            "version": "0",
+                            "id": aws_events.EventField.event_id,
+                            "detail-type": "ReconcileStuckVersions",
+                            "source": "vew.packaging.schedule",
+                            "account": aws_cdk.Aws.ACCOUNT_ID,
+                            "time": aws_events.EventField.time,
+                            "region": aws_cdk.Aws.REGION,
+                            "resources": [],
+                            "detail": {},
+                        }
+                    ),
+                )
+            ],
+            rule_name=app_config.format_resource_name("stuck-versions-reconcile"),
         )
         self._event_bus.l3_event_bus.subscribe_to_events(
             name="packaging-comp-testing-event-rule",

@@ -19,3 +19,6 @@ class ComponentVersionQueryService(ABC):
     def get_all_components_versions(
         self, status: str, architecture: str, os: str, platform: str
     ) -> list[component_version_summary.ComponentVersionSummary]: ...
+
+    @abstractmethod
+    def get_component_versions_in_status(self, status: str) -> list[component_version.ComponentVersion]: ...

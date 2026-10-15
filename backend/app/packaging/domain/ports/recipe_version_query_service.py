@@ -15,3 +15,6 @@ class RecipeVersionQueryService(ABC):
 
     @abstractmethod
     def get_all_recipe_versions(self, status: str) -> list[recipe_version_summary.RecipeVersionSummary]: ...
+
+    @abstractmethod
+    def get_recipe_versions_in_status(self, status: str) -> list[recipe_version.RecipeVersion]: ...

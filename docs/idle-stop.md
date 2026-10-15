@@ -31,7 +31,8 @@ separate policies; disabling nightly shutdown does not disable weekend shutdown.
 
 ## Managing policy in the portal
 
-Open a program/project's details and its **Shutdown policy** section. Project-scoped `ADMIN` and
+Select a program in the portal's program selector, then open **Administration → Program details →
+Shutdown policy** (`/administration/program`). Project-scoped `ADMIN` and
 `PROGRAM_OWNER` users can edit portal-managed projects:
 
 | Control | Policy field | Behavior |
@@ -125,30 +126,41 @@ are delivered with the spoke SSM document and re-onboarding, as described below.
    - `IdleMinutes` - the agent's own counter (informational).
 
    The selected flow is report-only (`ACTION=report`). The script also has an `ACTION=stop` local
-   fallback, but that is not the hub-managed deployment flow.
+   fallback, but that is not the hub-managed deployment flow. Session Manager detection matches the
+   worker's full executable command, including its path, because Linux truncates process names to
+   15 characters. RunCommand workers and the collector's own probes are excluded.
+
+   A successful empty DCV session or connection listing reports zero clients. An installed DCV CLI
+   that fails or returns an unrecognized session listing omits `DcvConnections` and resets the local
+   informational idle counter; it never publishes that failure as zero activity. The collector
+   supports the [documented unquoted session IDs](https://docs.aws.amazon.com/dcv/latest/adminguide/managing-sessions-lifecycle-view.html)
+   and older quoted IDs. An optional absent DCV CLI remains distinguishable in the log
+   (`dcv_probe=absent`) from a failed installed CLI (`dcv_probe=failed`).
 2. **The hub decides.** The provisioning scheduled job `WorkbenchLifecycleJob` action `idle-stop`
    (rule `<prefix>-provisioning-workbench-idle-stop-<env>`) reads each running workbench's signals
    through the provisioning role it already assumes in the workbench account
    (`cloudwatch:GetMetricData`). It stops through VEW's stop path when each selected signal has
-   sufficient samples in the timeout window and none of those samples indicates activity.
+   sufficient samples in the timeout window, a latest observation no older than
+   `maxSampleAgeMinutes` for every required signal, and none of those samples indicates activity.
    The stop is recorded with
    `lastUpdatedBy = VEWProvisioningBCIdleStop` and the reason in `statusReason`.
-3. **Missing or unreadable telemetry is reported.** No samples, insufficient coverage, or a
-   CloudWatch read exception keep the workbench running. A running workbench without any signal
-   for `missingSignalAlarmMinutes`
-   counts as `IdleSignalMissing` (metric and alarm
+3. **Missing or unreadable telemetry is reported.** Missing required samples, stale latest
+   observations, insufficient coverage, or a CloudWatch read exception keep the workbench running.
+   Sustained loss of any required signal for `missingSignalAlarmMinutes` counts as
+   `IdleSignalMissing`, even when other signals still arrive (metric and alarm
    `<prefix>-provisioning-idle-signal-missing-<env>`, part of the system-health composite alarm).
-   Unreadable signals count as `IdleSignalReadFailed`.
+   Unreadable signals count as `IdleSignalReadFailed`. A failed idle-stop initiation counts as
+   `IdleStopFailed` and appears in both `failed` and `stopFailed`; it never appears in `stopped`.
+   Idle and nightly jobs continue to the next workbench after an initiation failure.
 
-The intended reliable-observation flow needs working session detection and fresh telemetry before
-idleness can be trusted. Current `minCoverage = 0.8` permits gaps, there is no separate recent-sample
-gate, and a failed local DCV check can still emit zero. The project-policy UI does not change those
-session-detection or telemetry freshness/coverage behaviors. Validate them during rollout rather
-than treating this change as a fix for earlier telemetry review findings.
+The default `minCoverage = 0.8` still permits short sampling gaps, but coverage never substitutes
+for a recent observation: every selected signal needs a sample within 10 minutes by default.
+A dry run applies the same observation rules and reports which stops it would initiate.
 
 ## Configuration
 
-Two independent environment deployment opt-ins in `backend/infra/config.py` default to `false`:
+Two independent environment deployment opt-ins in `backend/infra/config.py` have generic defaults
+of `false` and can be enabled explicitly for a selected deployment:
 
 - Provisioning `workbench-lifecycle.idleStop.enabled` enables the hub idle-stop job.
 - Provisioning-enablement `workbench-agents-enabled` installs the collector through SSM.
@@ -169,8 +181,9 @@ Provisioning `workbench-lifecycle.idleStop` reference:
 | `signals` | all three | which signals count |
 | `loadPerCpuThreshold` | `0.15` | busy at or above this load per CPU |
 | `minCoverage` | `0.8` | share of 5-minute periods in the window that must have data |
+| `maxSampleAgeMinutes` | `10` | maximum age of the latest observation for every selected signal; 1–30 minutes |
 | `graceMinutesAfterStart` | `15` | never stop a workbench that started less than this ago |
-| `missingSignalAlarmMinutes` | `120` | running this long without any signal raises `IdleSignalMissing` |
+| `missingSignalAlarmMinutes` | `120` | running this long without a required signal raises `IdleSignalMissing` |
 
 ## Delivering the agent
 
@@ -195,4 +208,6 @@ its decisions before allowing live idle stops; project settings alone do not ena
 
 Invoke the scheduled jobs function with
 `{"jobName": "WorkbenchLifecycleJob", "parameters": {"action": "idle-stop", "dryRun": true}}`: the
-response lists `stopped` (would stop), `kept` with the reason per workbench, `missing` and `failed`.
+response lists `stopped` (would stop), `kept` with the reason per workbench, `missing`, `failed`,
+and `stopFailed` (the subset of failures during stop initiation). The nightly response also lists
+`failed` for workbenches whose stop could not be initiated.

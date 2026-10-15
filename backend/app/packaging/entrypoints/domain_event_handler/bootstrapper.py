@@ -39,6 +39,7 @@ from app.packaging.domain.commands.component import (
     remove_component_version_command,
     update_component_version_associations_command,
 )
+from app.packaging.domain.command_handlers.shared import retire_stuck_versions_command_handler
 from app.packaging.domain.commands.pipeline import deploy_pipeline_command, remove_pipeline_command
 from app.packaging.domain.commands.recipe import (
     deploy_recipe_version_command,
@@ -46,6 +47,7 @@ from app.packaging.domain.commands.recipe import (
     update_recipe_version_associations_command,
     update_recipe_version_on_component_update_command,
 )
+from app.packaging.domain.commands.shared import retire_stuck_versions_command
 from app.packaging.domain.ports import component_version_definition_service
 from app.packaging.entrypoints.domain_event_handler import config
 from app.shared.adapters.message_bus import (
@@ -312,6 +314,17 @@ def bootstrap(  # noqa: C901
 
         return _handle_command
 
+    def _retire_stuck_versions_cmd_handler_factory():
+        def _handle_command(command: retire_stuck_versions_command.RetireStuckVersionsCommand):
+            return retire_stuck_versions_command_handler.handle(
+                uow=shared_uow,
+                component_version_qry_srv=component_version_query_service,
+                recipe_version_qry_srv=recipe_version_qry_srv,
+                logger=logger,
+            )
+
+        return _handle_command
+
     command_bus = (
         command_bus_metrics.CommandBusMetrics(
             inner=in_memory_command_bus.InMemoryCommandBus(logger=logger),
@@ -352,6 +365,10 @@ def bootstrap(  # noqa: C901
         .register_handler(
             update_recipe_version_on_component_update_command.UpdateRecipeVersionOnComponentUpdateCommand,
             _update_recipe_version_on_component_update_command_handler_factory(),
+        )
+        .register_handler(
+            retire_stuck_versions_command.RetireStuckVersionsCommand,
+            _retire_stuck_versions_cmd_handler_factory(),
         )
     )
 

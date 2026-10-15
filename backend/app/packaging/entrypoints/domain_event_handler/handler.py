@@ -18,6 +18,7 @@ from app.packaging.domain.commands.recipe import (
     update_recipe_version_associations_command,
     update_recipe_version_on_component_update_command,
 )
+from app.packaging.domain.commands.shared import retire_stuck_versions_command
 from app.packaging.domain.events.component import (
     component_version_creation_started,
     component_version_release_completed,
@@ -69,7 +70,6 @@ from app.packaging.domain.value_objects.shared import (
     project_id_value_object,
     user_id_value_object,
 )
-from app.packaging.domain.commands.shared import retire_stuck_versions_command
 from app.packaging.entrypoints.domain_event_handler import bootstrapper, config
 from app.packaging.entrypoints.domain_event_handler.integration_events import reconcile_stuck_versions
 from app.shared.middleware import event_handler

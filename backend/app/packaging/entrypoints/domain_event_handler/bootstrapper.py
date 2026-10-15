@@ -34,12 +34,12 @@ from app.packaging.domain.command_handlers.recipe import (
     update_recipe_version_associations_command_handler,
     update_recipe_version_on_component_update_command_handler,
 )
+from app.packaging.domain.command_handlers.shared import retire_stuck_versions_command_handler
 from app.packaging.domain.commands.component import (
     deploy_component_version_command,
     remove_component_version_command,
     update_component_version_associations_command,
 )
-from app.packaging.domain.command_handlers.shared import retire_stuck_versions_command_handler
 from app.packaging.domain.commands.pipeline import deploy_pipeline_command, remove_pipeline_command
 from app.packaging.domain.commands.recipe import (
     deploy_recipe_version_command,

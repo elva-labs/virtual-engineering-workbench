@@ -16,6 +16,11 @@ interface InternalCustomUtility {
   onClick?: () => void,
   dataTest?: string,
 }
+// A control that handles its own focus and keys (the program Select), placed as it is.
+interface ElementUtility {
+  type: 'element',
+  element: JSX.Element,
+}
 export type CustomUtility =
   | TopNavigationProps.MenuDropdownUtility & {
     dataTest?: string,
@@ -23,7 +28,8 @@ export type CustomUtility =
   | TopNavigationProps.ButtonUtility & {
     dataTest?: string,
   }
-  | InternalCustomUtility;
+  | InternalCustomUtility
+  | ElementUtility;
 
 export interface CustomTopNavigationProps {
   utilities: CustomUtility[],
@@ -85,6 +91,9 @@ export default function CustomTopNavigation({
                 </span>
               </Button>
             ;
+          }
+          if (utility.type === 'element') {
+            button = utility.element;
           }
           if (utility.type === 'custom') {
             button =

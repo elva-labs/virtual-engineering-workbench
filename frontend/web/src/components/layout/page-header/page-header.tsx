@@ -24,6 +24,7 @@ import CustomTopNavigation, {
   CustomUtility,
 } from './cutom-top-navigation/custom-top-navigation';
 import { THEME } from '../../../constants';
+import { ProgramSelect } from './program-select';
 
 type Props = {
   onSignInClick: () => void,
@@ -105,17 +106,9 @@ export const PageHeader: FC<Props> = ({ onSignInClick, onSignOutClick }) => {
       return activePrograms;
     };
 
-    function handleProjectChangeClick({
-      detail,
-    }: CustomEvent<ButtonDropdownProps.ItemClickDetails>) {
-      if (detail.id.startsWith('project-')) {
-        navigateTo(getHomePage());
-        switchToProject(detail.id.substring(8));
-      }
-
-      if (detail.id === 'programs') {
-        navigateTo(RouteNames.Programs);
-      }
+    function handleProjectChangeClick(programId: string) {
+      navigateTo(getHomePage());
+      switchToProject(programId);
     }
 
     const menuCustomItemsList: CustomUtility[] = [];
@@ -135,21 +128,15 @@ export const PageHeader: FC<Props> = ({ onSignInClick, onSignOutClick }) => {
       }
 
       menuCustomItemsList.push({
-        type: 'menu-dropdown',
-        text: dropdownText,
-        onItemClick: handleProjectChangeClick,
-        dataTest: 'custom-drop-down-program',
-        items: [
-          {
-            id: 'programs-menu',
-            items: [{ id: 'programs', text: i18n.projectDropDownPrograms }],
-          },
-          ...programsToDisplay().map((p) => ({
-            id: `project-${p.id}`,
-            text: p.name,
-            disabled: p.id === selectedProject.projectId && !inProgramsScreen(),
-          })),
-        ],
+        type: 'element',
+        element:
+          <ProgramSelect
+            programs={programsToDisplay()}
+            selectedProgramId={inProgramsScreen() ? undefined : selectedProject.projectId}
+            triggerText={dropdownText}
+            onSelectProgram={id => handleProjectChangeClick(id)}
+            onSelectProgramsPage={() => navigateTo(RouteNames.Programs)}
+          />,
       });
 
       const displayDescription = (): string => {

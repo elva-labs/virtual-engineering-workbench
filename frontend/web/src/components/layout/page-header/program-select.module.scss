@@ -1,0 +1,13 @@
+// The program selector in the dark header: wide enough for long program names (the dropdown is at
+// least the trigger's width), shorter on narrow screens.
+.programSelect {
+  inline-size: 320px;
+  max-inline-size: 40vw;
+}
+
+@media (max-width: 600px) {
+  .programSelect {
+    inline-size: 110px;
+    max-inline-size: 30vw;
+  }
+}

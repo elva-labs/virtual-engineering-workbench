@@ -20,7 +20,13 @@ def handle(
     account = projects_query_service.get_project_account_by_id(project_id, account_id)
     if not account or account.accountStatus == project_account.ProjectAccountStatusEnum.Inactive:
         return
-    if account.accountStatus != project_account.ProjectAccountStatusEnum.Active:
+    # A Failed record (its first onboarding failed; nothing is in flight) can be deactivated too: Terraform
+    # replaces such a record (the create errored, so it is tainted), and the create that follows reactivates
+    # the retained inactive record under its id. Refusing it left the Terraform run stuck.
+    if account.accountStatus not in (
+        project_account.ProjectAccountStatusEnum.Active,
+        project_account.ProjectAccountStatusEnum.Failed,
+    ):
         raise domain_exception.ProjectAccountStateConflict(
             f"Account cannot be deactivated while its status is {account.accountStatus}."
         )

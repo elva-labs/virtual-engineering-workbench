@@ -249,7 +249,7 @@ class Ec2ImageBuilderPipelineService(pipeline_service.PipelineService):
 
             imagebuilder_client.delete_image_pipeline(imagePipelineArn=pipeline_arn)
 
-    def start_pipeline_execution(self, pipeline_arn: str) -> str:
+    def start_pipeline_execution(self, pipeline_arn: str, client_token: str) -> str:
         with sts_api.STSAPI(
             self._ami_factory_aws_account_id, self._region, self._admin_role, SESSION_USER, self._boto_session
         ) as sts:
@@ -260,7 +260,9 @@ class Ec2ImageBuilderPipelineService(pipeline_service.PipelineService):
             ) = sts.get_temp_creds()
 
             imagebuilder_client = self.__get_imagebuilder_client(access_key_id, secret_access_key, session_token)
-            response = imagebuilder_client.start_image_pipeline_execution(imagePipelineArn=pipeline_arn)
+            response = imagebuilder_client.start_image_pipeline_execution(
+                imagePipelineArn=pipeline_arn, clientToken=client_token
+            )
 
             return response.get("imageBuildVersionArn")
 

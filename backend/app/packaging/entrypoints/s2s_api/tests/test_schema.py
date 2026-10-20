@@ -1,0 +1,327 @@
+import json
+
+from openapi_spec_validator import validate_spec
+
+
+def test_schema_is_valid(api_schema):
+    validate_spec(api_schema)
+
+
+def test_schema_uses_structured_component_definitions(api_schema):
+    schemas = api_schema["components"]["schemas"]
+    create = schemas["CreateComponentVersionRequest"]
+    response = schemas["ComponentVersionResponse"]
+    assert create["properties"]["componentVersionDefinition"]["$ref"] == ("#/components/schemas/ComponentDefinition")
+    assert "componentVersionYamlDefinition" not in create["properties"]
+    assert "yaml_definition" not in response["properties"]
+    assert "yaml_definition_b64" not in response["properties"]
+
+
+def test_schema_requires_idempotency_for_managed_creates(api_schema):
+    paths = api_schema["paths"]
+    creates = [
+        ("/projects/{projectId}/components", "post"),
+        ("/projects/{projectId}/components/{componentId}/versions", "post"),
+        ("/projects/{projectId}/recipes", "post"),
+        ("/projects/{projectId}/recipes/{recipeId}/versions", "post"),
+        ("/projects/{projectId}/pipelines", "post"),
+        ("/projects/{projectId}/images", "post"),
+    ]
+    reference = {"$ref": "#/components/parameters/IdempotencyKey"}
+    for path, method in creates:
+        assert reference in paths[path][method]["parameters"]
+        expected = "lambda-only" if "/components/{componentId}/versions" in path else "body-only"
+        assert paths[path][method]["x-amazon-apigateway-request-validator"] == expected
+    image_create = paths["/projects/{projectId}/images"]["post"]
+    assert image_create["x-amazon-apigateway-request-validator"] == "body-only"
+
+
+def test_component_definition_validation_reaches_lambda_and_publishes_422(api_schema):
+    assert api_schema["x-amazon-apigateway-request-validators"]["lambda-only"] == {
+        "validateRequestBody": False,
+        "validateRequestParameters": False,
+    }
+    for path, method in [
+        ("/projects/{projectId}/components/{componentId}/versions", "post"),
+        ("/projects/{projectId}/components/{componentId}/versions/{versionId}", "put"),
+    ]:
+        operation = api_schema["paths"][path][method]
+        assert operation["x-amazon-apigateway-request-validator"] == "lambda-only"
+        assert operation["responses"]["422"] == {"$ref": "#/components/responses/Problem"}
+
+
+def test_schema_enumerates_resource_statuses(api_schema):
+    schemas = api_schema["components"]["schemas"]
+    assert schemas["ComponentVersionStatus"]["enum"] == [
+        "CREATING",
+        "CREATED",
+        "TESTING",
+        "VALIDATED",
+        "UPDATING",
+        "RELEASED",
+        "RETIRED",
+        "FAILED",
+    ]
+    assert schemas["PipelineStatus"]["enum"] == [
+        "CREATING",
+        "CREATED",
+        "UPDATING",
+        "RETIRED",
+        "FAILED",
+    ]
+
+
+def test_schema_declares_retry_after_for_async_mutations_only(api_schema):
+    paths = api_schema["paths"]
+    async_mutations = [
+        ("/projects/{projectId}/components/{componentId}/versions", "post"),
+        ("/projects/{projectId}/components/{componentId}/versions/{versionId}", "put"),
+        ("/projects/{projectId}/components/{componentId}/versions/{versionId}", "delete"),
+        ("/projects/{projectId}/recipes/{recipeId}/versions", "post"),
+        ("/projects/{projectId}/recipes/{recipeId}/versions/{versionId}", "put"),
+        ("/projects/{projectId}/recipes/{recipeId}/versions/{versionId}", "delete"),
+        ("/projects/{projectId}/pipelines", "post"),
+        ("/projects/{projectId}/pipelines/{pipelineId}", "put"),
+        ("/projects/{projectId}/pipelines/{pipelineId}", "delete"),
+    ]
+    responses = api_schema["components"]["responses"]
+    for path, method in async_mutations:
+        operation = paths[path][method]
+        response_ref = operation["responses"]["202"]["$ref"]
+        response = responses[response_ref.rsplit("/", 1)[-1]]
+        assert response["headers"]["Retry-After"]["schema"]["default"] == "5"
+
+    for path, method in [
+        ("/projects/{projectId}/components/{componentId}/versions/{versionId}/release", "post"),
+        ("/projects/{projectId}/recipes/{recipeId}/versions/{versionId}/release", "post"),
+    ]:
+        operation = paths[path][method]
+        assert "202" not in operation["responses"]
+        response_ref = operation["responses"]["200"]["$ref"]
+        response = responses[response_ref.rsplit("/", 1)[-1]]
+        assert "Retry-After" not in response.get("headers", {})
+
+
+def test_schema_constrains_component_definition_json_shapes(api_schema):
+    schemas = api_schema["components"]["schemas"]
+    step_inputs = schemas["ComponentStep"]["properties"]["inputs"]
+    assert step_inputs["oneOf"] == [
+        {"type": "object", "additionalProperties": True},
+        {"type": "array", "items": {}},
+    ]
+
+    definition = schemas["ComponentDefinition"]
+    constants = definition["properties"]["constants"]["items"]
+    parameters = definition["properties"]["parameters"]["items"]
+    assert constants["type"] == "object"
+    assert constants["additionalProperties"]["$ref"] == "#/components/schemas/ComponentConstant"
+    assert parameters["type"] == "object"
+    assert parameters["additionalProperties"]["$ref"] == "#/components/schemas/ComponentParameter"
+
+
+def test_schema_separates_recipe_component_views(api_schema):
+    schemas = api_schema["components"]["schemas"]
+    create = schemas["CreateRecipeVersionRequest"]
+    version = schemas["RecipeVersion"]
+    assert "configuredComponentsVersions" in create["required"]
+    assert "recipeComponentsVersions" not in create["properties"]
+    assert set(version["properties"]) >= {
+        "configuredComponentsVersions",
+        "effectiveComponentsVersions",
+    }
+
+
+def test_method_responses_use_explicit_status_codes_for_api_gateway(api_schema):
+    for path, methods in api_schema["paths"].items():
+        for method, operation in methods.items():
+            responses = operation["responses"]
+            assert all(code.isdigit() and len(code) == 3 for code in responses), (
+                method,
+                path,
+            )
+            for code in ("400", "401", "403", "404", "409", "429", "500", "503"):
+                assert responses[code] == {"$ref": "#/components/responses/Problem"}
+
+
+def test_schema_exposes_component_and_recipe_slices(api_schema):
+    assert set(api_schema["paths"]) == {
+        "/projects/{projectId}/components",
+        "/projects/{projectId}/components/{componentId}",
+        "/projects/{projectId}/components/{componentId}/versions",
+        "/projects/{projectId}/components/{componentId}/versions/{versionId}",
+        "/projects/{projectId}/components/{componentId}/versions/{versionId}/release",
+        "/projects/{projectId}/recipes",
+        "/projects/{projectId}/recipes/{recipeId}",
+        "/projects/{projectId}/recipes/{recipeId}/versions",
+        "/projects/{projectId}/recipes/{recipeId}/versions/{versionId}",
+        "/projects/{projectId}/recipes/{recipeId}/versions/{versionId}/release",
+        "/projects/{projectId}/pipelines",
+        "/projects/{projectId}/pipelines/{pipelineId}",
+        "/projects/{projectId}/images",
+        "/projects/{projectId}/images/{imageId}",
+    }
+    assert set(api_schema["paths"]["/projects/{projectId}/components/{componentId}"]) >= {
+        "put",
+        "get",
+        "delete",
+    }
+    assert set(api_schema["paths"]["/projects/{projectId}/components/{componentId}/versions/{versionId}"]) >= {
+        "put",
+        "get",
+        "delete",
+    }
+    assert set(api_schema["paths"]["/projects/{projectId}/recipes/{recipeId}/versions/{versionId}"]) >= {
+        "get",
+        "put",
+        "delete",
+    }
+
+
+def test_schema_applies_component_and_recipe_scopes(api_schema):
+    paths = api_schema["paths"]
+    assert paths["/projects/{projectId}/components"]["get"]["security"] == [
+        {"ClientCredentials": ["clients/packaging/component.read"]}
+    ]
+    version_put = paths["/projects/{projectId}/components/{componentId}/versions/{versionId}"]["put"]
+    assert version_put["security"] == [{"ClientCredentials": ["clients/packaging/component.write"]}]
+    assert paths["/projects/{projectId}/components/{componentId}/versions/{versionId}/release"]["post"]["security"] == [
+        {"ClientCredentials": ["clients/packaging/component.release"]}
+    ]
+    assert paths["/projects/{projectId}/recipes"]["get"]["security"] == [
+        {"ClientCredentials": ["clients/packaging/recipe.read"]}
+    ]
+    assert paths["/projects/{projectId}/recipes"]["post"]["security"] == [
+        {"ClientCredentials": ["clients/packaging/recipe.write"]}
+    ]
+    assert paths["/projects/{projectId}/recipes/{recipeId}/versions/{versionId}/release"]["post"]["security"] == [
+        {"ClientCredentials": ["clients/packaging/recipe.release"]}
+    ]
+
+
+def test_schema_applies_pipeline_and_image_scopes(api_schema):
+    paths = api_schema["paths"]
+    assert paths["/projects/{projectId}/pipelines"]["get"]["security"] == [
+        {"ClientCredentials": ["clients/packaging/pipeline.read"]}
+    ]
+    assert paths["/projects/{projectId}/pipelines"]["post"]["security"] == [
+        {"ClientCredentials": ["clients/packaging/pipeline.write"]}
+    ]
+    pipeline = paths["/projects/{projectId}/pipelines/{pipelineId}"]
+    assert pipeline["get"]["security"] == [{"ClientCredentials": ["clients/packaging/pipeline.read"]}]
+    assert pipeline["put"]["security"] == [{"ClientCredentials": ["clients/packaging/pipeline.write"]}]
+    assert pipeline["delete"]["security"] == [{"ClientCredentials": ["clients/packaging/pipeline.write"]}]
+    assert paths["/projects/{projectId}/images"]["get"]["security"] == [
+        {"ClientCredentials": ["clients/packaging/pipeline.read"]}
+    ]
+    assert paths["/projects/{projectId}/images"]["post"]["security"] == [
+        {"ClientCredentials": ["clients/packaging/pipeline.execute"]}
+    ]
+    assert paths["/projects/{projectId}/images/{imageId}"]["get"]["security"] == [
+        {"ClientCredentials": ["clients/packaging/pipeline.read"]}
+    ]
+
+
+def test_schema_defines_pipeline_and_image_contracts(api_schema):
+    schemas = api_schema["components"]["schemas"]
+    assert schemas["CreatePipelineRequest"]["required"] == [
+        "buildInstanceTypes",
+        "pipelineDescription",
+        "pipelineName",
+        "pipelineSchedule",
+        "recipeId",
+        "recipeVersionId",
+    ]
+    assert set(schemas["UpdatePipelineRequest"]["properties"]) == {
+        "buildInstanceTypes",
+        "pipelineSchedule",
+        "recipeVersionId",
+        "productId",
+    }
+    assert "pipelineId" not in schemas["UpdatePipelineRequest"]["properties"]
+    assert schemas["CreateImageRequest"]["required"] == ["pipelineId"]
+    assert schemas["PipelinePage"]["required"] == ["pipelines"]
+    assert schemas["PipelineResponse"]["required"] == ["pipeline"]
+    assert schemas["ImagePage"]["required"] == ["images"]
+    assert schemas["ImageResponse"]["required"] == ["image"]
+
+
+def test_schema_uses_async_mutation_responses(api_schema):
+    paths = api_schema["paths"]
+    for path, method in [
+        ("/projects/{projectId}/pipelines", "post"),
+        ("/projects/{projectId}/pipelines/{pipelineId}", "put"),
+        ("/projects/{projectId}/pipelines/{pipelineId}", "delete"),
+        ("/projects/{projectId}/images", "post"),
+    ]:
+        response_ref = paths[path][method]["responses"]["202"]["$ref"]
+        response = api_schema["components"]["responses"][response_ref.rsplit("/", 1)[-1]]
+        assert response["headers"]["Retry-After"]["schema"]["default"] == "5"
+    pipeline_action = api_schema["components"]["responses"]["PipelineAction"]
+    image_action = api_schema["components"]["responses"]["ImageAction"]
+    assert (
+        pipeline_action["content"]["application/json"]["schema"]["$ref"]
+        == "#/components/schemas/PipelineActionResponse"
+    )
+    assert image_action["content"]["application/json"]["schema"]["$ref"] == "#/components/schemas/CreateImageResponse"
+
+
+def test_gateway_errors_use_problem_details(api_schema):
+    responses = api_schema["x-amazon-apigateway-gateway-responses"]
+    assert {
+        "DEFAULT_4XX",
+        "DEFAULT_5XX",
+        "BAD_REQUEST_BODY",
+        "BAD_REQUEST_PARAMETERS",
+    } <= set(responses)
+    for response in responses.values():
+        assert response["responseParameters"]["gatewayresponse.header.Content-Type"] == ("'application/problem+json'")
+        assert "application/problem+json" in response["responseTemplates"]
+
+
+def test_gateway_problem_templates_render_integer_statuses(api_schema):
+    expected_statuses = {
+        "DEFAULT_4XX": 400,
+        "BAD_REQUEST_BODY": 400,
+        "BAD_REQUEST_PARAMETERS": 400,
+        "UNAUTHORIZED": 401,
+        "ACCESS_DENIED": 403,
+        "EXPIRED_TOKEN": 403,
+        "INVALID_API_KEY": 403,
+        "INVALID_SIGNATURE": 403,
+        "MISSING_AUTHENTICATION_TOKEN": 403,
+        "WAF_FILTERED": 403,
+        "RESOURCE_NOT_FOUND": 404,
+        "REQUEST_TOO_LARGE": 413,
+        "UNSUPPORTED_MEDIA_TYPE": 415,
+        "THROTTLED": 429,
+        "QUOTA_EXCEEDED": 429,
+        "DEFAULT_5XX": 500,
+        "API_CONFIGURATION_ERROR": 500,
+        "AUTHORIZER_CONFIGURATION_ERROR": 500,
+        "AUTHORIZER_FAILURE": 500,
+        "INTEGRATION_FAILURE": 504,
+        "INTEGRATION_TIMEOUT": 504,
+    }
+    responses = api_schema["x-amazon-apigateway-gateway-responses"]
+
+    for response_type, expected_status in expected_statuses.items():
+        template = responses[response_type]["responseTemplates"]["application/problem+json"]
+        rendered = (
+            template.replace("$context.error.messageString", json.dumps("Unauthorized"))
+            .replace("$context.error.responseType", response_type)
+            .replace("$context.requestId", "request-1")
+        )
+
+        assert json.loads(rendered)["status"] == expected_status
+
+
+def test_components_use_generated_internal_ids_without_operation_resources(api_schema):
+    paths = api_schema["paths"]
+    assert "post" in paths["/projects/{projectId}/components"]
+    assert "post" in paths["/projects/{projectId}/components/{componentId}/versions"]
+    assert not any("/operations" in path or "external" in path.lower() for path in paths)
+    parameters = api_schema["components"]["parameters"]
+    assert parameters["ComponentId"]["name"] == "componentId"
+    assert parameters["ComponentVersionId"]["name"] == "versionId"
+    assert "IfMatch" not in parameters
+    assert "ExternalId" not in parameters

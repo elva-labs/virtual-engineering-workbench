@@ -13,6 +13,7 @@ def handle(
 
     recipe_entity = recipe.Recipe(
         projectId=command.projectId.value,
+        recipeId=command.recipeId.value if command.recipeId else recipe.generate_recipe_id(),
         recipeDescription=command.recipeDescription.value,
         recipeName=command.recipeName.value,
         recipePlatform=command.recipeSystemConfiguration.platform,
@@ -28,3 +29,5 @@ def handle(
     with uow:
         uow.get_repository(repo_key=recipe.RecipePrimaryKey, repo_type=recipe.Recipe).add(recipe_entity)
         uow.commit()
+
+    return {"recipeId": recipe_entity.recipeId}

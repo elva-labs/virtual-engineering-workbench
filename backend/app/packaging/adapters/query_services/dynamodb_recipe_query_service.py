@@ -51,6 +51,7 @@ class DynamoDBRecipeQueryService(recipe_query_service.RecipeQueryService):
                 "PK": f"{DBPrefix.Project}#{project_id}",
                 "SK": f"{DBPrefix.Recipe}#{recipe_id}",
             },
+            ConsistentRead=True,
         )
 
         if "Item" in result:

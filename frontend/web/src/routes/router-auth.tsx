@@ -44,6 +44,10 @@ export const RouterAuth = (): React.ReactElement => {
         element={getComponentFor(RouteNames.Programs)}
       />
       <Route
+        path={getPathFor(RouteNames.ProgramDetails)}
+        element={getComponentFor(RouteNames.ProgramDetails)}
+      />
+      <Route
         path={getPathFor(RouteNames.OnboardProjectAccount)}
         element={getComponentFor(RouteNames.OnboardProjectAccount)}
       />

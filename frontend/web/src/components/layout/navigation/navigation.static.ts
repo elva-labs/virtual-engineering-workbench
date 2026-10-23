@@ -4,6 +4,7 @@ export const ROUTE_REGULAR_EXPRESSIONS = {
   allWorkbenchesNew: /^\/available-products-new\/.*|\/available-products-new$/giu,
   administrationMembers: /^\/administration\/members\/.*|\/administration\/members$/giu,
   programs: /^\/programs$/giu,
+  programDetails: /^\/administration\/program$/giu,
   hilDevices: /^\/hil-devices$/giu,
   hilDeviceDetails: /^\/hil-device-details\/.*$/giu,
   configurations: /^\/hardware\/hardware-configurations\/.*|\/hardware\/hardware-configurations$/giu,
@@ -60,6 +61,7 @@ export enum RouteNames {
   MyWorkbenches = 'MyWorkbenches',
   WorkbenchDetails = 'WorkbenchDetails',
   Programs = 'Programs',
+  ProgramDetails = 'ProgramDetails',
   OnboardProjectAccount = 'OnboardProjectAccount',
   ProjectUserAssignment = 'ProjectUserAssignment',
   ProjectMembers = 'ProjectMembers',
@@ -111,6 +113,9 @@ export enum RouteNames {
 }
 
 export const USER_NAVIGATION_MAP = [{
+  pathRegexMatcher: ROUTE_REGULAR_EXPRESSIONS.programDetails,
+  routeName: RouteNames.ProgramDetails,
+}, {
   pathRegexMatcher: ROUTE_REGULAR_EXPRESSIONS.newMyWorkbenches,
   routeName: RouteNames.MyWorkbenches,
 }, {

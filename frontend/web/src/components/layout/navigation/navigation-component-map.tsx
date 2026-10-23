@@ -3,6 +3,7 @@ import {
   AvailableProductsNew,
   ProvisionProductNew,
   Programs,
+  ProjectDetails,
   OnboardProjectAccount,
   ProjectUserAssignment,
   Members,
@@ -104,6 +105,9 @@ export const ROUTES: { [key in RouteNames]: RouteConfig } = {
   },
   Programs: {
     component: <Programs />,
+  },
+  ProgramDetails: {
+    component: <ProjectDetails />,
   },
   OnboardProjectAccount: {
     component: <OnboardProjectAccount />,

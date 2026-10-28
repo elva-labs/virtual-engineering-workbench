@@ -1814,10 +1814,14 @@ def get_create_image_command():
     def _get_create_image_command(
         project_id: str = TEST_PROJECT_ID,
         pipeline_id: str = TEST_PIPELINE_ID,
+        image_id: str | None = None,
+        client_token: str | None = None,
     ) -> create_image_command.CreateImageCommand:
         return create_image_command.CreateImageCommand(
             projectId=project_id_value_object.from_str(project_id),
             pipelineId=pipeline_id_value_object.from_str(pipeline_id),
+            imageId=image_id,
+            clientToken=client_token,
         )
 
     return _get_create_image_command

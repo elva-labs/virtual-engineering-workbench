@@ -429,10 +429,6 @@ with `pipeline.read` until `image.status` becomes `CREATED` or `FAILED`.
 `image.imageUpstreamId` is the resulting AMI ID when available. Builds still run
 through the existing Image Builder and event-processing workflow.
 
-Pipeline creates and image-build requests are not deduplicated. After a lost response,
-inspect the project pipeline/image lists before retrying; repeating `POST /images`
-can launch another billable build.
-
 ## Errors
 
 Errors use `application/problem+json` and a stable machine-readable `code`:

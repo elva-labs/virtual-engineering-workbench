@@ -198,8 +198,10 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
         project_id = router.current_event.get_query_string_value("projectId", "") or ""
         if not project_id and router.current_event.body:
             try:
-                project_id = str((router.current_event.json_body or {}).get("projectId") or "")
-            except (ValueError, AttributeError):
+                project_id = api_model.DeleteMandatoryComponentsListRequest.model_validate(
+                    router.current_event.json_body
+                ).projectId
+            except (ValueError, TypeError):
                 project_id = ""
         require_platform_program(project_id)
         common.require_scope(router, WRITE_SCOPE)

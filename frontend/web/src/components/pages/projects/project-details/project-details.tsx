@@ -1,6 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 import {
+  Alert,
   Box,
   Button,
   ColumnLayout,
@@ -12,7 +13,7 @@ import {
   StatusIndicator,
   Tabs
 } from '@cloudscape-design/components';
-import { FC, useEffect } from 'react';
+import { FC } from 'react';
 import { useLocalStorage, useProjectsSwitch } from '../../../../hooks';
 import { useRoleAccessToggle } from '../../../../hooks/role-access-toggle';
 import { RoleBasedFeature } from '../../../../state';
@@ -43,22 +44,14 @@ const TAB_ID_ACCOUNTS = 'accounts';
 const TAB_ID_SHUTDOWN = 'shutdown-policy';
 
 /* eslint @typescript-eslint/no-magic-numbers: "off" */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-interface SampleProps {
-}
+export const ProjectDetails: FC = () => {
 
-const projectDetails: FC<SampleProps> = () => {
-
-  const [selectedTab, setSelectedTab] = useLocalStorage('project-details#last-selected-tab');
+  const [selectedTab, setSelectedTab] = useLocalStorage(
+    'project-details#last-selected-tab', TAB_ID_SHUTDOWN
+  );
   const { loadingProjects, selectedProject } = useProjectsSwitch({});
   const isFeatureAccessible = useRoleAccessToggle();
   const { getPathFor, navigateTo } = useNavigationPaths();
-
-  useEffect(() => {
-    if (!!selectedTab && !new Set([TAB_ID_ACCOUNTS, TAB_ID_SHUTDOWN]).has(selectedTab)) {
-      setSelectedTab(TAB_ID_ACCOUNTS);
-    }
-  }, []);
 
   function getBreadcrumbItems(): BreadcrumbItem[] {
     return [
@@ -81,22 +74,30 @@ const projectDetails: FC<SampleProps> = () => {
     return <>
       <Header
         variant='h1'
-        actions={
+        actions={selectedProject?.projectId && isFeatureAccessible(RoleBasedFeature.ProgramAdministration) ?
           <Button onClick={() => {
             navigateTo(RouteNames.UpdateProgram);
           }}
           variant='primary'
           >
             {i18n.updateButtonText}
-          </Button>
+          </Button> : undefined
         }
       >
-        {loadingProjects ? i18n.headerLoading : `${selectedProject?.projectName} program`}
+        {loadingProjects ? i18n.headerLoading : selectedProject?.projectId
+          ? `${selectedProject.projectName} program` : i18n.header}
       </Header>
     </>;
   }
 
   function renderContent() {
+    if (!loadingProjects && !selectedProject?.projectId) {
+      return <Alert type="info" action={
+        <Button onClick={() => navigateTo(RouteNames.Programs)}>Choose program</Button>
+      }>
+        Choose a program to view its details and shutdown policy.
+      </Alert>;
+    }
     return <>
       <SpaceBetween size='l'>
         {renderProjectDetails()}
@@ -169,7 +170,7 @@ const projectDetails: FC<SampleProps> = () => {
     return (
       <Tabs
         tabs={tabs}
-        activeTabId={tabs.some(tab => tab.id === selectedTab) ? selectedTab ?? undefined : tabs[0]?.id}
+        activeTabId={tabs.some(tab => tab.id === selectedTab) ? selectedTab ?? undefined : TAB_ID_SHUTDOWN}
         onChange={(e) => setSelectedTab(e.detail.activeTabId)}
       />
     );
@@ -209,5 +210,3 @@ const projectDetails: FC<SampleProps> = () => {
     );
   }
 };
-
-export { projectDetails as ProjectDetails };

@@ -396,6 +396,7 @@ _dev_provisioning_config = {
             "signals": ["dcvConnections", "interactiveSessions", "load"],
             "loadPerCpuThreshold": 0.15,
             "minCoverage": 0.8,
+            "maxSampleAgeMinutes": 10,
             "graceMinutesAfterStart": 15,
             "missingSignalAlarmMinutes": 120,
         },

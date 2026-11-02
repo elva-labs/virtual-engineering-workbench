@@ -26,6 +26,9 @@ export const ROUTES: { [key in RouteNames]: RouteConfig } = {
   Programs: {
     path: '/programs',
   },
+  ProgramDetails: {
+    path: '/administration/program',
+  },
   OnboardProjectAccount: {
     path: '/administration/project/onboard-account',
   },

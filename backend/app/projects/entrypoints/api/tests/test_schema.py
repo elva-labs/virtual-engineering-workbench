@@ -1,4 +1,8 @@
+from pathlib import Path
+
 import assertpy
+import yaml
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 from openapi_spec_validator import validate_spec
 
 from app.shared.test_utils import openapi_analyzer
@@ -7,6 +11,30 @@ from app.shared.test_utils import openapi_analyzer
 def test_api_schema_should_be_valid(api_schema):
     # ACT / ASSERT
     validate_spec(api_schema)
+
+
+def test_api_schema_renders_quoted_cors_origin_for_shutdown_policy():
+    schema_directory = Path(__file__).parents[1] / "schema"
+    template_env = Environment(
+        loader=FileSystemLoader(schema_directory), autoescape=select_autoescape(enabled_extensions="yaml")
+    )
+    template = template_env.get_template("proserve-workbench-projects-api-schema.yaml")
+    # Infra supplies API Gateway's single-quoted static header expression, not a bare domain.
+    cors_origin = "'https://dev.workbench.elva.land'"
+    rendered = template.render(
+        handler_arn="arn:aws:lambda:eu-north-1:123456789012:function:projects",
+        authorization_bc_handler_arn="arn:aws:lambda:eu-north-1:123456789012:function:authorization",
+        apigw_invocation_role_arn="arn:aws:iam::123456789012:role/api-gateway",
+        cors_origin=cors_origin,
+        handler_region="eu-north-1",
+    )
+
+    schema = yaml.safe_load(rendered)
+    validate_spec(schema)
+    preflight = schema["paths"]["/projects/{projectId}/workbench-lifecycle"]["options"]
+    response_parameters = preflight["x-amazon-apigateway-integration"]["responses"]["default"]["responseParameters"]
+    assert response_parameters["method.response.header.Access-Control-Allow-Origin"] == cors_origin
+    assert response_parameters["method.response.header.Access-Control-Allow-Methods"] == "'GET,PUT,DELETE,OPTIONS'"
 
 
 def test_api_schema_should_have_http_method_cors_configured(api_schema):

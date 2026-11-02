@@ -26,6 +26,7 @@ const i18n = {
   userNavigationAllWorkbenches: 'All workbenches',
   adminNavigationHeaderAdministration: 'Administration',
   adminNavigationMembers: 'Members',
+  adminNavigationProgramDetails: 'Program details',
   adminNavigationTechnologies: 'Technologies',
   productNavigationHeaderProductManagement: 'Product management',
   productNavigationProducts: 'Products',
@@ -142,6 +143,7 @@ export const Navigation: FC<Props> = ({ user }) => {
     }
 
     if (
+      isFeatureAccessible(RoleBasedFeature.ProgramDetails) ||
       isFeatureAccessible(RoleBasedFeature.ManageEnrolments) ||
       isFeatureAccessible(RoleBasedFeature.ManageTechnologies) ||
       isFeatureAccessible(RoleBasedFeature.ProvisionedProductsAdministration) ||
@@ -152,6 +154,13 @@ export const Navigation: FC<Props> = ({ user }) => {
         type: 'section',
         text: i18n.adminNavigationHeaderAdministration,
         items: [
+          ...tryGetLink(
+            RoleBasedFeature.ProgramDetails,
+            {
+              type: 'link',
+              text: i18n.adminNavigationProgramDetails,
+              href: getPathFor(RouteNames.ProgramDetails),
+            }),
           ...tryGetLink(
             RoleBasedFeature.ProvisionedProductsAdministration,
             {

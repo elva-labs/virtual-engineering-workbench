@@ -7,8 +7,8 @@ own stop path once every counted signal stayed quiet for the effective inactivit
 live here and in the deployment config (infra/config.py workbench-lifecycle idleStop), so they change
 with a deploy, not with a new image.
 
-Missing data never stops a workbench: no signal at all for a running workbench is reported (and
-alarmed on) instead.
+Missing or stale required data never stops a workbench. Sustained loss of any required signal is
+reported (and alarmed on), even when the other signals still arrive.
 """
 
 import math
@@ -38,14 +38,18 @@ class IdleStopConfig(BaseModel):
     enabled: bool = True
     # Log and count what would be stopped, stop nothing.
     dryRun: bool = False
-    signals: list[Signal] = Field(default_factory=lambda: ["dcvConnections", "interactiveSessions", "load"])
+    signals: list[Signal] = Field(
+        default_factory=lambda: ["dcvConnections", "interactiveSessions", "load"], min_length=1
+    )
     # Busy while the 5-minute load average per CPU reaches this.
     loadPerCpuThreshold: float = 0.15
     # Share of the 5-minute periods in the window that must have data before a workbench counts as idle.
     minCoverage: float = Field(0.8, gt=0, le=1)
+    # Every required signal must also have a recent observation; quiet history is not live evidence.
+    maxSampleAgeMinutes: int = Field(10, ge=1, le=30)
     # Never stop a workbench that started less than this ago (boot, first login).
     graceMinutesAfterStart: int = 15
-    # Running this long without any signal raises IdleSignalMissing (and never stops).
+    # Running this long without a required signal raises IdleSignalMissing (and never stops).
     missingSignalAlarmMinutes: int = 120
 
 
@@ -70,6 +74,26 @@ def _busy(signal: str, value: float, config: IdleStopConfig) -> bool:
     return value > 0
 
 
+def _missing_required_signals(signals: dict[str, list[Point]], now: datetime, config: IdleStopConfig) -> list[str]:
+    alarm_start = now - timedelta(minutes=config.missingSignalAlarmMinutes)
+    return [
+        signal for signal in config.signals if not any(alarm_start <= ts <= now for ts, _ in signals.get(signal, []))
+    ]
+
+
+def _window_keep_reason(
+    signal: str, window: list[Point], expected: int, now: datetime, config: IdleStopConfig
+) -> str | None:
+    if any(_busy(signal, value, config) for _, value in window):
+        return f"busy ({signal})"
+    needed = max(1, math.ceil(expected * config.minCoverage))
+    if len(window) < needed:
+        return f"not enough data ({signal}: {len(window)}/{expected})"
+    if now - max(ts for ts, _ in window) > timedelta(minutes=config.maxSampleAgeMinutes):
+        return f"stale idle signal ({signal})"
+    return None
+
+
 def decide(
     signals: dict[str, list[Point]],
     idle_minutes: int,
@@ -82,26 +106,24 @@ def decide(
     if running_for is not None and running_for < timedelta(minutes=config.graceMinutesAfterStart):
         return IdleDecision(action="keep", reason="started recently")
 
-    lookback_start = now - timedelta(minutes=lookback_minutes(idle_minutes, config))
-    any_data = any(ts >= lookback_start for points in signals.values() for ts, _ in points)
-    if not any_data:
+    missing_signals = _missing_required_signals(signals, now, config)
+    if missing_signals:
         long_enough = running_for is None or running_for >= timedelta(minutes=config.missingSignalAlarmMinutes)
+        missing = ", ".join(missing_signals)
         if long_enough:
-            return IdleDecision(action="missing", reason="no idle signals from the workbench")
-        return IdleDecision(action="keep", reason="no idle signals yet")
+            return IdleDecision(action="missing", reason=f"missing required idle signals ({missing})")
+        return IdleDecision(action="keep", reason=f"no idle signals yet ({missing})")
 
     window_start = now - timedelta(minutes=idle_minutes)
     if started_at and started_at > window_start:
         return IdleDecision(action="keep", reason="running for less than the inactivity timeout")
 
     expected = idle_minutes * 60 // PERIOD_SECONDS
-    needed = max(1, math.ceil(expected * config.minCoverage))
     for signal in config.signals:
-        window = [(ts, v) for ts, v in signals.get(signal, []) if ts >= window_start]
-        if any(_busy(signal, v, config) for _, v in window):
-            return IdleDecision(action="keep", reason=f"busy ({signal})")
-        if len(window) < needed:
-            return IdleDecision(action="keep", reason=f"not enough data ({signal}: {len(window)}/{expected})")
+        window = [(ts, v) for ts, v in signals.get(signal, []) if window_start <= ts <= now]
+        reason = _window_keep_reason(signal, window, expected, now, config)
+        if reason:
+            return IdleDecision(action="keep", reason=reason)
     return IdleDecision(
         action="stop",
         reason=f"Stopped after {idle_minutes} minutes without activity",

@@ -230,3 +230,77 @@ def test_disabled_does_nothing():
 
     assert srv.idle_stop()["disabled"] is True
     publisher.publish.assert_not_called()
+
+
+@pytest.mark.parametrize("signal", CONFIG.signals)
+def test_coverage_cannot_replace_a_fresh_observation(signal):
+    signals = _quiet(120)
+    # 21 of 24 quiet samples pass 80% coverage for a 120-minute timeout, but the
+    # most recent required observation is 15 minutes old.
+    signals[signal] = signals[signal][:-3]
+    decision = _decide(signals, idle=120)
+    assert decision.action == "keep"
+    assert decision.reason == f"stale idle signal ({signal})"
+
+
+def test_sample_at_the_freshness_boundary_is_accepted():
+    signals = _quiet(120)
+    signals["load"] = signals["load"][:-2]
+    assert _decide(signals, idle=120).action == "stop"
+
+
+@pytest.mark.parametrize("signal", CONFIG.signals)
+def test_sustained_loss_of_one_required_metric_is_reported(signal):
+    signals = _quiet(120)
+    signals[signal] = [(NOW - timedelta(minutes=125), 0)]
+    decision = _decide(signals)
+    assert decision.action == "missing"
+    assert signal in decision.reason
+
+
+def test_future_samples_do_not_prove_current_idleness():
+    signals = _quiet(120)
+    signals["load"] = [(ts + timedelta(hours=5), value) for ts, value in signals["load"]]
+    assert _decide(signals).action == "missing"
+
+
+@pytest.mark.parametrize("age", [0, 31])
+def test_freshness_bound_must_be_positive_and_bounded(age):
+    with pytest.raises(ValueError, match="maxSampleAgeMinutes"):
+        idle_signals.IdleStopConfig(maxSampleAgeMinutes=age)
+
+
+def test_required_signal_list_cannot_be_empty():
+    with pytest.raises(ValueError, match="signals"):
+        idle_signals.IdleStopConfig(signals=[])
+
+
+def test_partial_required_telemetry_loss_is_counted_without_stopping():
+    signals = _quiet(120)
+    signals.pop("interactiveSessions")
+    srv, publisher = _service([_pp("pp-partial")], {"i-pp-partial": signals})
+    result = srv.idle_stop()
+    assert result["missing"] == ["pp-partial"]
+    assert result["stopped"] == []
+    publisher.publish.assert_not_called()
+
+
+def test_failed_stop_initiation_does_not_prevent_the_next_workbench():
+    first, second = _pp("pp-first"), _pp("pp-second")
+    srv, publisher = _service([first, second], {"i-pp-first": _quiet(120), "i-pp-second": _quiet(120)})
+    publisher.publish.side_effect = [RuntimeError("publish failed"), None]
+    result = srv.idle_stop()
+    assert result["failed"] == ["pp-first"]
+    assert result["stopFailed"] == ["pp-first"]
+    assert result["stopped"] == ["pp-second"]
+    assert publisher.publish.call_count == 2
+    assert publisher.publish.call_args.args[0]._provisioned_product.provisionedProductId == "pp-second"
+
+
+def test_dry_run_does_not_attempt_stop_initiation():
+    srv, publisher = _service([_pp()], {"i-pp-1": _quiet(120)})
+    publisher.publish.side_effect = RuntimeError("should not be called")
+    result = srv.idle_stop(dry_run=True)
+    assert result["stopped"] == ["pp-1"]
+    assert result["failed"] == result["stopFailed"] == []
+    publisher.publish.assert_not_called()

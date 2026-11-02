@@ -123,7 +123,7 @@ const roleAccessFeatures: RoleAccessConfigItem[] = [
   },
   {
     feature: RoleAccessFeatureNames.ProgramDetails,
-    rolesWithAccess: [ProjectRoles.Admin, ProjectRoles.ProgramOwner]
+    rolesWithAccess: ALL_ROLE_ACCESS
   },
   {
     feature: RoleAccessFeatureNames.AddUserToProgram,

@@ -119,7 +119,7 @@ class WorkbenchLifecycleService:
     def nightly_stop(self, dry_run: bool = False) -> dict:
         """Stops running workbenches that keep the nightly stop. Never starts anything."""
         programs = self.programs()
-        stopped, kept = [], []
+        stopped, kept, failed = [], [], []
         for pp in self._workbenches(product_status.ProductStatus.Running):
             effective = self.effective_for(pp, programs.get(pp.projectId))
             toggles = product_feature_toggles.ProductFeatureToggles(outputs=pp.outputs)
@@ -128,12 +128,18 @@ class WorkbenchLifecycleService:
             ):
                 kept.append(pp.provisionedProductId)
                 continue
+            if not dry_run:
+                try:
+                    self._stop(pp, NIGHTLY_STOP_PROCESS_NAME)
+                except Exception as error:  # one failed initiation must not prevent the other workbenches
+                    failed.append(pp.provisionedProductId)
+                    self._logger.warning({"job": "nightly-stop", "pp": pp.provisionedProductId, "error": str(error)})
+                    continue
             stopped.append(pp.provisionedProductId)
-            if dry_run:
-                continue
-            self._stop(pp, NIGHTLY_STOP_PROCESS_NAME)
-        self._logger.info({"job": "nightly-stop", "dryRun": dry_run, "stopped": stopped, "kept": kept})
-        return {"dryRun": dry_run, "stopped": stopped, "kept": kept}
+        self._logger.info(
+            {"job": "nightly-stop", "dryRun": dry_run, "stopped": stopped, "kept": kept, "failed": failed}
+        )
+        return {"dryRun": dry_run, "stopped": stopped, "kept": kept, "failed": failed}
 
     def weekend_stop_allowed(self, pp: provisioned_product.ProvisionedProduct, programs: dict) -> bool:
         return self.effective_for(pp, programs.get(pp.projectId)).weekendStop
@@ -161,13 +167,13 @@ class WorkbenchLifecycleService:
     def idle_stop(self, dry_run: bool = False) -> dict:
         """Stops running workbenches whose signals stayed quiet for their inactivity timeout.
 
-        stopped: stopped now (or would be, in a dry run); missing: running without any signal for
-        missingSignalAlarmMinutes - never stopped, the job counts them for an alarm; failed: the
-        signals could not be read (also never stopped).
+        stopped: stop initiated now (or would be, in a dry run); missing: a required signal has
+        been absent for missingSignalAlarmMinutes; failed: signals could not be read or stopping
+        could not be initiated. stopFailed identifies initiation failures within failed.
         """
         config = self._idle_config
         dry_run = dry_run or config.dryRun
-        result = {"dryRun": dry_run, "stopped": [], "missing": [], "failed": [], "kept": {}}
+        result = {"dryRun": dry_run, "stopped": [], "missing": [], "failed": [], "stopFailed": [], "kept": {}}
         if not config.enabled or self._signals_srv is None:
             result["disabled"] = True
             return result
@@ -181,9 +187,15 @@ class WorkbenchLifecycleService:
             elif action in ("missing", "failed"):
                 result[action].append(pp_id)
             else:
-                result["stopped"].append(pp_id)
                 if not dry_run:
-                    self._stop(pp, IDLE_STOP_PROCESS_NAME, reason=reason)
+                    try:
+                        self._stop(pp, IDLE_STOP_PROCESS_NAME, reason=reason)
+                    except Exception as error:  # one failed initiation must not prevent the other workbenches
+                        result["failed"].append(pp_id)
+                        result["stopFailed"].append(pp_id)
+                        self._logger.warning({"job": "idle-stop", "pp": pp_id, "error": str(error)})
+                        continue
+                result["stopped"].append(pp_id)
         self._logger.info({"job": "idle-stop", **result})
         return result
 

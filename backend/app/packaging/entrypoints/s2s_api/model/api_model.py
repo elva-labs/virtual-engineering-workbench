@@ -406,8 +406,8 @@ class BaseImagePage(BaseModel):
 class ReleaseBaseImageRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    projectId: str = Field(..., min_length=1)
-    imageId: str = Field(..., min_length=1)
+    projectId: str = Field(..., min_length=1, max_length=64)
+    imageId: str = Field(..., min_length=1, max_length=64)
 
 
 class RecipeResponse(BaseModel):
@@ -469,8 +469,8 @@ class MandatoryComponentVersionRef(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    componentId: str = Field(..., min_length=1)
-    componentVersionId: str = Field(..., min_length=1)
+    componentId: str = Field(..., min_length=1, max_length=64)
+    componentVersionId: str = Field(..., min_length=1, max_length=64)
 
 
 class MandatoryComponentVersion(BaseModel):
@@ -500,6 +500,14 @@ class PutMandatoryComponentsListRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     # The project the change is made for (the releasing project, when the deployment has one).
-    projectId: str = Field(..., min_length=1)
-    prependedComponentsVersions: list[MandatoryComponentVersionRef] = Field(default_factory=list)
-    appendedComponentsVersions: list[MandatoryComponentVersionRef] = Field(default_factory=list)
+    projectId: str = Field(..., min_length=1, max_length=64)
+    prependedComponentsVersions: list[MandatoryComponentVersionRef] = Field(default_factory=list, max_length=50)
+    appendedComponentsVersions: list[MandatoryComponentVersionRef] = Field(default_factory=list, max_length=50)
+
+
+class DeleteMandatoryComponentsListRequest(BaseModel):
+    """The JSON body alternative to the `projectId` query parameter of the DELETE route."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    projectId: str = Field(..., min_length=1, max_length=64)

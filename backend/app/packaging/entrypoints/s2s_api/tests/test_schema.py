@@ -368,6 +368,8 @@ def test_every_response_reference_has_a_body_schema(api_schema):
     for path, methods in api_schema["paths"].items():
         for method, operation in methods.items():
             for code, response in operation["responses"].items():
+                if code == "204":
+                    continue  # no content by definition, so there is no body schema to reference
                 name = response["$ref"].split("/")[-1]
                 content = responses[name]["content"]
                 assert all("schema" in media for media in content.values()), (method, path, code)

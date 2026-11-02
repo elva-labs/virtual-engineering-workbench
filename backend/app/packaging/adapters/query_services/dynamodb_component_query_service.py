@@ -75,6 +75,7 @@ class DynamoDBComponentQueryService(component_query_service.ComponentQueryServic
                 "PK": f"{DBPrefix.Component}#{component_id}",
                 "SK": f"{DBPrefix.Component}#{component_id}",
             },
+            ConsistentRead=True,
         )
 
         if "Item" in result:

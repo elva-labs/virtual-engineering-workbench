@@ -60,7 +60,7 @@ def test_create_component_version_returns_the_handler_generated_id(
     command = mocked_dependencies.command_bus.handle.call_args.args[0]
     assert command.componentId.value == "comp-1"
     assert command.createdBy.value == "service:client-1"
-    assert "componentVersionId" not in command.model_dump()
+    assert command.componentVersionId is None
 
 
 def test_component_version_requires_parent_project_membership_before_looking_up_version(

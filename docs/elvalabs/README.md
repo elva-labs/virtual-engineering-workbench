@@ -9,16 +9,11 @@ a claim that it has been deployed to an AWS environment.
 ## Staying close to upstream
 
 Elva's `main` is the working branch. The `awslabs` branch mirrors official upstream
-`main`: [Sync awslabs](../../.github/workflows/sync-awslabs.yml) is scheduled daily at
-06:17 UTC and fast-forwards that branch, not Elva's `main`. After the sync, a
-scheduled Stig worker rebases `main` onto `awslabs` daily at 07:00 UTC. It resolves
-conflicts by behavior and takes upstream's version when upstream now covers a fork
-feature. It runs backend and frontend tests plus CI on `rebase/candidate`. It saves
-a `backup/main-<date>` branch and tag, then force-updates `main` with a lease. It
-skips publishing while other work is open against `main` and asks a maintainer when
-a conflict is unclear. Between runs, `main` can be up to a day behind upstream.
-See the [manual rebase procedure](../../CONTRIBUTING.md#rebase-elvas-main-onto-awslabs)
-for doing this by hand.
+`main` and is fast-forwarded daily at 06:17 UTC by the
+[Sync awslabs](../../.github/workflows/sync-awslabs.yml) workflow. Elva's `main`
+is kept rebased onto `awslabs`, normally daily, so it carries every upstream
+change. Between rebases, it can be up to a day behind. See the
+[manual rebase procedure](../../CONTRIBUTING.md#rebase-elvas-main-onto-awslabs).
 
 Configuration below lives in [`backend/infra/config.py`](../../backend/infra/config.py)
 unless stated otherwise. Changing deployment configuration requires deploying the

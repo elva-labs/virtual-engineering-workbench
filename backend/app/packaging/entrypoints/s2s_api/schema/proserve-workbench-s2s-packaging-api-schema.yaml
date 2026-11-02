@@ -827,6 +827,7 @@ paths:
         '429': {$ref: '#/components/responses/Problem'}
         '500': {$ref: '#/components/responses/Problem'}
         '503': {$ref: '#/components/responses/Problem'}
+        '415': {$ref: '#/components/responses/Problem'}
         '422': {$ref: '#/components/responses/Problem'}
       security: [{ClientCredentials: [clients/packaging/base_image.write]}]
       x-amazon-apigateway-request-validator: all
@@ -894,6 +895,7 @@ paths:
         '429': {$ref: '#/components/responses/Problem'}
         '500': {$ref: '#/components/responses/Problem'}
         '503': {$ref: '#/components/responses/Problem'}
+        '415': {$ref: '#/components/responses/Problem'}
         '422': {$ref: '#/components/responses/Problem'}
       security: [{ClientCredentials: [clients/packaging/mandatory_components_list.write]}]
       x-amazon-apigateway-request-validator: all
@@ -925,8 +927,9 @@ paths:
         '429': {$ref: '#/components/responses/Problem'}
         '500': {$ref: '#/components/responses/Problem'}
         '503': {$ref: '#/components/responses/Problem'}
+        '415': {$ref: '#/components/responses/Problem'}
       security: [{ClientCredentials: [clients/packaging/mandatory_components_list.write]}]
-      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-request-validator: all
       x-amazon-apigateway-integration: *lambdaIntegration
 components:
   parameters:
@@ -1797,8 +1800,8 @@ components:
       additionalProperties: false
       required: [componentId, componentVersionId]
       properties:
-        componentId: {type: string, minLength: 1}
-        componentVersionId: {type: string, minLength: 1, description: A released version.}
+        componentId: {type: string, minLength: 1, maxLength: 64}
+        componentVersionId: {type: string, minLength: 1, maxLength: 64, description: A released version.}
     MandatoryComponentVersion:
       type: object
       required: [componentId, componentName, componentVersionId, componentVersionName]
@@ -1837,26 +1840,28 @@ components:
       additionalProperties: false
       required: [projectId]
       properties:
-        projectId: {type: string, minLength: 1}
+        projectId: {type: string, minLength: 1, maxLength: 64}
     PutMandatoryComponentsListRequest:
       type: object
       additionalProperties: false
       required: [projectId]
       properties:
-        projectId: {type: string, minLength: 1, description: The project the change is made for (the releasing project if one is configured).}
+        projectId: {type: string, minLength: 1, maxLength: 64, description: The project the change is made for (the releasing project if one is configured).}
         prependedComponentsVersions:
           type: array
+          maxItems: 50
           items: {$ref: '#/components/schemas/MandatoryComponentVersionRef'}
         appendedComponentsVersions:
           type: array
+          maxItems: 50
           items: {$ref: '#/components/schemas/MandatoryComponentVersionRef'}
     ReleaseBaseImageRequest:
       type: object
       additionalProperties: false
       required: [projectId, imageId]
       properties:
-        projectId: {type: string, minLength: 1, description: Must be the deployment's releasing project.}
-        imageId: {type: string, minLength: 1, description: 'A successful build of a releasing-project recipe for the architecture, on the raw OS.'}
+        projectId: {type: string, minLength: 1, maxLength: 64, description: Must be the deployment's releasing project.}
+        imageId: {type: string, minLength: 1, maxLength: 64, description: 'A successful build of a releasing-project recipe for the architecture, on the raw OS.'}
     RecipeResponse:
       type: object
       required: [recipe]

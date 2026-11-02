@@ -1,0 +1,1 @@
+"""Shared idempotency persistence adapters."""

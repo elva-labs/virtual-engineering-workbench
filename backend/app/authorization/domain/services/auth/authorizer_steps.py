@@ -291,7 +291,10 @@ class ProjectsBCContextEnricher(authorizer.AuthorizerStep):
         roles = project_assignment_model.Role
         if not assignment or not assignment.roles or roles.ADMIN in assignment.roles:
             return assignment
-        kept = [roles.PLATFORM_USER] + [
+        # The user chain (ADMIN > PROGRAM_OWNER > POWER_USER > PRODUCT_CONTRIBUTOR > BETA_USER > PLATFORM_USER)
+        # gives user rights; SUPPORT is outside it, so a SUPPORT-only member must not gain PLATFORM_USER.
+        user_chain = [role for role in assignment.roles if role != roles.SUPPORT]
+        kept = ([roles.PLATFORM_USER] if user_chain else []) + [
             role for role in (roles.PROGRAM_OWNER, roles.SUPPORT) if role in assignment.roles
         ]
         if sorted(assignment.roles) == sorted(kept):

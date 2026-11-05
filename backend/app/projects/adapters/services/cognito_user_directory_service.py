@@ -1,8 +1,8 @@
 import logging
 from typing import TYPE_CHECKING, Iterable, Optional
 
-from app.shared.identity import entra_groups
 from app.projects.domain.ports import user_directory_service
+from app.shared.identity import entra_groups
 
 if TYPE_CHECKING:
     from mypy_boto3_cognito_idp import CognitoIdentityProviderClient
@@ -59,7 +59,9 @@ class CognitoUserDirectoryService(user_directory_service.UserDirectoryService):
         self._user_pool_id = user_pool_id
         self._logger = logger
 
-    def get_user_profiles(self, user_tids: Iterable[str]) -> dict[str, user_directory_service.UserProfile]:
+    def get_user_profiles(  # noqa: C901
+        self, user_tids: Iterable[str]
+    ) -> dict[str, user_directory_service.UserProfile]:
         wanted = {user_directory_service.canonical_user_id(tid) for tid in user_tids if tid}
         if not wanted:
             return {}
@@ -123,7 +125,7 @@ class CognitoUserDirectoryService(user_directory_service.UserDirectoryService):
                     attributes = {attr["Name"]: attr.get("Value") for attr in cognito_user.get("Attributes", [])}
                     tid = attributes.get(_USER_TID_ATTRIBUTE)
                     if tid and user_directory_service.canonical_user_id(tid) == wanted:
-                        return attributes.get(_GROUPS_ATTRIBUTE)
+                        return attributes.get(_GROUPS_ATTRIBUTE) if entra_groups.is_federated(attributes) else None
             return None
         except Exception:
             self._logger.exception("Failed to look up the groups of user_tid=%s in pool=%s", wanted, self._user_pool_id)

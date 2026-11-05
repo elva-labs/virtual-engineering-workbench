@@ -7,6 +7,7 @@ from unittest import mock
 
 import pytest
 
+from app.projects.adapters.services import cognito_user_directory_service
 from app.projects.domain.model import project, project_assignment, project_group_assignment
 from app.projects.domain.ports import projects_query_service, user_directory_service
 from app.projects.entrypoints.api import bootstrapper, group_access
@@ -172,3 +173,40 @@ def test_internal_user_assignment_includes_group_roles(lambda_context, authentic
     assert (assignment.userEmail, assignment.userDisplayName) == ("u@example.com", "U")
     directory.get_user_groups_claim.assert_called_once_with("USER123")
     queries.get_group_assignments.assert_called_once_with([G_USERS])
+
+
+@pytest.mark.parametrize(
+    "identities,expected_roles",
+    [
+        (None, None),
+        ('[{"providerName":"CorporateLogin"}]', ["ADMIN", "PLATFORM_USER"]),
+    ],
+)
+def test_internal_assignment_only_grants_groups_to_federated_records(
+    identities, expected_roles, handler, query_service, authenticated_event, lambda_context
+):
+    attributes = [
+        {"Name": "custom:user_tid", "Value": "user123"},
+        {"Name": "custom:entra_groups", "Value": f"[{G_USERS},{G_PLATFORM}]"},
+        {"Name": "email", "Value": "u@example.com"},
+    ]
+    if identities:
+        attributes.append({"Name": "identities", "Value": identities})
+    client = mock.MagicMock()
+    client.get_paginator.return_value.paginate.return_value = [{"Users": [{"Attributes": attributes}]}]
+    handler.dependencies.user_directory_service = cognito_user_directory_service.CognitoUserDirectoryService(
+        cognito_client=client, user_pool_id="pool", logger=logging.getLogger("test")
+    )
+    query_service.get_user_assignment.return_value = None
+
+    result = handler.handler(
+        authenticated_event(None, "/internal/projects/proj-bound/users/user123", "GET"), lambda_context
+    )
+
+    assert result["statusCode"] == 200
+    assignment = json.loads(result["body"])["assignment"]
+    assert (assignment["roles"] if assignment else None) == expected_roles
+    if expected_roles:
+        query_service.get_group_assignments.assert_called_once_with([G_USERS, G_PLATFORM])
+    else:
+        query_service.get_group_assignments.assert_not_called()

@@ -185,11 +185,18 @@ def test_returns_none_and_logs_when_cognito_raises():
     assertpy.assert_that(logger.exception.call_count).is_equal_to(2)
 
 
-def test_get_user_groups_claim_returns_the_stored_groups_of_the_user(cognito_client, user_pool):
+def test_get_user_groups_claim_returns_the_stored_groups_of_federated_users(cognito_client, user_pool):
     _create_user(
         cognito_client, user_pool["Id"], "a@example.com", "4c4863be-aaaa", **{"custom:entra_groups": "[g-1,g-2]"}
     )
-    _create_user(cognito_client, user_pool["Id"], "b@example.com", "5d5974cf-bbbb")
+    cognito_client.admin_update_user_attributes(
+        UserPoolId=user_pool["Id"],
+        Username="a@example.com",
+        UserAttributes=[{"Name": "identities", "Value": '[{"providerName":"CorporateLogin"}]'}],
+    )
+    _create_user(
+        cognito_client, user_pool["Id"], "b@example.com", "5d5974cf-bbbb", **{"custom:entra_groups": "[g-1,g-2]"}
+    )
     service = _service(cognito_client, user_pool)
 
     assertpy.assert_that(service.get_user_groups_claim("4C4863BE-AAAA")).is_equal_to("[g-1,g-2]")

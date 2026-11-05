@@ -8,21 +8,22 @@ GROUPS_CLAIM = "custom:entra_groups"
 ENTRA_PROVIDER = "CorporateLogin"
 
 
-def trusted_group_ids(profile: dict) -> list[str]:
-    """Only Cognito-linked Entra users can supply group grants."""
+def is_federated(profile: dict) -> bool:
+    """Whether Cognito linked this profile to the configured Entra provider."""
     identities = profile.get("identities")
     if isinstance(identities, str):
         try:
             identities = json.loads(identities)
         except ValueError:
-            return []
+            return False
     if not isinstance(identities, list):
-        return []
-    if not any(
-        isinstance(identity, dict) and identity.get("providerName") == ENTRA_PROVIDER for identity in identities
-    ):
-        return []
-    return group_ids(profile)
+        return False
+    return any(isinstance(identity, dict) and identity.get("providerName") == ENTRA_PROVIDER for identity in identities)
+
+
+def trusted_group_ids(profile: dict) -> list[str]:
+    """Only Cognito-linked Entra users can supply group grants."""
+    return group_ids(profile) if is_federated(profile) else []
 
 
 def group_ids(profile: dict) -> list[str]:

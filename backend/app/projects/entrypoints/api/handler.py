@@ -52,7 +52,7 @@ from app.projects.domain.value_objects import (
 from app.projects.entrypoints.api import bootstrapper, config, group_access, user_profiles
 from app.projects.entrypoints.api.model import api_model
 from app.shared.adapters.boto import paging_utils
-from app.shared.identity.entra_groups import effective_roles, group_ids
+from app.shared.identity.entra_groups import effective_roles, trusted_group_ids
 from app.shared.logging.helpers import clear_auth_headers
 from app.shared.middleware import authorization, exception_handler, externally_managed
 from app.shared.middleware.metric import metric_handlers
@@ -106,7 +106,7 @@ def _trusted_group_ids() -> list[str]:
     if scheme.lower() != "bearer" or not token:
         return []
     try:
-        return group_ids(dependencies.user_info_client(token))
+        return trusted_group_ids(dependencies.user_info_client(token))
     except Exception:
         logger.warning("Trusted user info unavailable; group grants omitted")
         return []

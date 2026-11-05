@@ -120,7 +120,8 @@ def test_get_projects_group_only_and_paginated_union(lambda_context, authenticat
 
     handler.dependencies = get_mock_dependencies
     handler.dependencies.user_info_client = lambda token: {
-        "custom:entra_groups": ["f883a15c-90e0-4341-9a23-ef4f18937b4d"]
+        "identities": '[{"providerName":"CorporateLogin"}]',
+        "custom:entra_groups": ["f883a15c-90e0-4341-9a23-ef4f18937b4d"],
     }
     handler.dependencies.projects_query_service.get_group_assignments = lambda ids: [_group_assignment()] if ids else []
 
@@ -164,12 +165,29 @@ def test_get_projects_missing_trusted_claim_keeps_direct_grant(
     }
 
 
+def test_get_projects_native_user_info_cannot_grant_group_roles(
+    lambda_context, authenticated_event, get_mock_dependencies
+):
+    from app.projects.entrypoints.api import handler
+
+    handler.dependencies = get_mock_dependencies
+    handler.dependencies.user_info_client = lambda token: {"custom:entra_groups": [_group_assignment().groupId]}
+    handler.dependencies.projects_query_service.get_group_assignments = lambda ids: [_group_assignment()] if ids else []
+    event = authenticated_event(None, "/projects", "GET", {"pageSize": "25"})
+
+    response = api_model.GetProjectsResponse.model_validate_json(handler.handler(event, lambda_context)["body"])
+    assert {access.projectId: access.roles for access in response.effectiveAccess or []} == {
+        "project-4": ["PLATFORM_USER"]
+    }
+
+
 def test_get_projects_unions_direct_and_group_roles(lambda_context, authenticated_event, get_mock_dependencies):
     from app.projects.entrypoints.api import handler
 
     handler.dependencies = get_mock_dependencies
     handler.dependencies.user_info_client = lambda token: {
-        "custom:entra_groups": ["f883a15c-90e0-4341-9a23-ef4f18937b4d"]
+        "identities": '[{"providerName":"CorporateLogin"}]',
+        "custom:entra_groups": ["f883a15c-90e0-4341-9a23-ef4f18937b4d"],
     }
     handler.dependencies.projects_query_service.get_group_assignments = lambda ids: [_group_assignment("project-4")]
     event = authenticated_event(None, "/projects", "GET", {"pageSize": "25"})

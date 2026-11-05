@@ -2,12 +2,12 @@ from unittest.mock import Mock
 
 import pytest
 
-from app.shared.identity.entra_groups import group_ids
 from app.authorization.domain.read_models.project_assignment import Assignment
 from app.authorization.domain.read_models.project_group_assignment import (
     GroupAssignment,
 )
 from app.authorization.domain.services.auth import authorizer, authorizer_steps
+from app.shared.identity.entra_groups import group_ids
 
 GROUP = "12345678-1234-1234-1234-123456789abc"
 
@@ -26,6 +26,53 @@ GROUP = "12345678-1234-1234-1234-123456789abc"
 def test_trusted_claim_normalization(claim, expected):
     assert group_ids({"custom:entra_groups": claim}) == expected
     assert group_ids({"groups": [GROUP]}) == []
+
+
+@pytest.mark.parametrize(
+    "identities,expected_roles",
+    [
+        (None, []),
+        ("not json", []),
+        ('[{"providerName":"OtherProvider"}]', []),
+        ('[{"providerName":"CorporateLogin"}]', ["ADMIN"]),
+        ([{"providerName": "CorporateLogin"}], ["ADMIN"]),
+    ],
+)
+def test_only_federated_user_info_grants_group_roles(identities, expected_roles):
+    auth_service = Mock()
+    auth_service.get_user_info.return_value = {
+        "email": "user@example.test",
+        "custom:user_tid": "user@example.test",
+        "custom:entra_groups": f"[{GROUP}]",
+        "identities": identities,
+    }
+    request = authorizer.AuthorizationRequest(
+        auth_token="Bearer token",
+        api_id="api",
+        operation_id="GetProject",
+        resource_ids={"projectId": "p1"},
+        resource_path="/projects/p1",
+        resource="arn",
+    )
+    context = authorizer.AuthorizationContext(
+        api_auth_cfg=authorizer.APIAuthConfig(bounded_context="projects"),
+        project_scoped_bounded_contexts=["projects"],
+    )
+    query = Mock()
+    query.get_user_assignments.return_value = []
+    query.get_group_assignments.return_value = [
+        GroupAssignment(groupId=GROUP, projectId="p1", roles=["ADMIN"], version=1)
+    ]
+    query.get_project_settings.return_value = Mock(experience="full")
+
+    assert authorizer_steps.CognitoAuthorizer(auth_service, Mock(), Mock()).invoke(request, context)
+    assert authorizer_steps.ProjectsBCContextEnricher(query).invoke(request, context)
+    assert context.roles == expected_roles
+    assert context.trusted_group_ids == ([GROUP] if expected_roles else [])
+    if expected_roles:
+        query.get_group_assignments.assert_called_once_with([GROUP])
+    else:
+        query.get_group_assignments.assert_not_called()
 
 
 def test_union_drives_cedar_and_refresh_preserves_direct_grant():
@@ -78,6 +125,7 @@ def test_union_drives_cedar_and_refresh_preserves_direct_grant():
 def test_reconciliation_pages_include_revocation_records():
     from types import SimpleNamespace
     from unittest.mock import patch
+
     from app.authorization.domain.command_handlers import sync_group_assignments_command_handler as sync
 
     query = Mock()
@@ -96,6 +144,7 @@ def test_reconciliation_pages_include_revocation_records():
 
 def test_human_authorizer_cache_cannot_outlive_token():
     from pathlib import Path
+
     import yaml
 
     for schema_path in Path("app").glob("*/entrypoints/api/schema/*.yaml"):
@@ -112,21 +161,36 @@ def test_group_only_stage_access_uses_same_effective_roles():
     query = Mock()
     query.get_user_assignments.return_value = []
     query.get_group_assignments.return_value = [
-        GroupAssignment(groupId=GROUP, projectId="p", roles=["PLATFORM_USER"], version=1)]
+        GroupAssignment(groupId=GROUP, projectId="p", roles=["PLATFORM_USER"], version=1)
+    ]
+
     class Identity(authorizer.AuthorizerStep):
         def invoke(self, request, context):
             context.user_name = "USER"
             context.user_email = "user@example.test"
             context.trusted_group_ids = [GROUP]
             return True
-    service = authorizer.Authorizer(logger=Mock(), metrics=Mock(),
+
+    service = authorizer.Authorizer(
+        logger=Mock(),
+        metrics=Mock(),
         api_config_provider=lambda api: authorizer.APIAuthConfig(bounded_context="projects"),
         project_scoped_bounded_contexts=["projects"],
         authorization_steps=[Identity(), authorizer_steps.ProjectsBCContextEnricher(query)],
-        stage_access_config={"PLATFORM_USER": ["dev", "test"]})
-    result = service.authorize(authorizer.AuthorizationRequest(auth_token="Bearer token", api_id="api", operation_id="GetProject",
-        resource_ids={"projectId":"p"}, resource_path="/projects/p", resource="arn"))
+        stage_access_config={"PLATFORM_USER": ["dev", "test"]},
+    )
+    result = service.authorize(
+        authorizer.AuthorizationRequest(
+            auth_token="Bearer token",
+            api_id="api",
+            operation_id="GetProject",
+            resource_ids={"projectId": "p"},
+            resource_path="/projects/p",
+            resource="arn",
+        )
+    )
     import json
+
     assert json.loads(result["context"]["stages"]) == ["dev", "test"]
     assert json.loads(result["context"]["userRoles"]) == ["PLATFORM_USER"]
     assert "trusted_group_ids" not in result["context"]

@@ -12,7 +12,7 @@ from app.authorization.domain.ports import assignments_query_service, authentica
 from app.authorization.domain.read_models import project_assignment
 from app.authorization.domain.read_models import project_assignment as project_assignment_model
 from app.authorization.domain.services.auth import authorizer
-from app.shared.identity.entra_groups import effective_roles, group_ids
+from app.shared.identity.entra_groups import effective_roles, trusted_group_ids
 
 USER_ID_CLAIM_NAME = "custom:user_tid"
 
@@ -143,7 +143,7 @@ class CognitoAuthorizer(authorizer.AuthorizerStep):
                 if USER_ID_CLAIM_NAME in user_profile
                 else None
             )
-            context.trusted_group_ids = group_ids(user_profile)
+            context.trusted_group_ids = trusted_group_ids(user_profile)
             context.user_email = user_profile["email"]
             return True
 

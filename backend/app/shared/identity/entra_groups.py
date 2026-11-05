@@ -5,6 +5,24 @@ from urllib.parse import unquote
 from uuid import UUID
 
 GROUPS_CLAIM = "custom:entra_groups"
+ENTRA_PROVIDER = "CorporateLogin"
+
+
+def trusted_group_ids(profile: dict) -> list[str]:
+    """Only Cognito-linked Entra users can supply group grants."""
+    identities = profile.get("identities")
+    if isinstance(identities, str):
+        try:
+            identities = json.loads(identities)
+        except ValueError:
+            return []
+    if not isinstance(identities, list):
+        return []
+    if not any(
+        isinstance(identity, dict) and identity.get("providerName") == ENTRA_PROVIDER for identity in identities
+    ):
+        return []
+    return group_ids(profile)
 
 
 def group_ids(profile: dict) -> list[str]:
@@ -17,22 +35,12 @@ def group_ids(profile: dict) -> list[str]:
         except (ValueError, TypeError):
             # Cognito flattens a multi-valued OIDC attribute into [value,value].
             text = value.strip()
-            value = (
-                text[1:-1].split(",")
-                if text.startswith("[") and text.endswith("]")
-                else [text]
-            )
+            value = text[1:-1].split(",") if text.startswith("[") and text.endswith("]") else [text]
     if not isinstance(value, list):
         return []
     try:
         return (
-            sorted(
-                {
-                    str(UUID(unquote(item.strip())))
-                    for item in value
-                    if isinstance(item, str)
-                }
-            )
+            sorted({str(UUID(unquote(item.strip()))) for item in value if isinstance(item, str)})
             if all(isinstance(item, str) for item in value)
             else []
         )

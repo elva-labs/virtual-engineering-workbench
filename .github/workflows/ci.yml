@@ -16,6 +16,18 @@ permissions:
   contents: read
 
 jobs:
+  deployment-scripts:
+    name: Deployment scripts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Validate deployment scripts without AWS access
+        run: |
+          bash tests/deploy-regions.test.sh
+          bash tests/diff-summary.test.sh
+          python3 -m unittest discover -s tests -p 'test_deploy_update.py'
+
   backend:
     name: Backend (lint, type, test)
     runs-on: ${{ vars.CI_RUNNER == 'codebuild' && format('codebuild-vew-ci-{0}-{1}', github.run_id, github.run_attempt) || 'ubuntu-24.04' }}

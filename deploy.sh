@@ -5,12 +5,14 @@
 # Deploys the Virtual Engineering Workbench to a single AWS account with
 # optional spoke account onboarding. Standard public deployment.
 #
-# Usage: ./deploy.sh [--config <path>] [--dry-run] [--destroy] [--yes]
+# Usage: ./deploy.sh [--config <path>] [--dry-run] [--diff] [--update-only] [--destroy] [--yes]
 #   --config <path>  Load inputs from a config file instead of prompting
 #   --dry-run        Validate prerequisites and config without deploying
 #   --diff           Preview the CDK stack changes without deploying them
 #   --destroy        Tear down all VEW stacks and orphaned resources
 #   --yes            Auto-confirm interactive prompts (for CI/CD)
+#   --update-only    Update an existing deployment without bootstrap, identity secret writes,
+#                    admin/program seeding or spoke onboarding
 #
 # Prerequisites: aws-cli v2, cdk v2, node 18+, python 3.13+, uv, jq, yarn 4+
 # =============================================================================
@@ -90,6 +92,7 @@ DESTROY_MODE=false
 DRY_RUN=false
 DIFF_MODE=false
 AUTO_CONFIRM=false
+UPDATE_ONLY=false
 while [[ $# -gt 0 ]]; do
   case $1 in
     --config)  CONFIG_FILE="$2"; shift 2 ;;
@@ -97,9 +100,14 @@ while [[ $# -gt 0 ]]; do
     --dry-run) DRY_RUN=true; shift ;;
     --diff)    DIFF_MODE=true; shift ;;
     --yes)     AUTO_CONFIRM=true; shift ;;
+    --update-only) UPDATE_ONLY=true; shift ;;
     *) err "Unknown argument: $1" ;;
   esac
 done
+
+if [ "$UPDATE_ONLY" = "true" ] && [ "$DESTROY_MODE" = "true" ]; then
+  err "--update-only cannot be combined with --destroy"
+fi
 
 # One capture file across every CDK app: cdk reports its stack total per app,
 # so the figure it prints last is not the total for the run. Created here, in
@@ -972,6 +980,27 @@ BOOTSTRAP_REGIONS=$(required_bootstrap_regions \
 
 step 3 "CDK bootstrapping account $AWS_ACCOUNT_ID in required regions"
 
+if [ "$UPDATE_ONLY" = "true" ]; then
+  log "Update only: verifying existing bootstrap stacks, frontend and VPC"
+  while IFS= read -r bootstrap_region; do
+    aws ssm get-parameter --name /cdk-bootstrap/hnb659fds/version \
+      --region "$bootstrap_region" >/dev/null || \
+      err "CDK bootstrap is missing or unreadable in $bootstrap_region. Run an initial deployment first."
+  done < <(workbench_regions_lines "$BOOTSTRAP_REGIONS")
+  aws cloudformation describe-stacks --stack-name "${APP_NAME}-${ENVIRONMENT}" \
+    --region "$FE_REGION" >/dev/null || err "The frontend stack must already exist for --update-only."
+  EXISTING_VPC=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=$VPC_NAME" \
+    --query 'Vpcs[0].VpcId' --output text --region "$AWS_REGION")
+  [[ -n "$EXISTING_VPC" && "$EXISTING_VPC" != "None" ]] || \
+    err "VPC '$VPC_NAME' must already exist for --update-only."
+  if [ "$PRIVATE_DEPLOYMENT" = "true" ] && [ -z "$CERT_ARN" ]; then
+    err "--update-only requires CERT_ARN for an existing private deployment."
+  fi
+  if [ -n "$OIDC_CLIENT_ID" ]; then
+    aws secretsmanager describe-secret --secret-id "${ORG_PREFIX}-${APP_PREFIX}-ui-${ENVIRONMENT}/oidc" \
+      --region "$AWS_REGION" >/dev/null || err "The configured identity secret must already exist for --update-only."
+  fi
+else
 while IFS= read -r bootstrap_region; do
   log "Bootstrapping hub account in $bootstrap_region"
   run_cmd cdk bootstrap "aws://${AWS_ACCOUNT_ID}/${bootstrap_region}" \
@@ -1147,6 +1176,7 @@ elif [ -n "$OIDC_CLIENT_ID" ] && [ -n "$OIDC_CLIENT_SECRET" ] && [ -n "$OIDC_ISS
 else
   warn "No OIDC credentials provided — Cognito will use manual user creation"
 fi
+fi # Initial setup; --update-only preserves prerequisites and the identity secret.
 
 # ---------------------------------------------------------------------------
 # Phase 6: Deploy frontend infrastructure (Cognito, CloudFront, WAF, S3)
@@ -1284,9 +1314,13 @@ if [ "$DIFF_MODE" = "true" ]; then
   fi
   log "=== DIFF COMPLETE ==="
   log "The stack changes above are what a deploy would apply. Nothing was deployed."
-  warn "Two writes still happen, because the diff itself needs them: the CDK"
-  warn "bootstrap stack, and the SSM parameters the stacks read while"
-  warn "synthesizing. Both are no-ops on an account already deployed."
+  if [ "$UPDATE_ONLY" = "true" ]; then
+    log "Update only: bootstrap and prerequisite writes were skipped. CDK diff may create change sets."
+  else
+    warn "Two writes still happen, because the diff itself needs them: the CDK"
+    warn "bootstrap stack, and the SSM parameters the stacks read while"
+    warn "synthesizing. Both are no-ops on an account already deployed."
+  fi
   warn "Everything else is skipped: the service-linked role, the self-signed"
   warn "certificate import, and the OIDC secret."
   log "Run without --diff to apply."
@@ -1422,6 +1456,9 @@ fi
 # ---------------------------------------------------------------------------
 # Phase 9: Seed DynamoDB (admin user + default program)
 # ---------------------------------------------------------------------------
+if [ "$UPDATE_ONLY" = "true" ]; then
+  log "Update only: preserving existing admin and program records"
+else
 step 9 "Seeding DynamoDB (admin user + default program)"
 
 PROGRAM_ID="prog-73488"
@@ -1481,11 +1518,14 @@ aws dynamodb put-item \
   }" 2>&1 | tee -a "$LOG_FILE"
 
 log "DynamoDB seeding complete"
+fi
 
 # ---------------------------------------------------------------------------
 # Phase 10: Spoke account onboarding (optional)
 # ---------------------------------------------------------------------------
-if [ -n "${SPOKE_ACCOUNT_ID:-}" ]; then
+if [ "$UPDATE_ONLY" = "true" ]; then
+  log "Update only: skipping spoke account onboarding"
+elif [ -n "${SPOKE_ACCOUNT_ID:-}" ]; then
   step 10 "Onboarding spoke account $SPOKE_ACCOUNT_ID (CloudFormation bootstrap)"
 
   SPOKE_TEMPLATE="$REPO_ROOT/backend/setup/prerequisites/vew-spoke-account-bootstrap.yml"

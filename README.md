@@ -222,6 +222,19 @@ cp config.env deploy-config.env
 
 The script saves a config file after the first run at `.deploy-config-{env}` for re-runs.
 
+For routine updates to an existing deployment, use:
+
+```bash
+./deploy.sh --config .deploy-config-dev --yes --update-only
+```
+
+This verifies the existing CDK bootstrap stacks, frontend stack and VPC, then deploys
+the application infrastructure and web app. It preserves the identity-provider secret,
+admin/program records and spoke onboarding. The saved configuration must retain the
+existing identity-provider and networking settings. Add `--diff` to preview stack
+changes; CDK may create CloudFormation change sets while comparing templates.
+Use the full deployment command for initial setup or changes to prerequisites.
+
 ### Configuration reference
 
 Parameters used by `deploy.sh` (prompted interactively or loaded from config file):

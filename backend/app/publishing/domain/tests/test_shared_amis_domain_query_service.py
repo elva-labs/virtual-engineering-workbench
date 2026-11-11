@@ -150,6 +150,7 @@ def test_make_share_ami_decision_matches_the_version_region(
         product_id=product_id_value_object.from_str("prod-11111111"),
         version_id=version_id_value_object.from_str("vers-11111111"),
         aws_account_id=aws_account_id_value_object.from_str("123456789012"),
+        stage=stage_value_object.from_str("DEV"),
         product_type=product_type_value_object.from_str("WORKBENCH"),
     )
 

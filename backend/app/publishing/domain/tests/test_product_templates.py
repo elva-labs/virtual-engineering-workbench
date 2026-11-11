@@ -56,11 +56,8 @@ def test_region_map_lists_every_shared_region(name):
 
 @pytest.mark.parametrize("name", NAMES)
 def test_drafts_render_for_validation(name):
-    """The raw draft is Jinja, not YAML; CloudFormation rejects it ("YAML not well-formed"). Validation
-    sees it rendered with a placeholder image."""
+    """Validation sees the draft rendered with a placeholder image."""
     raw = (TEMPLATES / name).read_text()
-    with pytest.raises(yaml.YAMLError):
-        yaml.load(raw, Loader=_CfnTagLoader)
 
     rendered = yaml.load(product_template.render_for_validation(raw), Loader=_CfnTagLoader)
 

@@ -10,7 +10,13 @@ from app.authorization.domain.commands import sync_assignments_command
 from app.shared.api import bounded_contexts
 from infra import config, constants
 from infra.backend import vew_bounded_context_stack
-from infra.constructs import backend_app_entrypoints, backend_app_openapi, backend_app_storage, shared_layer
+from infra.constructs import (
+    backend_app_entrypoints,
+    backend_app_openapi,
+    backend_app_storage,
+    oidc_group_grants,
+    shared_layer,
+)
 from infra.constructs.eventbridge import l3_event_bus
 from infra.helpers import ops_monitoring
 
@@ -94,6 +100,7 @@ class AuthorizationAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
         )
 
         user_pool_region = app_config.environment_config["cognito-region"]
+        groups_provider = oidc_group_grants.provider_name(self, app_config)
 
         # Create shared authorizer function using BackendAppEntrypoints
         self.__backend_app = backend_app_entrypoints.BackendAppEntrypoints(
@@ -105,6 +112,7 @@ class AuthorizationAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                 "TABLE_NAME": storage.table.table_name,
                 "GSI_NAME_INVERTED_PK": GSI_NAME_INVERTED_PK,
                 "POLICY_STORE_SSM_PARAM_PREFIX": policy_param_prefix,
+                "OIDC_GROUPS_PROVIDER_NAME": groups_provider,
             },
             app_entry_points=[
                 backend_app_entrypoints.AppEntryPoint(
@@ -200,6 +208,7 @@ class AuthorizationAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                         bounded_contexts.BoundedContext.PROJECTS: [
                             ("GET", "/internal/projects"),
                             ("GET", "/internal/projects/*/users"),
+                            ("GET", "/internal/projects/*/groups"),
                         ],
                     },
                 ),
@@ -222,6 +231,7 @@ class AuthorizationAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                 "UserAssigned",
                 "UserReAssigned",
                 "UserUnAssigned",
+                "ProjectGroupAssignmentChanged",
             ],
         )
 

@@ -21,11 +21,14 @@ import { ProjectUsers } from '../projects/project-details/project-users';
 import { useRecoilValue } from 'recoil';
 import { selectedProjectState, RoleBasedFeature } from '../../../state';
 import { useProjectUsers } from '../projects/project-details/project-users.logic';
+import { ProjectGroups } from '../projects/project-details/project-groups';
+import { useProjectGroups } from '../projects/project-details/project-groups.logic';
 import { useLocalStorage } from '../../../hooks';
 import { GetProjectEnrolmentsResponseItem } from '../../../services/API/proserve-wb-projects-api';
 
 const TAB_ID_MEMBERS = 'members';
 const TAB_ID_REQUESTS = 'requests';
+const TAB_ID_GROUPS = 'groups';
 
 export type EnhancedProjectEnrolmentResponseItem = GetProjectEnrolmentsResponseItem
 & { isDuplicate: boolean };
@@ -41,6 +44,17 @@ export const Members = () => {
     unassignUsers,
     userUnassignInProgress,
   } = useProjectUsers({ projectId: selectedProject.projectId ?? '' });
+
+  const {
+    groups,
+    groupsLoading,
+    groupsAvailable,
+    loadGroups,
+    saveGroup,
+    removeGroup,
+    groupSaveInProgress,
+    groupRemoveInProgress,
+  } = useProjectGroups({ projectId: selectedProject.projectId ?? '' });
 
   const { navigateTo, getPathFor } = useNavigationPaths();
   const {
@@ -151,7 +165,20 @@ export const Members = () => {
                     isDeclineLoading={isDeclineLoading}
                     reloadEnrolments={loadEnrolments}
                   />
-                }
+                },
+                ...groupsAvailable ? [{
+                  label: i18n.tabGroups,
+                  id: TAB_ID_GROUPS,
+                  content: <ProjectGroups
+                    groups={groups}
+                    groupsLoading={groupsLoading}
+                    loadGroups={loadGroups}
+                    saveGroup={saveGroup}
+                    removeGroup={removeGroup}
+                    groupSaveInProgress={groupSaveInProgress}
+                    groupRemoveInProgress={groupRemoveInProgress}
+                  />
+                }] : []
               ]}
               ariaLabel={i18n.tabsAriaLabel}
             />

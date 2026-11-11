@@ -32,6 +32,7 @@ export class AppConfig {
     public readonly allowCustomUserLogin?: boolean,
     public readonly requireCustomUserLogin2FA?: boolean,
     public readonly additionalAppClients: AdditionalAppClient[] = [],
+    public readonly oidcGroupsClaim?: string,
   ) {
 
   }
@@ -60,6 +61,7 @@ export class AppConfig {
       environmentConfig.AllowCustomUserLogin,
       environmentConfig.RequireCustomUserLogin2FA,
       AppConfig._parseAdditionalAppClients(environmentConfig.AdditionalAppClients),
+      environmentConfig.OIDCGroupsClaim || undefined,
     );
   }
 

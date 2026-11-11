@@ -4,6 +4,9 @@ from pydantic import BaseModel, Field
 
 
 class AppConfig(BaseModel):
+    def get_user_info_url(self) -> str:
+        return os.environ.get("USER_INFO_URL", "")
+
     cors_config: dict = Field(..., title="CORS configuration")
 
     def get_api_base_path(self) -> str:

@@ -1559,6 +1559,171 @@ paths:
           - "method.request.querystring.pageSize"
         contentHandling: "CONVERT_TO_TEXT"
         credentials: "{{apigw_invocation_role_arn}}"
+  /projects/{projectId}/groups:
+    get:
+      description: List the project's group bindings. Requires the same access as changing user roles.
+      operationId: GetProjectGroups
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Active group bindings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetProjectGroupsResponse"
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        credentials: "{{apigw_invocation_role_arn}}"
+        passthroughBehavior: when_no_match
+        contentHandling: CONVERT_TO_TEXT
+    put:
+      description: Create or replace a group binding. Group ids are opaque, case-sensitive strings.
+      operationId: PutProjectGroup
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PutProjectGroupRequest"
+      responses:
+        "200":
+          description: Saved group binding
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectGroupAssignment"
+      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        credentials: "{{apigw_invocation_role_arn}}"
+        passthroughBehavior: when_no_match
+        contentHandling: CONVERT_TO_TEXT
+    delete:
+      description: Remove a group binding. Repeated deletion is safe.
+      operationId: DeleteProjectGroup
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeleteProjectGroupRequest"
+      responses:
+        "200":
+          description: Binding removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Empty"
+      x-amazon-apigateway-request-validator: all
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        credentials: "{{apigw_invocation_role_arn}}"
+        passthroughBehavior: when_no_match
+        contentHandling: CONVERT_TO_TEXT
+    options:
+      operationId: ProjectGroupsCors
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      security: []
+      responses:
+        "200":
+          description: CORS
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
+            Access-Control-Allow-Methods:
+              schema:
+                type: string
+            Access-Control-Allow-Headers:
+              schema:
+                type: string
+      x-amazon-apigateway-integration:
+        type: mock
+        requestTemplates:
+          application/json: '{"statusCode": 200}'
+        responses:
+          default:
+            statusCode: "200"
+            responseParameters:
+              method.response.header.Access-Control-Allow-Origin: "{{cors_origin}}"
+              method.response.header.Access-Control-Allow-Methods: "'GET,PUT,DELETE,OPTIONS'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+  /internal/projects/{projectId}/groups:
+    get:
+      description: List group bindings for authorization reconciliation, including revocations when requested.
+      operationId: GetInternalProjectGroups
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: includeDeleted
+          in: query
+          required: false
+          schema:
+            type: boolean
+      security:
+        - sigv4: []
+      responses:
+        "200":
+          description: Group bindings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetProjectGroupsResponse"
+      x-amazon-apigateway-request-validator: params-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/{{handler_arn}}/invocations"
+        credentials: "{{apigw_invocation_role_arn}}"
+        passthroughBehavior: when_no_match
+        contentHandling: CONVERT_TO_TEXT
   /internal/projects/{projectId}/users:
     get:
       description: "Get all project assignments via internal API"
@@ -1725,6 +1890,57 @@ paths:
           - "method.request.querystring.nextToken"
 components:
   schemas:
+    ProjectGroupRole:
+      type: string
+      enum: [ADMIN, PROGRAM_OWNER, POWER_USER, PRODUCT_CONTRIBUTOR, BETA_USER, PLATFORM_USER]
+    PutProjectGroupRequest:
+      type: object
+      required: [groupId, roles]
+      properties:
+        groupId:
+          type: string
+          minLength: 1
+          maxLength: 2042
+        groupName:
+          type: string
+          nullable: true
+        roles:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectGroupRole"
+    DeleteProjectGroupRequest:
+      type: object
+      required: [groupId]
+      properties:
+        groupId:
+          type: string
+          minLength: 1
+          maxLength: 2042
+    ProjectGroupAssignment:
+      allOf:
+        - $ref: "#/components/schemas/PutProjectGroupRequest"
+        - type: object
+          required: [projectId, version, isDeleted, createDate, lastUpdateDate]
+          properties:
+            projectId:
+              type: string
+            version:
+              type: integer
+              minimum: 1
+            isDeleted:
+              type: boolean
+            createDate:
+              type: string
+            lastUpdateDate:
+              type: string
+    GetProjectGroupsResponse:
+      type: object
+      required: [assignments]
+      properties:
+        assignments:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectGroupAssignment"
     Empty:
       title: "Empty Schema"
       type: "object"

@@ -19,6 +19,9 @@ class ProjectsBCEntities(enum.StrEnum):
 class ProjectsBCActions(enum.StrEnum):
     AddProjectAccount = "AddProjectAccount"
     AddProjectUser = "AddProjectUser"
+    GetProjectGroups = "GetProjectGroups"
+    PutProjectGroup = "PutProjectGroup"
+    DeleteProjectGroup = "DeleteProjectGroup"
     AddTechnology = "AddTechnology"
     CreateProject = "CreateProject"
     DeleteTechnology = "DeleteTechnology"

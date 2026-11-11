@@ -1,9 +1,12 @@
 from abc import ABC, abstractmethod
 
-from app.authorization.domain.read_models import project_assignment
+from app.authorization.domain.read_models import project_assignment, project_group_assignment
 
 
 class AssignmentsQueryService(ABC):
+    def get_group_assignments(self, group_ids: list[str]) -> list[project_group_assignment.GroupAssignment]:
+        raise NotImplementedError
+
     @abstractmethod
     def get_user_assignments(self, user_id: str) -> list[project_assignment.Assignment]: ...
 

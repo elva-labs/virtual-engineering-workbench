@@ -9,6 +9,33 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from app.projects.domain.model.project_assignment import Role
+
+
+class ProjectGroupAssignment(BaseModel):
+    projectId: str
+    groupId: str
+    roles: list[Role]
+    groupName: str | None = None
+    version: int
+    isDeleted: bool = False
+    createDate: str
+    lastUpdateDate: str
+
+
+class GetProjectGroupsResponse(BaseModel):
+    assignments: list[ProjectGroupAssignment]
+
+
+class PutProjectGroupRequest(BaseModel):
+    groupId: str = Field(min_length=1, max_length=2042)
+    groupName: str | None = None
+    roles: list[Role]
+
+
+class DeleteProjectGroupRequest(BaseModel):
+    groupId: str = Field(min_length=1, max_length=2042)
+
 
 class Empty(BaseModel):
     pass

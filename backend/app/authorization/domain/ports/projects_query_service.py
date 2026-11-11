@@ -1,10 +1,13 @@
 from abc import ABC, abstractmethod
 
-from app.authorization.domain.read_models import project, project_assignment
+from app.authorization.domain.read_models import project, project_assignment, project_group_assignment
 from app.shared.adapters.boto import paging_utils
 
 
 class ProjectsQueryService(ABC):
+    def get_project_group_assignments(self, project_id: str) -> list[project_group_assignment.GroupAssignment]:
+        raise NotImplementedError
+
     @abstractmethod
     def get_user_assignments(self, user_id: str) -> list[project_assignment.Assignment]: ...
 

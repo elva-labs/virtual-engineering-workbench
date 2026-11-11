@@ -672,6 +672,7 @@ prompt OIDC_CLIENT_ID     "OIDC Client ID"                     ""
 prompt OIDC_CLIENT_SECRET "OIDC Client Secret"                 "" true
 prompt OIDC_ISSUER_URL    "OIDC Issuer URL"                    ""
 prompt OIDC_USER_ID_CLAIM "OIDC claim containing the VEW user ID" "sub"
+prompt OIDC_GROUPS_CLAIM  "OIDC groups claim (empty disables group grants)" ""
 prompt OIDC_LOGOUT_URL    "OIDC provider logout URL (optional; {appDns} = application URL)" ""
 
 echo ""
@@ -754,6 +755,7 @@ VPC_NAME="${HUB_VPC_NAME:-vpc-${ORG_PREFIX}-${APP_PREFIX}-${ENVIRONMENT}}"
 # Save config for re-runs (excluding secrets)
 CONFIG_OUT="$SCRIPT_DIR/.deploy-config-${ENVIRONMENT}"
 printf -v OIDC_USER_ID_CLAIM_CONFIG '%q' "$OIDC_USER_ID_CLAIM"
+printf -v OIDC_GROUPS_CLAIM_CONFIG '%q' "$OIDC_GROUPS_CLAIM"
 printf -v OIDC_LOGOUT_URL_CONFIG '%q' "$OIDC_LOGOUT_URL"
 cat > "$CONFIG_OUT" <<CONF
 AWS_ACCOUNT_ID="$AWS_ACCOUNT_ID"
@@ -767,6 +769,7 @@ ADMIN_USER_ID="$ADMIN_USER_ID"
 OIDC_CLIENT_ID="$OIDC_CLIENT_ID"
 OIDC_ISSUER_URL="$OIDC_ISSUER_URL"
 OIDC_USER_ID_CLAIM=$OIDC_USER_ID_CLAIM_CONFIG
+OIDC_GROUPS_CLAIM=$OIDC_GROUPS_CLAIM_CONFIG
 OIDC_LOGOUT_URL=$OIDC_LOGOUT_URL_CONFIG
 CERT_ARN="$CERT_ARN"
 CERT_ARN_US_EAST_1="${CERT_ARN_US_EAST_1:-}"
@@ -832,12 +835,17 @@ FE_PUBLIC_STACK="$REPO_ROOT/frontend/infrastructure/lib/public-access-deployment
 
 # --- backend/infra/config.py ---
 log "Patching $BACKEND_CONFIG"
+OIDC_GROUPS_ENABLED=False
+if [ -n "$OIDC_CLIENT_ID" ] && [ -n "$OIDC_GROUPS_CLAIM" ]; then
+  OIDC_GROUPS_ENABLED=True
+fi
 sed -i.bak \
   -e "s/^ORGANIZATION_PREFIX = \".*\"/ORGANIZATION_PREFIX = \"${ORG_PREFIX}\"/" \
   -e "s/^APPLICATION_PREFIX = \".*\"/APPLICATION_PREFIX = \"${APP_PREFIX}\"/" \
   -e "s/^HUB_VPC_NAME = \".*\"/HUB_VPC_NAME = \"${HUB_VPC_NAME}\"/" \
   -e "s/^HUB_SUBNET_NAMES = \".*\"/HUB_SUBNET_NAMES = \"${HUB_SUBNET_NAMES}\"/" \
   -e "s/\"cognito-region\": \"[^\"]*\"/\"cognito-region\": \"${COGNITO_REGION}\"/" \
+  -e "s/\"oidc-groups-enabled\": [^,]*/\"oidc-groups-enabled\": ${OIDC_GROUPS_ENABLED}/" \
   -e "s/login-[a-z0-9]*\.auth\.[a-z0-9-]*/login-${DEPLOYMENT_QUALIFIER}.auth.${COGNITO_REGION}/g" \
   "$BACKEND_CONFIG"
 rm -f "${BACKEND_CONFIG}.bak"
@@ -898,13 +906,14 @@ jq --arg app_name "$APP_NAME" \
    --arg qualifier "$DEPLOYMENT_QUALIFIER" \
    --arg oidc "$OIDC_NAME" \
    --arg uid_claim "$OIDC_USER_ID_CLAIM" \
+   --arg groups_claim "$OIDC_GROUPS_CLAIM" \
    --arg logout "$OIDC_LOGOUT_URL" \
    --arg vpcname "$VPC_NAME" \
    --argjson app_clients "$ADDITIONAL_APP_CLIENTS" \
    --argjson allow_login "$ALLOW_CUSTOM_LOGIN" \
    --argjson private "$PRIVATE_DEPLOYMENT" \
    --argjson adoptedvpc "$([ -n "$HUB_VPC_NAME" ] && echo true || echo false)" \
-   ".context[\"app-name\"] = \$app_name | .context[\"deployment-qualifier\"] = \$qualifier | .context.config.dev.AllowCustomUserLogin = \$allow_login | .context.config.dev.PrivateDeployment = \$private | .context.config.dev.VPCName = \$vpcname | .context.config.dev.AdoptedVPC = \$adoptedvpc | .context.config.dev.AdditionalAppClients = \$app_clients $OIDC_FILTER" \
+   ".context[\"app-name\"] = \$app_name | .context[\"deployment-qualifier\"] = \$qualifier | .context.config.dev.AllowCustomUserLogin = \$allow_login | .context.config.dev.PrivateDeployment = \$private | .context.config.dev.VPCName = \$vpcname | .context.config.dev.AdoptedVPC = \$adoptedvpc | .context.config.dev.AdditionalAppClients = \$app_clients | .context.config.dev.OIDCGroupsClaim = \$groups_claim $OIDC_FILTER" \
    "$FE_CDK_JSON" > "${FE_CDK_JSON}.tmp" && mv "${FE_CDK_JSON}.tmp" "$FE_CDK_JSON"
 
 # --- frontend/infrastructure/lib/public-access-deployment-stack.ts ---

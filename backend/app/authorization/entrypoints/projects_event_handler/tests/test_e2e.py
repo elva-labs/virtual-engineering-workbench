@@ -1,6 +1,23 @@
 import assertpy
 
 
+def test_group_events_revoke_and_ignore_older_versions_without_user_records(
+    generate_event, backend_app_dynamodb_table, lambda_context
+):
+    from app.authorization.entrypoints.projects_event_handler import handler
+
+    group = "engineering/team"
+    for version, deleted in [(1, False), (2, True), (1, False), (2, False)]:
+        event = generate_event(
+            detail_type="ProjectGroupAssignmentChanged",
+            detail={"projectId": "p1", "groupId": group, "roles": ["ADMIN"], "version": version, "isDeleted": deleted},
+        )
+        handler.handler(event=event, context=lambda_context)
+    record = backend_app_dynamodb_table.get_item(Key={"PK": f"GROUP#{group}", "SK": "PROJECT#p1"})["Item"]
+    assert record["isDeleted"] and record["version"] == 2
+    assert not any(item["PK"].startswith("USER#") for item in backend_app_dynamodb_table.scan()["Items"])
+
+
 def test_enrolment_approved_creates_user_assignment_entity(
     enrolment_approved_event, generate_event, backend_app_dynamodb_table, lambda_context
 ):

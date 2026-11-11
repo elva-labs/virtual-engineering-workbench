@@ -176,6 +176,8 @@ _dev_env_config = {
     "cognito-userpool-client-ids-ssm-param": f"{SSM_PARAM_COGNITO_PREFIX}/user-pool-client-ids",
     "cognito-url-ssm-param": f"{SSM_PARAM_COGNITO_PREFIX}/user-pool-domain",
     "cognito-region": "us-east-1",
+    "oidc-groups-enabled": False,
+    "oidc-groups-provider-name-ssm-param": f"{SSM_PARAM_COGNITO_PREFIX}/oidc-groups-provider-name",
     "enabled-workbench-regions": ["us-east-1"],
     "spoke-account-vpc-id-param-name": "/workbench/vpc/vpc-id",
     "spoke-account-vpc-tag": "onboarding:enabled",

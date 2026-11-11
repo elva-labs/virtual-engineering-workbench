@@ -19,12 +19,14 @@ class FEStack {
     oidcUserIdClaim?: string,
     domainName?: string,
     additionalAppClients?: unknown,
+    oidcGroupsClaim?: string,
   ) {
     const cdkCfg: { [key: string]: unknown } = {
       LogoutUrl: logoutUrl ?? undefined,
       OIDCSecretName: oidcSecretName,
       OIDCUserIdClaim: oidcUserIdClaim,
       AdditionalAppClients: additionalAppClients,
+      OIDCGroupsClaim: oidcGroupsClaim,
     };
     for (const key of Object.keys(cdkCfg)) {
       if (cdkCfg[key] === undefined) {
@@ -278,6 +280,33 @@ test('Configured OIDC user ID claim should be mapped to the VEW user ID attribut
   }));
 });
 
+test('OIDC group grants should stay unmapped when the claim setting is unset', () => {
+  const template = Template.fromStack(FEStack.get('fake-secret-name'));
+  template.hasResourceProperties('AWS::Cognito::UserPoolIdentityProvider', {
+    AttributeMapping: Match.objectLike({ 'custom:oidc_groups': Match.absent() }),
+  });
+});
+
+test.each(['public', 'private'])('OIDC group grants should map the claim in %s deployments', mode => {
+  const claim = 'https://identity.example.com/groups';
+  const stack = mode === 'public' ?
+    FEStack.get('fake-secret-name', 'http://localhost', undefined, undefined, undefined, claim) :
+    getPrivateStack(undefined, claim);
+  const template = Template.fromStack(stack);
+  template.hasResourceProperties('AWS::Cognito::UserPoolIdentityProvider', {
+    AttributeMapping: Match.objectLike({ 'custom:oidc_groups': claim }),
+  });
+  template.hasResourceProperties('AWS::Cognito::UserPool', {
+    Schema: Match.arrayWith([
+      Match.objectLike({ Name: 'oidc_groups', Mutable: true, AttributeDataType: 'String' })
+    ]),
+  });
+  template.hasResourceProperties('AWS::SSM::Parameter', {
+    Name: '/my-app-dev/oidc-groups-provider-name',
+    Value: { Ref: Match.stringLikeRegexp('webuserpooloidcprovider.*') },
+  });
+});
+
 test('OIDC verified email claim should be mapped to Cognito', () => {
   // ACT
   const stack = FEStack.get('fake-secret-name');
@@ -345,7 +374,7 @@ test('User Pool Client should be configured with openid, email and profile scope
   }));
 });
 
-function getPrivateStack(additionalAppClients?: unknown) {
+function getPrivateStack(additionalAppClients?: unknown, oidcGroupsClaim?: string) {
   const app = new App({
     context: {
       'use-custom-domain': 'app.example.com',
@@ -356,6 +385,8 @@ function getPrivateStack(additionalAppClients?: unknown) {
           VPCName: 'vpc-test',
           PrivateDeployment: true,
           AdditionalAppClients: additionalAppClients,
+          OIDCGroupsClaim: oidcGroupsClaim,
+          ...oidcGroupsClaim ? { OIDCSecretName: 'fake-secret-name' } : {},
         }
       }
     }

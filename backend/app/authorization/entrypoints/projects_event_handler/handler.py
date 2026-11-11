@@ -5,6 +5,7 @@ from aws_xray_sdk.core import patch_all
 
 from app.authorization.domain.integration_events.projects import (
     enrolment_approved,
+    project_group_assignment_changed,
     user_assigned,
     user_reassigned,
     user_unassigned,
@@ -30,6 +31,11 @@ dependencies = bootstrapper.bootstrap(app_config, logger)
 @app.handle(enrolment_approved.EnrolmentApproved)
 def enrolment_approved_ep(event: enrolment_approved.EnrolmentApproved):
     dependencies.enrolment_approved_handler(event)
+
+
+@app.handle(project_group_assignment_changed.ProjectGroupAssignmentChanged)
+def project_group_assignment_changed_ep(event: project_group_assignment_changed.ProjectGroupAssignmentChanged):
+    dependencies.project_group_assignment_changed_handler(event)
 
 
 @app.handle(user_assigned.UserAssigned)

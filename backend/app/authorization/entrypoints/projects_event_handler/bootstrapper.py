@@ -7,12 +7,14 @@ from pydantic import BaseModel, ConfigDict
 from app.authorization.adapters.repository import dynamo_entity_config
 from app.authorization.domain.integration_event_handlers.projects import (
     enrolment_approved_handler,
+    project_group_assignment_changed_handler,
     user_assigned_handler,
     user_reassigned_handler,
     user_unassigned_handler,
 )
 from app.authorization.domain.integration_events.projects import (
     enrolment_approved,
+    project_group_assignment_changed,
     user_assigned,
     user_reassigned,
     user_unassigned,
@@ -23,6 +25,9 @@ from app.shared.logging import boto_logger
 
 
 class Dependencies(BaseModel):
+    project_group_assignment_changed_handler: typing.Callable[
+        [project_group_assignment_changed.ProjectGroupAssignmentChanged], None
+    ]
     enrolment_approved_handler: typing.Callable[[enrolment_approved.EnrolmentApproved], None]
     user_assigned_handler: typing.Callable[[user_assigned.UserAssigned], None]
     user_reassigned_handler: typing.Callable[[user_reassigned.UserReAssigned], None]
@@ -58,6 +63,9 @@ def bootstrap(  # noqa: C901
         user_unassigned_handler.handle(event=event, uow=uow)
 
     return Dependencies(
+        project_group_assignment_changed_handler=lambda event: project_group_assignment_changed_handler.handle(
+            event, uow
+        ),
         enrolment_approved_handler=__enrolment_approved,
         user_assigned_handler=__user_assigned,
         user_reassigned_handler=__user_reassigned,

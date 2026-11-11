@@ -2,6 +2,7 @@ import logging
 from typing import TYPE_CHECKING, Optional
 
 from app.projects.domain.ports import user_directory_service
+from app.shared.identity import oidc_groups
 
 if TYPE_CHECKING:
     from mypy_boto3_cognito_idp import CognitoIdentityProviderClient
@@ -37,6 +38,24 @@ class CognitoUserDirectoryService(user_directory_service.UserDirectoryService):
         self._client = cognito_client
         self._user_pool_id = user_pool_id
         self._logger = logger
+
+    def get_user_group_ids(self, user_tid: str) -> list[str]:
+        if not oidc_groups.provider_name() or not user_tid:
+            return []
+        try:
+            paginator = self._client.get_paginator("list_users")
+            # Read all attributes: optional ones may be absent on native users.
+            for page in paginator.paginate(
+                UserPoolId=self._user_pool_id, PaginationConfig={"PageSize": self._PAGE_SIZE}
+            ):
+                for cognito_user in page.get("Users", []):
+                    attributes = {attr["Name"]: attr.get("Value") for attr in cognito_user.get("Attributes", [])}
+                    tid = attributes.get(_USER_TID_ATTRIBUTE)
+                    if tid and tid.upper() == user_tid.upper():
+                        return oidc_groups.trusted_group_ids(attributes)
+        except Exception:
+            self._logger.exception("Failed to look up group grants")
+        return []
 
     def get_user_email(self, user_tid: str) -> Optional[str]:
         if not user_tid:

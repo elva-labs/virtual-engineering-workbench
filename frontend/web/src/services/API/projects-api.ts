@@ -17,6 +17,10 @@ import {
   AddTechnologyRequest,
   UpdateTechnologyRequest,
   RemoveUsersRequest,
+  GetProjectGroupsResponse,
+  ProjectGroupAssignment,
+  PutProjectGroupRequest,
+  DeleteProjectGroupRequest,
 } from './proserve-wb-projects-api';
 import { getAccessToken } from '..';
 
@@ -138,6 +142,41 @@ export const projectsAPI = {
       projectId: projectId,
     },
     { headers: headers });
+  },
+
+  getProjectGroups: async (projectId: string): Promise<GetProjectGroupsResponse> => {
+    const access = await getAccessToken();
+    const headers: { [key: string]: string } = {};
+    headers[CACHE_CONTROL_HEADER] = 'max-age=0, no-cache';
+    const api = prepareClient();
+    return api.getProjectGroups({
+      authorization: `Bearer ${access}`,
+      projectId: projectId,
+    },
+    { headers: headers });
+  },
+
+  putProjectGroup: async (
+    projectId: string,
+    body: PutProjectGroupRequest
+  ): Promise<ProjectGroupAssignment> => {
+    const access = await getAccessToken();
+    const api = prepareClient();
+    return api.putProjectGroup({
+      authorization: `Bearer ${access}`,
+      projectId: projectId,
+      putProjectGroupRequest: body
+    });
+  },
+
+  deleteProjectGroup: async (projectId: string, body: DeleteProjectGroupRequest): Promise<object> => {
+    const access = await getAccessToken();
+    const api = prepareClient();
+    return api.deleteProjectGroup({
+      authorization: `Bearer ${access}`,
+      projectId: projectId,
+      deleteProjectGroupRequest: body
+    });
   },
 
   getUserRoles: async(projectId: string, userId: string): Promise<GetUserRolesResponse> => {

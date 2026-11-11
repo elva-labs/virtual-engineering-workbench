@@ -30,6 +30,7 @@ class AuthorizationContext(BaseModel):
     roles: list[str] | None = Field(None)
     domains: list[str] | None = Field(None)
     project_assignments: list[project_assignment.Assignment] = Field([])
+    trusted_group_ids: list[str] = Field(default_factory=list)
     api_auth_cfg: APIAuthConfig = Field(...)
     project_scoped_bounded_contexts: list[str] = Field([])
 

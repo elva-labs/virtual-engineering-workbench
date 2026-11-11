@@ -4,6 +4,7 @@ index.ts
 models/AddTechnologyRequest.ts
 models/AssignUserRequest.ts
 models/CreateProjectRequest.ts
+models/DeleteProjectGroupRequest.ts
 models/GetProjectAccountsResponse.ts
 models/GetProjectAssignmentResponse.ts
 models/GetProjectAssignmentResponseItem.ts
@@ -12,6 +13,7 @@ models/GetProjectAssignmentsResponseItem.ts
 models/GetProjectAssignmentsResponseItemADGroup.ts
 models/GetProjectEnrolmentsResponse.ts
 models/GetProjectEnrolmentsResponseItem.ts
+models/GetProjectGroupsResponse.ts
 models/GetProjectResponse.ts
 models/GetProjectsResponse.ts
 models/GetTechnologiesResponse.ts
@@ -23,6 +25,9 @@ models/Project.ts
 models/ProjectAccount.ts
 models/ProjectAssignment.ts
 models/ProjectEnrolment.ts
+models/ProjectGroupAssignment.ts
+models/ProjectGroupRole.ts
+models/PutProjectGroupRequest.ts
 models/ReAssignUsersRequest.ts
 models/RemoveUsersRequest.ts
 models/ReonboardProjectAccountRequest.ts

@@ -2,13 +2,23 @@ from typing import Any
 from urllib.parse import quote
 
 from app.authorization.domain.ports import projects_query_service
-from app.authorization.domain.read_models import project, project_assignment
+from app.authorization.domain.read_models import project, project_assignment, project_group_assignment
 from app.shared.adapters.boto import paging_utils
 from app.shared.api import aws_api
 
 
 # has to be refactored: user assignments should move to this BC
 class ProjectsApiQueryService(projects_query_service.ProjectsQueryService):
+    def get_project_group_assignments(self, project_id: str) -> list[project_group_assignment.GroupAssignment]:
+        response = self._aws_api.call_api(
+            path=f"internal/projects/{quote(project_id, safe='')}/groups",
+            http_method="GET",
+            query_params={"includeDeleted": "true"},
+        )
+        return [
+            project_group_assignment.GroupAssignment.model_validate(item) for item in response.get("assignments", [])
+        ]
+
     def __init__(
         self,
         api: aws_api.AWSAPI,

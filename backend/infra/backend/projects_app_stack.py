@@ -29,6 +29,7 @@ from infra.constructs import (
     backend_app_openapi_oauth,
     backend_app_storage,
     backend_app_task_definition,
+    oidc_group_grants,
     shared_layer,
 )
 from infra.constructs.account_onboarding import account_onboarding_state_machine
@@ -162,6 +163,10 @@ class ProjectsAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
             app_config.environment_config["cognito-userpool-id-ssm-param"].format(environment=app_config.environment),
         )
         cognito_user_pool_arn = f"arn:aws:cognito-idp:{self.region}:{self.account}:userpool/{cognito_user_pool_id}"
+        groups_provider = oidc_group_grants.provider_name(self, app_config)
+        user_pool_domain = aws_ssm.StringParameter.value_for_string_parameter(
+            self, app_config.environment_config["cognito-url-ssm-param"].format(environment=app_config.environment)
+        )
 
         environment_vars = {
             "TABLE_NAME": self._storage.table.table_name,
@@ -216,6 +221,8 @@ class ProjectsAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                         "CUSTOM_DNS": custom_api_domain,
                         "LAYER_VERSION": self._shared_app_layer.layer.layer_version_arn,
                         "COGNITO_USER_POOL_ID": cognito_user_pool_id,
+                        "OIDC_GROUPS_PROVIDER_NAME": groups_provider,
+                        "USER_INFO_URL": f"https://{user_pool_domain}/oauth2/userInfo",
                     },
                     permissions=[
                         lambda lambda_f: lambda_f.add_to_role_policy(
@@ -556,6 +563,7 @@ class ProjectsAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
             cache_explicit_disable=[
                 "/projects/{projectId}/accounts/GET",
                 "/projects/{projectId}/users/GET",
+                "/projects/{projectId}/groups/GET",
                 "/projects/{projectId}/users/{userId}/GET",
                 "/projects/{projectId}/enrolments/GET",
                 "/projects/{projectId}/technologies/GET",

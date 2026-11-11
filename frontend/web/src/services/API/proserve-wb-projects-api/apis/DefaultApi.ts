@@ -17,17 +17,21 @@ import * as runtime from '../runtime';
 import type {
   AddTechnologyRequest,
   AssignUserRequest,
+  DeleteProjectGroupRequest,
   CreateProjectRequest,
   GetProjectAccountsResponse,
   GetProjectAssignmentResponse,
   GetProjectAssignmentsResponse,
   GetProjectEnrolmentsResponse,
+  GetProjectGroupsResponse,
   GetProjectResponse,
   GetProjectsResponse,
   GetTechnologiesResponse,
   GetUserResponse,
   GetUserRolesResponse,
   GetUsersResponse,
+  ProjectGroupAssignment,
+  PutProjectGroupRequest,
   OnBoardProjectAccountRequest,
   ReAssignUsersRequest,
   RemoveUsersRequest,
@@ -60,6 +64,14 @@ import {
     GetTechnologiesResponseToJSON,
     GetUserResponseFromJSON,
     GetUserResponseToJSON,
+    DeleteProjectGroupRequestFromJSON,
+    DeleteProjectGroupRequestToJSON,
+    GetProjectGroupsResponseFromJSON,
+    GetProjectGroupsResponseToJSON,
+    ProjectGroupAssignmentFromJSON,
+    ProjectGroupAssignmentToJSON,
+    PutProjectGroupRequestFromJSON,
+    PutProjectGroupRequestToJSON,
     GetUserRolesResponseFromJSON,
     GetUserRolesResponseToJSON,
     GetUsersResponseFromJSON,
@@ -179,6 +191,23 @@ export interface GetProjectEnrolmentsRequest {
     pageSize: number;
     nextToken?: object;
     status?: string;
+}
+
+export interface GetProjectGroupsRequest {
+    authorization: string;
+    projectId: string;
+}
+
+export interface PutProjectGroupOperationRequest {
+    authorization: string;
+    projectId: string;
+    putProjectGroupRequest: PutProjectGroupRequest;
+}
+
+export interface DeleteProjectGroupOperationRequest {
+    authorization: string;
+    projectId: string;
+    deleteProjectGroupRequest: DeleteProjectGroupRequest;
 }
 
 export interface GetProjectUsersRequest {
@@ -1070,6 +1099,146 @@ export class DefaultApi extends runtime.BaseAPI {
      */
     async getProjectEnrolments(requestParameters: GetProjectEnrolmentsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GetProjectEnrolmentsResponse> {
         const response = await this.getProjectEnrolmentsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * List the project's group bindings. Requires the same access as changing user roles.
+     */
+    async getProjectGroupsRaw(requestParameters: GetProjectGroupsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GetProjectGroupsResponse>> {
+        if (requestParameters.authorization === null || requestParameters.authorization === undefined) {
+            throw new runtime.RequiredError('authorization','Required parameter requestParameters.authorization was null or undefined when calling getProjectGroups.');
+        }
+
+        if (requestParameters.projectId === null || requestParameters.projectId === undefined) {
+            throw new runtime.RequiredError('projectId','Required parameter requestParameters.projectId was null or undefined when calling getProjectGroups.');
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (requestParameters.authorization !== undefined && requestParameters.authorization !== null) {
+            headerParameters['Authorization'] = String(requestParameters.authorization);
+        }
+
+        if (this.configuration && this.configuration.apiKey) {
+            headerParameters["AmazonVerifiedPermissions"] = this.configuration.apiKey("AmazonVerifiedPermissions"); // AVP-Request-Authorizer authentication
+        }
+
+        const response = await this.request({
+            path: `/projects/{projectId}/groups`.replace(`{${"projectId"}}`, encodeURIComponent(String(requestParameters.projectId))),
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => GetProjectGroupsResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * List the project's group bindings. Requires the same access as changing user roles.
+     */
+    async getProjectGroups(requestParameters: GetProjectGroupsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GetProjectGroupsResponse> {
+        const response = await this.getProjectGroupsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Create or replace a group binding. Group ids are opaque, case-sensitive strings.
+     */
+    async putProjectGroupRaw(requestParameters: PutProjectGroupOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ProjectGroupAssignment>> {
+        if (requestParameters.authorization === null || requestParameters.authorization === undefined) {
+            throw new runtime.RequiredError('authorization','Required parameter requestParameters.authorization was null or undefined when calling putProjectGroup.');
+        }
+
+        if (requestParameters.projectId === null || requestParameters.projectId === undefined) {
+            throw new runtime.RequiredError('projectId','Required parameter requestParameters.projectId was null or undefined when calling putProjectGroup.');
+        }
+
+        if (requestParameters.putProjectGroupRequest === null || requestParameters.putProjectGroupRequest === undefined) {
+            throw new runtime.RequiredError('putProjectGroupRequest','Required parameter requestParameters.putProjectGroupRequest was null or undefined when calling putProjectGroup.');
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+        if (requestParameters.authorization !== undefined && requestParameters.authorization !== null) {
+            headerParameters['Authorization'] = String(requestParameters.authorization);
+        }
+
+        if (this.configuration && this.configuration.apiKey) {
+            headerParameters["AmazonVerifiedPermissions"] = this.configuration.apiKey("AmazonVerifiedPermissions"); // AVP-Request-Authorizer authentication
+        }
+
+        const response = await this.request({
+            path: `/projects/{projectId}/groups`.replace(`{${"projectId"}}`, encodeURIComponent(String(requestParameters.projectId))),
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: PutProjectGroupRequestToJSON(requestParameters.putProjectGroupRequest),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ProjectGroupAssignmentFromJSON(jsonValue));
+    }
+
+    /**
+     * Create or replace a group binding. Group ids are opaque, case-sensitive strings.
+     */
+    async putProjectGroup(requestParameters: PutProjectGroupOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ProjectGroupAssignment> {
+        const response = await this.putProjectGroupRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Remove a group binding. Repeated deletion is safe.
+     */
+    async deleteProjectGroupRaw(requestParameters: DeleteProjectGroupOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<object>> {
+        if (requestParameters.authorization === null || requestParameters.authorization === undefined) {
+            throw new runtime.RequiredError('authorization','Required parameter requestParameters.authorization was null or undefined when calling deleteProjectGroup.');
+        }
+
+        if (requestParameters.projectId === null || requestParameters.projectId === undefined) {
+            throw new runtime.RequiredError('projectId','Required parameter requestParameters.projectId was null or undefined when calling deleteProjectGroup.');
+        }
+
+        if (requestParameters.deleteProjectGroupRequest === null || requestParameters.deleteProjectGroupRequest === undefined) {
+            throw new runtime.RequiredError('deleteProjectGroupRequest','Required parameter requestParameters.deleteProjectGroupRequest was null or undefined when calling deleteProjectGroup.');
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+        if (requestParameters.authorization !== undefined && requestParameters.authorization !== null) {
+            headerParameters['Authorization'] = String(requestParameters.authorization);
+        }
+
+        if (this.configuration && this.configuration.apiKey) {
+            headerParameters["AmazonVerifiedPermissions"] = this.configuration.apiKey("AmazonVerifiedPermissions"); // AVP-Request-Authorizer authentication
+        }
+
+        const response = await this.request({
+            path: `/projects/{projectId}/groups`.replace(`{${"projectId"}}`, encodeURIComponent(String(requestParameters.projectId))),
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+            body: DeleteProjectGroupRequestToJSON(requestParameters.deleteProjectGroupRequest),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse<any>(response);
+    }
+
+    /**
+     * Remove a group binding. Repeated deletion is safe.
+     */
+    async deleteProjectGroup(requestParameters: DeleteProjectGroupOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<object> {
+        const response = await this.deleteProjectGroupRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

@@ -6,6 +6,7 @@ export const i18n = {
   filterEnrolmentsPlaceholder: 'Find enrolments',
   tabMembers: 'Program members',
   tabRequests: 'Enrolment requests',
+  tabGroups: 'Groups',
   enrolmentsFetchErrorTitle: 'Unable to fetch enrolments for the project',
   enrolmentsApproveErrorTitle: 'Unable to approve enrolments for the project',
   enrolmentsApproveSuccessTitle: 'Enrollment requests have been approved',

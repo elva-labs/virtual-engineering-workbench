@@ -63,6 +63,9 @@ export class WebUserPool extends Construct {
         }
       },
       customAttributes: {
+        // Custom attributes cannot be removed later. Keep the schema when disabled,
+        // but map and trust the claim only when group grants are enabled.
+        oidc_groups: new cognito.StringAttribute({ mutable: true, maxLen: 2048 }),
         user_tid: new cognito.StringAttribute({
           mutable: true
         })
@@ -125,8 +128,10 @@ export class WebUserPool extends Construct {
     return this;
   }
 
-  withIdentityProvider(identityProviderSecretName: string, userIdClaim = 'sub'): WebUserPool {
-    this._userPool.registerIdentityProvider(new UserPoolIdentityProviderOidc(this, 'oidc-provider', {
+  withIdentityProvider(
+    identityProviderSecretName: string, userIdClaim = 'sub', groupsClaim?: string
+  ): WebUserPool {
+    const provider = new UserPoolIdentityProviderOidc(this, 'oidc-provider', {
       userPool: this._userPool,
       name: 'CorporateLogin',
       clientId: SecretValue.
@@ -149,9 +154,17 @@ export class WebUserPool extends Construct {
         familyName: ProviderAttribute.other('family_name'),
         custom: {
           'custom:user_tid': ProviderAttribute.other(userIdClaim), // eslint-disable-line
+          ...(groupsClaim ? { 'custom:oidc_groups': ProviderAttribute.other(groupsClaim) } : {}), // eslint-disable-line
         }
       },
-    }));
+    });
+    this._userPool.registerIdentityProvider(provider);
+    if (groupsClaim) {
+      new ssm.StringParameter(this, 'oidc-groups-provider-name', {
+        parameterName: `/${this._appName}/oidc-groups-provider-name`,
+        stringValue: provider.providerName,
+      });
+    }
 
     return this;
   }

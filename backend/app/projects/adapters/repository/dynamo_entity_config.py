@@ -5,6 +5,7 @@ from app.projects.domain.model import (
     project,
     project_account,
     project_assignment,
+    project_group_assignment,
     service_client_assignment,
     technology,
     user,
@@ -19,6 +20,7 @@ class DBPrefix(enum.StrEnum):
     TECHNOLOGY = "TECHNOLOGY"
     ENROLMENT = "ENROLMENT"
     CLIENT = "CLIENT"
+    GROUP = "GROUP"
 
 
 class EntityConfigurator(dynamodb_repository.DynamoDBEntityConfiguratorBase):
@@ -38,6 +40,11 @@ class EntityConfigurator(dynamodb_repository.DynamoDBEntityConfiguratorBase):
         """
 
         super().__init__(table_name)
+        self.register_cfg(
+            project_group_assignment.ProjectGroupAssignmentPrimaryKey,
+            project_group_assignment.ProjectGroupAssignment,
+            self.project_group_assignment_entity_config,
+        )
         self.register_cfg(
             project_account.ProjectAccountPrimaryKey,
             project_account.ProjectAccount,
@@ -73,6 +80,21 @@ class EntityConfigurator(dynamodb_repository.DynamoDBEntityConfiguratorBase):
             service_client_assignment.ServiceClientAssignment,
             self.service_client_assignment_entity_config,
         )
+
+    def project_group_assignment_entity_config(self, cfg):
+        cfg.partition_key(
+            name="PK",
+            value_template=lambda group_id: f"{DBPrefix.GROUP}#{group_id}",
+            values_from_entity=lambda ent: ent.groupId,
+            values_from_primary_key=lambda pk: pk.groupId,
+        )
+        cfg.sort_key(
+            name="SK",
+            value_template=lambda project_id: f"{DBPrefix.PROJECT}#{project_id}",
+            values_from_entity=lambda ent: ent.projectId,
+            values_from_primary_key=lambda pk: pk.projectId,
+        )
+        cfg.enable_optimistic_concurrency_control()
 
     def service_client_assignment_entity_config(
         self,

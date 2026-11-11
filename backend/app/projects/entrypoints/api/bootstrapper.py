@@ -1,6 +1,7 @@
-from typing import Optional
+from typing import Callable, Optional
 
 import boto3
+import requests
 from aws_lambda_powertools import logging
 from pydantic import BaseModel, ConfigDict
 
@@ -63,6 +64,8 @@ from app.projects.domain.ports import (
     projects_query_service,
     technologies_query_service,
 )
+from app.projects.domain.ports.user_directory_service import UserDirectoryService
+from app.projects.domain.project_group_assignment_service import ProjectGroupAssignmentService
 from app.projects.entrypoints.api import config
 from app.shared.adapters.message_bus import (
     command_bus,
@@ -81,6 +84,9 @@ from app.shared.logging import boto_logger
 
 
 class Dependencies(BaseModel):
+    group_assignment_service: ProjectGroupAssignmentService | None = None
+    user_directory_service: UserDirectoryService | None = None
+    user_info_client: Callable[[str], dict] | None = None
     command_bus: command_bus.CommandBus
     projects_query_service: projects_query_service.ProjectsQueryService
     technologies_query_service: technologies_query_service.TechnologiesQueryService
@@ -302,7 +308,15 @@ def bootstrap(
         )
     )
 
+    def get_user_info(authorization: str) -> dict:
+        response = requests.get(app_config.get_user_info_url(), headers={"Authorization": authorization}, timeout=3)
+        response.raise_for_status()
+        return response.json()
+
     return Dependencies(
+        group_assignment_service=ProjectGroupAssignmentService(shared_uow_v2, projects_query_service, message_bus),
+        user_directory_service=user_directory_svc,
+        user_info_client=get_user_info,
         command_bus=command_bus,
         projects_query_service=projects_query_service,
         technologies_query_service=technologies_qry_srv,

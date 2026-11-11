@@ -15,6 +15,7 @@ from app.authorization.domain.ports import (
 )
 from app.authorization.domain.read_models import project_assignment
 from app.authorization.domain.services.auth import authorizer
+from app.shared.identity import oidc_groups
 
 USER_ID_CLAIM_NAME = "custom:user_tid"
 
@@ -131,7 +132,6 @@ class CognitoAuthorizer(authorizer.AuthorizerStep):
             self.__logger.debug(
                 {
                     "message": "User profile retrieved",
-                    "response": user_profile,
                 }
             )
             context.user_name = (
@@ -140,6 +140,7 @@ class CognitoAuthorizer(authorizer.AuthorizerStep):
                 else None
             )
             context.user_email = user_profile["email"]
+            context.trusted_group_ids = oidc_groups.trusted_group_ids(user_profile)
             return True
 
         self.__logger.debug(
@@ -177,22 +178,34 @@ class ProjectsBCContextEnricher(authorizer.AuthorizerStep):
         context.roles = []
         context.domains = []
 
-        project_assignment = None
+        selected_assignment = None
 
         context.project_assignments = self.__assignments_query_service.get_user_assignments(user_id=context.user_name)
+
+        if oidc_groups.provider_name() and context.trusted_group_ids:
+            groups = self.__assignments_query_service.get_group_assignments(context.trusted_group_ids)
+            direct = {assignment.projectId: assignment for assignment in context.project_assignments}
+            context.project_assignments = [
+                (
+                    direct[project_id].model_copy(update={"roles": roles})
+                    if project_id in direct
+                    else project_assignment.Assignment(userId=context.user_name, projectId=project_id, roles=roles)
+                )
+                for project_id, roles in oidc_groups.effective_roles(context.project_assignments, groups).items()
+            ]
 
         if request.resource_path.startswith("/projects/") and (
             project_id := request.resource_ids.get("projectId", None)
         ):
-            project_assignment = next(
+            selected_assignment = next(
                 (assignment for assignment in context.project_assignments if assignment.projectId == project_id),
                 None,
             )
 
-            context.roles = project_assignment.roles if project_assignment and project_assignment.roles else []
+            context.roles = selected_assignment.roles if selected_assignment and selected_assignment.roles else []
             context.domains = (
-                list({g.get("domain") for g in project_assignment.activeDirectoryGroups if "domain" in g})
-                if project_assignment and project_assignment.activeDirectoryGroups
+                list({g.get("domain") for g in selected_assignment.activeDirectoryGroups if "domain" in g})
+                if selected_assignment and selected_assignment.activeDirectoryGroups
                 else []
             )
 

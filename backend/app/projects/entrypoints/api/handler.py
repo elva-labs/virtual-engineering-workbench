@@ -5,7 +5,7 @@ from urllib.parse import unquote
 
 from aws_lambda_powertools import logging, tracing
 from aws_lambda_powertools.event_handler import api_gateway, content_types
-from aws_lambda_powertools.event_handler.exceptions import NotFoundError
+from aws_lambda_powertools.event_handler.exceptions import BadRequestError, NotFoundError
 from aws_lambda_powertools.event_handler.openapi.models import Server
 from aws_lambda_powertools.event_handler.openapi.params import Query
 from aws_lambda_powertools.utilities import typing
@@ -47,9 +47,10 @@ from app.projects.domain.value_objects import (
     user_id_value_object,
     user_role_value_object,
 )
-from app.projects.entrypoints.api import bootstrapper, config
+from app.projects.entrypoints.api import bootstrapper, config, group_access
 from app.projects.entrypoints.api.model import api_model
 from app.shared.adapters.boto import paging_utils
+from app.shared.identity import oidc_groups
 from app.shared.logging.helpers import clear_auth_headers
 from app.shared.middleware import authorization, exception_handler
 from app.shared.middleware.metric import metric_handlers
@@ -80,6 +81,43 @@ tracer = tracing.Tracer()
 dependencies = bootstrapper.bootstrap(app_config, logger)
 
 
+def _trusted_group_ids() -> list[str]:
+    if not oidc_groups.provider_name() or dependencies.user_info_client is None:
+        return []
+    authorization = app.current_event.headers.get("Authorization", "")
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        return []
+    try:
+        profile = dependencies.user_info_client(authorization)
+        if str(profile.get("custom:user_tid", "")).upper() != app.context.get("user_principal").user_name.upper():
+            return []
+        return oidc_groups.trusted_group_ids(profile)
+    except Exception:
+        logger.warning("Trusted user info unavailable; group grants omitted")
+        return []
+
+
+def _effective_assignment(project_id: str, user_id: str):
+    direct = dependencies.projects_query_service.get_user_assignment(project_id=project_id, user_id=user_id)
+    if not oidc_groups.provider_name() or dependencies.user_directory_service is None:
+        return direct
+    groups = dependencies.user_directory_service.get_user_group_ids(user_id)
+    if not groups:
+        return direct
+    assignment = group_access.effective_assignment(
+        user_id, project_id, direct, dependencies.projects_query_service.get_group_assignments(groups)
+    )
+    if assignment is not None and direct is None:
+        assignment.userEmail = dependencies.user_directory_service.get_user_email(user_id)
+    return assignment
+
+
+def _require_group_grants():
+    if not oidc_groups.provider_name():
+        raise NotFoundError("Group grants are not enabled")
+
+
 @tracer.capture_method
 @app.get("/projects")
 def get_projects(
@@ -96,6 +134,25 @@ def get_projects(
         next_token=json.loads(next_token) if next_token else None,
         user_id=user_principal_name,
     )
+
+    trusted_groups = _trusted_group_ids()
+    if trusted_groups:
+        group_assignments = dependencies.projects_query_service.get_group_assignments(trusted_groups)
+        # Keep inventory paging and the existing response shape. Assignments in
+        # this response are effective roles, never new persisted user records.
+        assignments = [
+            assignment
+            for p in projects
+            if (
+                assignment := group_access.effective_assignment(
+                    user_principal_name,
+                    p.projectId,
+                    dependencies.projects_query_service.get_user_assignment(p.projectId, user_principal_name),
+                    group_assignments,
+                )
+            )
+            is not None
+        ]
 
     enrolments, last_evaluated_key = dependencies.enrolment_query_service.list_enrolments_by_user(
         user_id=user_principal_name,
@@ -351,6 +408,49 @@ def get_project_users(
 
 
 @tracer.capture_method
+@app.get("/projects/<project_id>/groups")
+def get_project_groups(project_id: str) -> api_gateway.Response[api_model.GetProjectGroupsResponse]:
+    _require_group_grants()
+    assignments = dependencies.projects_query_service.list_project_group_assignments(project_id)
+    return api_gateway.Response(
+        status_code=HTTPStatus.OK,
+        body=api_model.GetProjectGroupsResponse(
+            assignments=[api_model.ProjectGroupAssignment.model_validate(a.model_dump()) for a in assignments]
+        ),
+        content_type=content_types.APPLICATION_JSON,
+    )
+
+
+@app.put("/projects/<project_id>/groups")
+def put_project_group(
+    project_id: str, request: api_model.PutProjectGroupRequest
+) -> api_gateway.Response[api_model.ProjectGroupAssignment]:
+    _require_group_grants()
+    try:
+        assignment = dependencies.group_assignment_service.put(
+            project_id, request.groupId, request.roles, request.groupName
+        )
+    except ValueError as error:
+        raise BadRequestError(str(error)) from error
+    return api_gateway.Response(
+        status_code=HTTPStatus.OK,
+        body=api_model.ProjectGroupAssignment.model_validate(assignment.model_dump()),
+        content_type=content_types.APPLICATION_JSON,
+    )
+
+
+@app.delete("/projects/<project_id>/groups")
+def delete_project_group(
+    project_id: str, request: api_model.DeleteProjectGroupRequest
+) -> api_gateway.Response[api_model.Empty]:
+    _require_group_grants()
+    dependencies.group_assignment_service.delete(project_id, request.groupId)
+    return api_gateway.Response(
+        status_code=HTTPStatus.OK, body=api_model.Empty(), content_type=content_types.APPLICATION_JSON
+    )
+
+
+@tracer.capture_method
 @app.delete("/projects/<project_id>/users/<user_id>")
 def unassign_project_user(
     project_id: str,
@@ -427,14 +527,16 @@ def get_user_roles(
 ) -> api_gateway.Response[api_model.GetUserRolesResponse]:
     """Returns a list of roles assigned to a user for a project."""
 
-    project_assignment = dependencies.projects_query_service.get_user_assignment(
-        project_id=project_id,
-        user_id=user_id,
-    )
+    if oidc_groups.provider_name():
+        assignment = _effective_assignment(project_id, user_id.upper())
+        roles = assignment.roles if assignment else []
+    else:
+        assignment = dependencies.projects_query_service.get_user_assignment(project_id=project_id, user_id=user_id)
+        roles = assignment.roles
 
     return api_gateway.Response(
         status_code=HTTPStatus.OK,
-        body=api_model.GetUserRolesResponse(roles=project_assignment.roles),
+        body=api_model.GetUserRolesResponse(roles=roles),
         content_type=content_types.APPLICATION_JSON,
     )
 
@@ -668,6 +770,19 @@ def get_project_internal() -> dict:
 
 
 @tracer.capture_method
+@app.get("/internal/projects/<project_id>/groups")
+def get_project_groups_internal(project_id: str) -> dict:
+    _require_group_grants()
+    include_deleted = (app.current_event.get_query_string_value("includeDeleted") or "").lower() == "true"
+    assignments = dependencies.projects_query_service.list_project_group_assignments(
+        project_id, include_deleted=include_deleted
+    )
+    return api_model.GetProjectGroupsResponse(
+        assignments=[api_model.ProjectGroupAssignment.model_validate(a.model_dump()) for a in assignments]
+    ).model_dump()
+
+
+@tracer.capture_method
 @app.get("/internal/projects/<project_id>/users")
 def get_project_assignments_internal(
     project_id: str,
@@ -710,7 +825,7 @@ def get_project_user_assignment_internal(
 ) -> api_gateway.Response[api_model.GetProjectAssignmentResponse]:
     """Returns a list of project assignments."""
 
-    assignment = dependencies.projects_query_service.get_user_assignment(project_id=project_id, user_id=user_id.upper())
+    assignment = _effective_assignment(project_id, user_id.upper())
 
     response = api_model.GetProjectAssignmentResponse(
         assignment=(

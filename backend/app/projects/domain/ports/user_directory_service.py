@@ -11,6 +11,10 @@ class UserDirectoryService(abc.ABC):
     a specific SDK.
     """
 
+    def get_user_group_ids(self, user_tid: str) -> list[str]:
+        """Trusted group ids from the user's last federated sign-in; none by default."""
+        return []
+
     @abc.abstractmethod
     def get_user_email(self, user_tid: str) -> Optional[str]:
         """Return the email of the user identified by ``user_tid``.

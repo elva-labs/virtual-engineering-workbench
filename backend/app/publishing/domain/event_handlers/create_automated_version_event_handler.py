@@ -76,19 +76,23 @@ def _calculate_new_version_name(latest_version_name: str, release_type: str) -> 
 def _superseded_rc_versions(
     version_qry_srv: versions_query_service.VersionsQueryService, product_entity: product.Product
 ) -> list[version.Version]:
-    """Release candidates a new build may replace, oldest first: in DEV only and not recommended.
+    """Release candidates a new build may replace, oldest first: in DEV only, not recommended, and not the
+    product's latest version (the retire command refuses that one, which would drop the build).
 
-    One entry per version (a version has a distribution per account)."""
+    One entry per version (a version has a distribution per account). A version's age is its first
+    distribution's: an account added later gets a newer distribution of the same version."""
     distributions = version_qry_srv.get_product_version_distributions(
         product_id=product_entity.productId, statuses=[version.VersionStatus.Created]
     )
+    latest_version_name = _get_latest_version_name(version_qry_srv, product_entity.productId)
     by_version: dict[str, list[version.Version]] = {}
     for distribution in distributions:
         by_version.setdefault(distribution.versionId, []).append(distribution)
     candidates = [
-        dists[0]
+        min(dists, key=lambda d: d.createDate)
         for version_id, dists in by_version.items()
         if version.VersionType.ReleaseCandidate.suffix in dists[0].versionName
+        and dists[0].versionName != latest_version_name
         and all(d.stage == version.VersionStage.DEV for d in dists)
         and version_id != product_entity.recommendedVersionId
         and not any(d.isRecommendedVersion for d in dists)

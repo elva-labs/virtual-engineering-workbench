@@ -666,11 +666,33 @@ def test_superseded_rc_versions_are_dev_only_unrecommended_candidates_oldest_fir
         _distribution("vers-rec", "0.9.2-rc.1", create_date="2026-09-03T00:00:00+00:00", recommended=True),
     ]
 
+    versions_qry_srv.get_latest_version_name_and_id.return_value = ("1.0.2-rc.1", "vers-latest")
+
     # ACT
     candidates = create_automated_version_event_handler._superseded_rc_versions(versions_qry_srv, mock_product_entity)
 
     # ASSERT
     assert [c.versionId for c in candidates] == ["vers-old", "vers-new"]
+
+
+def test_superseded_rc_versions_skip_the_latest_version_and_age_a_version_by_its_first_distribution(
+    mock_product_entity,
+):
+    # ARRANGE: 1.0.8-rc.1 was distributed to a new account later than 1.0.10-rc.1 was built, and 1.0.10-rc.1
+    # is the latest version, which the retire command refuses: picking it dropped the build.
+    versions_qry_srv = Mock()
+    versions_qry_srv.get_product_version_distributions.return_value = [
+        _distribution("vers-108", "1.0.8-rc.1", create_date="2026-10-21T09:30:52+00:00", account="333333333333"),
+        _distribution("vers-1010", "1.0.10-rc.1", create_date="2026-10-21T09:00:00+00:00"),
+        _distribution("vers-108", "1.0.8-rc.1", create_date="2026-10-11T14:58:11+00:00"),
+    ]
+    versions_qry_srv.get_latest_version_name_and_id.return_value = ("1.0.10-rc.1", "vers-1010")
+
+    # ACT
+    candidates = create_automated_version_event_handler._superseded_rc_versions(versions_qry_srv, mock_product_entity)
+
+    # ASSERT
+    assert [(c.versionId, c.createDate) for c in candidates] == [("vers-108", "2026-10-11T14:58:11+00:00")]
 
 
 @pytest.mark.parametrize("retire, expect_retired", [(True, ["vers-old"]), (False, [])])

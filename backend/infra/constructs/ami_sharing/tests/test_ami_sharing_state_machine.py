@@ -7,7 +7,7 @@ def test_ami_sharing_copy_path(start_execution, wait_for_execution, mocked_test_
     # ARRANGE
 
     # ACT
-    execution_arn = start_execution(test_name="CopyPath", test_event=mocked_test_event)
+    execution_arn = start_execution(test_name="CopyPath", test_event=mocked_test_event())
     status, output, history = wait_for_execution(execution_arn=execution_arn)
 
     # ASSERT
@@ -23,7 +23,7 @@ def test_ami_sharing_share_path(start_execution, wait_for_execution, mocked_test
     # ARRANGE
 
     # ACT
-    execution_arn = start_execution(test_name="SharePath", test_event=mocked_test_event)
+    execution_arn = start_execution(test_name="SharePath", test_event=mocked_test_event())
     status, output, history = wait_for_execution(execution_arn=execution_arn)
 
     # ASSERT
@@ -39,7 +39,7 @@ def test_ami_sharing_done_path(start_execution, wait_for_execution, mocked_test_
     # ARRANGE
 
     # ACT
-    execution_arn = start_execution(test_name="DonePath", test_event=mocked_test_event)
+    execution_arn = start_execution(test_name="DonePath", test_event=mocked_test_event())
     status, output, history = wait_for_execution(execution_arn=execution_arn)
 
     # ASSERT

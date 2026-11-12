@@ -234,6 +234,8 @@ class GetProjectAssignmentsResponseItemADGroup(BaseModel):
 
 
 class GetProjectAssignmentsResponseItem(BaseModel):
+    source: Optional[str] = Field(None, title="Source", exclude_if=lambda value: value is None)
+    groupIds: Optional[List[str]] = Field(None, title="GroupIds", exclude_if=lambda value: value is None)
     userId: Optional[str] = Field(None, description="User TID", title="UserId")
     roles: Optional[List[str]] = Field(None, description="User roles in the project", title="Roles")
     userEmail: Optional[str] = Field(None, description="Email address of the user", title="UserEmail")

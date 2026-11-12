@@ -46,24 +46,34 @@ def handle_reassign_user_command(  # noqa: C901
     missing_user_assignment = []
     with unit_of_work:
         for user_id_batch in batched(cmd.user_ids, BATCH_SIZE):
+            events = []
             for user_id in user_id_batch:
                 user_id = user_id.value.upper()
 
                 user_assignment = projects_query_service.get_user_assignment(cmd.project_id.value, user_id)
                 if user_assignment:
 
+                    # Internal group reconciliation must never overwrite a direct grant.
+                    if cmd.group_ids is not None and user_assignment.source != "GROUP":
+                        continue
+
                     new_user_roles = {role.value for role in cmd.roles} & initiating_user_role_permissions
                     existing_user_roles = {role for role in user_assignment.roles} - initiating_user_role_permissions
                     user_assignment.roles = [*new_user_roles, *existing_user_roles]
+                    user_assignment.source = "GROUP" if cmd.group_ids is not None else "DIRECT"
+                    user_assignment.groupIds = cmd.group_ids or []
+                    user_assignment.trustedGroupIds = cmd.trusted_group_ids if cmd.group_ids is not None else []
 
-                    unit_of_work.get_repository(
+                    repository = unit_of_work.get_repository(
                         project_assignment.AssignmentPrimaryKey, project_assignment.Assignment
-                    ).update_entity(
+                    )
+                    kwargs = {"expected": {"source": "GROUP"}} if cmd.group_ids is not None else {}
+                    repository.update_entity(
                         pk=project_assignment.AssignmentPrimaryKey(userId=user_id, projectId=cmd.project_id.value),
                         entity=user_assignment,
+                        **kwargs,
                     )
-
-                    message_bus.publish(
+                    events.append(
                         user_reassigned.UserReAssigned(
                             userId=user_id, projectId=cmd.project_id.value, roles=user_assignment.roles
                         )
@@ -72,6 +82,8 @@ def handle_reassign_user_command(  # noqa: C901
                     missing_user_assignment.append(user_id)
 
             unit_of_work.commit()
+            for event in events:
+                message_bus.publish(event)
 
     if missing_user_assignment:
         missing_user_assignment_error = ", ".join(missing_user_assignment)

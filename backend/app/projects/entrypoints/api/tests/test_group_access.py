@@ -17,6 +17,32 @@ GROUP = "engineering/team"
 PROVIDER = "ExampleOIDC"
 
 
+@pytest.mark.parametrize("enabled", [False, True])
+def test_members_include_source_only_when_enabled(
+    setup_handler, monkeypatch, authenticated_event, lambda_context, enabled
+):
+    handler, query, _, _, _ = setup_handler
+    monkeypatch.setenv("OIDC_GROUPS_PROVIDER_NAME", PROVIDER if enabled else "")
+    query.list_users_by_project.return_value = [
+        project_assignment.Assignment(
+            userId="USER123",
+            projectId="proj-bound",
+            roles=["PLATFORM_USER"],
+            source="GROUP",
+            groupIds=[GROUP],
+            trustedGroupIds=[GROUP, "other"],
+        )
+    ]
+    response = handler.handler(authenticated_event(None, "/projects/proj-bound/users", "GET"), lambda_context)
+    assert response["statusCode"] == 200
+    member = json.loads(response["body"])["assignments"][0]
+    assert "trustedGroupIds" not in member
+    if enabled:
+        assert member["source"] == "GROUP" and member["groupIds"] == [GROUP]
+    else:
+        assert "source" not in member and "groupIds" not in member
+
+
 def _grant(project_id="proj-bound", roles=None):
     return project_group_assignment.ProjectGroupAssignment(
         projectId=project_id,

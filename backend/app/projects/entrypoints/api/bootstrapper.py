@@ -59,6 +59,7 @@ from app.projects.domain.commands.users import (
     reassign_user_command,
     unassign_user_command,
 )
+from app.projects.domain.group_membership_service import GroupMembershipService
 from app.projects.domain.ports import (
     enrolment_query_service,
     projects_query_service,
@@ -84,6 +85,7 @@ from app.shared.logging import boto_logger
 
 
 class Dependencies(BaseModel):
+    group_membership_service: GroupMembershipService | None = None
     group_assignment_service: ProjectGroupAssignmentService | None = None
     user_directory_service: UserDirectoryService | None = None
     user_info_client: Callable[[str], dict] | None = None
@@ -313,8 +315,12 @@ def bootstrap(
         response.raise_for_status()
         return response.json()
 
+    memberships = GroupMembershipService(projects_query_service, command_bus)
     return Dependencies(
-        group_assignment_service=ProjectGroupAssignmentService(shared_uow_v2, projects_query_service, message_bus),
+        group_membership_service=memberships,
+        group_assignment_service=ProjectGroupAssignmentService(
+            shared_uow_v2, projects_query_service, message_bus, memberships
+        ),
         user_directory_service=user_directory_svc,
         user_info_client=get_user_info,
         command_bus=command_bus,

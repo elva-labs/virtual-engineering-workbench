@@ -26,6 +26,13 @@ def handle_unassign_user_command(
         )
 
     unique_user_ids = {user_id.value for user_id in cmd.user_ids}
+    if cmd.group_only:
+        unique_user_ids = {
+            user_id
+            for user_id in unique_user_ids
+            if (assignment := projects_qry_service.get_user_assignment(cmd.project_id.value, user_id)) is not None
+            and assignment.source == "GROUP"
+        }
 
     user_enrolments: dict[str, enrolment.Enrolment] = {}
     user_enrolments_hp = []
@@ -45,7 +52,11 @@ def handle_unassign_user_command(
     for transaction in __get_transaction_page(user_enrolments_hp, user_enrolments, cmd.project_id.value):
         with uow:
             for entity, pk in transaction:
-                uow.get_repository(type(pk), entity).remove(pk)
+                repository = uow.get_repository(type(pk), entity)
+                if cmd.group_only and entity is project_assignment.Assignment:
+                    repository.remove(pk, expected={"source": "GROUP"})
+                else:
+                    repository.remove(pk)
             uow.commit()
 
     for user in unique_user_ids:

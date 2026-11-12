@@ -13,6 +13,9 @@ from app.shared.adapters.boto import paging_utils
 
 
 class ProjectsQueryService(ABC):
+    def list_user_assignments(self, user_id: str) -> list[project_assignment.Assignment]:
+        raise NotImplementedError
+
     def get_project_group_assignment(
         self, project_id: str, group_id: str
     ) -> project_group_assignment.ProjectGroupAssignment | None:

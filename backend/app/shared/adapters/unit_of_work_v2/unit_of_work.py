@@ -73,7 +73,7 @@ class GenericRepository(ABC, Generic[TPrimaryKey, T]):
         ...
 
     @abstractmethod
-    def remove(self, pk: TPrimaryKey) -> None:
+    def remove(self, pk: TPrimaryKey, expected: Optional[dict[str, Any]] = None) -> None:
         """
         Removes an entity from the database.
         """

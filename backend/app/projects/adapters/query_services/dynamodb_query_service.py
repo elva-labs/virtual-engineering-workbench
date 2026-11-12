@@ -64,6 +64,16 @@ class DynamoDBProjectsQueryService(projects_query_service.ProjectsQueryService):
         item = result.get("Item")
         return project_group_assignment.ProjectGroupAssignment.model_validate(item) if item else None
 
+    def list_user_assignments(self, user_id: str) -> list[project_assignment.Assignment]:
+        assignments = []
+        for page in self._dynamodb_client.get_paginator("query").paginate(
+            TableName=self._table_name,
+            ConsistentRead=True,
+            KeyConditionExpression=Key("PK").eq(f"USER#{user_id}") & Key("SK").begins_with("PROJECT#"),
+        ):
+            assignments.extend(project_assignment.Assignment.model_validate(item) for item in page.get("Items", []))
+        return assignments
+
     def get_group_assignments(self, group_ids: list[str]) -> list[project_group_assignment.ProjectGroupAssignment]:
         assignments = []
         paginator = self._dynamodb_client.get_paginator("query")
@@ -342,6 +352,7 @@ class DynamoDBProjectsQueryService(projects_query_service.ProjectsQueryService):
     def get_user_assignment(self, project_id: str, user_id: str) -> Optional[project_assignment.Assignment]:
         result = self._dynamodb_client.get_item(
             TableName=self._table_name,
+            ConsistentRead=True,
             Key={
                 "PK": f"{dynamo_entity_config.DBPrefix.USER.value}#{user_id}",
                 "SK": f"{dynamo_entity_config.DBPrefix.PROJECT.value}#{project_id}",

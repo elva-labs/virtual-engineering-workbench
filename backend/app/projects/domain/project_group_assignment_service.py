@@ -9,11 +9,16 @@ from app.shared.adapters.unit_of_work_v2 import unit_of_work
 
 class ProjectGroupAssignmentService:
     def __init__(
-        self, uow: unit_of_work.UnitOfWork, query_service: ProjectsQueryService, events: message_bus.MessageBus
+        self,
+        uow: unit_of_work.UnitOfWork,
+        query_service: ProjectsQueryService,
+        events: message_bus.MessageBus,
+        memberships=None,
     ):
         self._uow = uow
         self._query = query_service
         self._events = events
+        self._memberships = memberships
 
     def put(self, project_id: str, group_id: str, roles: list[str], group_name: str | None = None):
         if self._query.get_project_by_id(project_id) is None:
@@ -90,3 +95,5 @@ class ProjectGroupAssignmentService:
                 isDeleted=assignment.isDeleted,
             )
         )
+        if self._memberships is not None:
+            self._memberships.binding_changed(assignment)

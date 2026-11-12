@@ -85,9 +85,17 @@ class DynamoDBRepository:
         update_request = {"Update": {"TableName": self._cfg.table_name, "Key": key, **expression}}
         self._context.add_to_transaction(item=update_request)
 
-    def delete_generic_item(self, key: dict) -> None:
+    def delete_generic_item(self, key: dict, expected: dict | None = None) -> None:
         """Converts item to a DynamoDB delete instruction and adds to the pending transactions list."""
         delete_request = {"Delete": {"TableName": self._cfg.table_name, "Key": key}}
+        if expected:
+            delete_request["Delete"].update(
+                {
+                    "ConditionExpression": " AND ".join(f"#e{i} = :e{i}" for i in range(len(expected))),
+                    "ExpressionAttributeNames": {f"#e{i}": name for i, name in enumerate(expected)},
+                    "ExpressionAttributeValues": {f":e{i}": value for i, value in enumerate(expected.values())},
+                }
+            )
         self._context.add_to_transaction(item=delete_request)
 
     def create_get_request(self, key: dict) -> dict:
@@ -131,10 +139,10 @@ class GenericDynamoDBRepository(unit_of_work.GenericRepository[unit_of_work.TPri
         item_dict = self._dynamodb_repository.context.get_generic_item(request)
         return self._dynamodb_repository.cfg.entity_type.model_validate(item_dict) if item_dict is not None else None
 
-    def remove(self, pk: unit_of_work.TPrimaryKey) -> None:
+    def remove(self, pk: unit_of_work.TPrimaryKey, expected: dict[str, typing.Any] | None = None) -> None:
         """Removes an entity from the DynamoDB table."""
         key = self._dynamodb_repository.cfg.primary_key_to_dict(pk)
-        return self._dynamodb_repository.delete_generic_item(key=key)
+        return self._dynamodb_repository.delete_generic_item(key=key, expected=expected)
 
     def update_attributes(self, pk: unit_of_work.TPrimaryKey, **kwargs) -> None:
         """Updates arbitrary attributes of the entity in DynamoDB table."""

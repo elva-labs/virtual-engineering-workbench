@@ -26,6 +26,8 @@ import {
  * @interface GetProjectAssignmentsResponseItem
  */
 export interface GetProjectAssignmentsResponseItem {
+    source?: string;
+    groupIds?: Array<string>;
     /**
      * User TID
      * @type {string}
@@ -78,6 +80,8 @@ export function GetProjectAssignmentsResponseItemFromJSONTyped(json: any, ignore
     return {
 
         'userId': !exists(json, 'userId') ? undefined : json['userId'],
+        'source': !exists(json, 'source') ? undefined : json['source'],
+        'groupIds': !exists(json, 'groupIds') ? undefined : json['groupIds'],
         'roles': !exists(json, 'roles') ? undefined : json['roles'],
         'userEmail': !exists(json, 'userEmail') ? undefined : json['userEmail'],
         'activeDirectoryGroups': !exists(json, 'activeDirectoryGroups') ? undefined : ((json['activeDirectoryGroups'] as Array<any>).map(GetProjectAssignmentsResponseItemADGroupFromJSON)),
@@ -95,6 +99,8 @@ export function GetProjectAssignmentsResponseItemToJSON(value?: GetProjectAssign
     return {
 
         'userId': value.userId,
+        'source': value.source,
+        'groupIds': value.groupIds,
         'roles': value.roles,
         'userEmail': value.userEmail,
         'activeDirectoryGroups': value.activeDirectoryGroups === undefined ? undefined : ((value.activeDirectoryGroups as Array<any>).map(GetProjectAssignmentsResponseItemADGroupToJSON)),

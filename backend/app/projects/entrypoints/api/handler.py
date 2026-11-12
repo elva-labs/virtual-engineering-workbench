@@ -400,7 +400,10 @@ def get_project_users(
         status_code=HTTPStatus.OK,
         body=api_model.GetProjectAssignmentsResponse(
             assignments=[
-                api_model.GetProjectAssignmentsResponseItem.model_validate(a.model_dump()) for a in assignments
+                api_model.GetProjectAssignmentsResponseItem.model_validate(
+                    a.model_dump() if oidc_groups.provider_name() else a.model_dump(exclude={"source", "groupIds"})
+                )
+                for a in assignments
             ],
         ),
         content_type=content_types.APPLICATION_JSON,

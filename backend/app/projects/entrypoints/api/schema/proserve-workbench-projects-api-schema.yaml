@@ -2358,6 +2358,15 @@ components:
       title: GetProjectAssignmentsResponseItem
       type: object
       properties:
+        source:
+          type: string
+          enum: [DIRECT, GROUP]
+          description: Assignment source. Missing means a direct assignment.
+        groupIds:
+          type: array
+          description: Group ids granting this membership at the last reconciliation.
+          items:
+            type: string
         userId:
           title: UserId
           type: string

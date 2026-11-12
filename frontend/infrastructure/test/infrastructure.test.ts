@@ -285,6 +285,9 @@ test('OIDC group grants should stay unmapped when the claim setting is unset', (
   template.hasResourceProperties('AWS::Cognito::UserPoolIdentityProvider', {
     AttributeMapping: Match.objectLike({ 'custom:oidc_groups': Match.absent() }),
   });
+  template.hasResourceProperties('AWS::Cognito::UserPool', {
+    LambdaConfig: Match.objectLike({ PreTokenGeneration: Match.absent() }),
+  });
 });
 
 test.each(['public', 'private'])('OIDC group grants should map the claim in %s deployments', mode => {
@@ -297,6 +300,7 @@ test.each(['public', 'private'])('OIDC group grants should map the claim in %s d
     AttributeMapping: Match.objectLike({ 'custom:oidc_groups': claim }),
   });
   template.hasResourceProperties('AWS::Cognito::UserPool', {
+    LambdaConfig: Match.objectLike({ PreTokenGeneration: Match.anyValue() }),
     Schema: Match.arrayWith([
       Match.objectLike({ Name: 'oidc_groups', Mutable: true, AttributeDataType: 'String' })
     ]),

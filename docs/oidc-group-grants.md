@@ -2,8 +2,10 @@
 
 Group grants let people use projects through their identity provider's groups.
 Each project binds a group id to existing project roles. Effective roles are
-the union of direct assignments and group bindings. No user assignment is
-created for a group member.
+the union of direct assignments and group bindings. At sign-in, a linked
+federated user's trusted groups also create real project user assignments.
+These assignments appear on the Members page and use the existing membership
+events and provisioning lifecycle.
 
 ## Enable group grants
 
@@ -59,14 +61,49 @@ confirmation. The tab is hidden when group grants are disabled
 owners cannot pick the Program Owner or Frontend Admin roles, as in the
 members table. The form needs at least one role.
 
+The Members tab marks group-sourced members with **via group <id>** for each
+granting group. Adding a direct assignment or updating a member's roles makes
+the assignment direct. Later group changes do not change a direct assignment.
+
 Binding changes reach the authorizer through versioned events. Reconciliation
 repairs missed events, including deletions. Removing a binding does not remove
 direct roles or roles granted by another group.
 
 ## Membership changes and limits
 
-Removing someone from a group takes effect at their next sign-in. Refreshing
-tokens is not a new sign-in. Launch checks read the trusted groups stored in
+On sign-in, Cognito's pre-token trigger queues membership reconciliation.
+Token refreshes do not queue it. This applies to every app client, not just the
+web app. Membership updates are asynchronous and can take a short time to appear.
+Deploy both frontend and backend before signing in: the frontend trigger queues
+work to the backend membership function. A queueing failure fails sign-in;
+backend processing failures use the function's existing retries and failure queue.
+
+Reconciliation reads the latest Cognito profile and checks its linked provider
+identity before trusting groups. It creates group-sourced assignments with the
+union of the bound groups' roles, updates changed roles, and removes assignments
+that no bound group still grants. Each assignment stores `source: GROUP`, the
+granting `groupIds`, and the last trusted `trustedGroupIds` snapshot. Existing
+records without a source are direct. Direct assignments are never changed by
+reconciliation. Changing or deleting a binding reconciles that project's
+group-sourced members using these stored group lists, without an IdP lookup.
+
+Assignment creation, role updates, and removal use the regular command handlers
+and their `UserAssigned`, `UserReAssigned`, and `UserUnAssigned` events. Removal
+runs provisioning's existing workbench removal and user profile and maintenance
+window cleanup. This also applies when an admin removes a group-sourced member
+by hand. Binding edits do not recreate a manually removed membership; the next
+sign-in can restore it. Workbenches removed during cleanup are not restored.
+
+Removing membership is not a group-access block. Binding-based effective roles
+remain in the authorizer, projects list, and internal launch checks. This keeps
+access available while asynchronous membership events are being processed.
+Remove the binding or disable the account to stop group access. The removal
+dialog warns about this and about membership returning at the next sign-in.
+
+Removing someone from a group takes effect at their next sign-in. A user who
+leaves a group but never signs in again keeps their membership until an admin
+removes it or the account is disabled. Refreshing tokens is not a new sign-in.
+Launch checks read the trusted groups stored in
 the user's Cognito record from their last sign-in. Existing sessions and
 authorization caches may retain earlier access until they expire; use sign-out
 or disable the account when immediate revocation is needed.

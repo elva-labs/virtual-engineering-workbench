@@ -206,6 +206,38 @@ class ProjectsAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
             global_env_vars=environment_vars,
             app_entry_points=[
                 backend_app_entrypoints.AppEntryPoint(
+                    # Shared with the frontend trigger; no deployment-time
+                    # reference to a backend function is needed by the user pool.
+                    name=app_config.environment_config["cognito-userpool-id-ssm-param"]
+                    .format(environment=app_config.environment)
+                    .rsplit("/", 1)[0]
+                    .lstrip("/")
+                    + "-group-membership",
+                    app_root="app",
+                    lambda_root="app/projects",
+                    entry="app/projects/entrypoints/group_sign_in",
+                    environment={
+                        "COGNITO_USER_POOL_ID": cognito_user_pool_id,
+                        "OIDC_GROUPS_PROVIDER_NAME": groups_provider,
+                    },
+                    permissions=[
+                        lambda lambda_f: self._storage.table.grant_read_write_data(lambda_f),
+                        lambda lambda_f: self._event_bus.grant_put_events_to(lambda_f),
+                        lambda lambda_f: lambda_f.add_to_role_policy(
+                            statement=aws_iam.PolicyStatement(
+                                actions=["cognito-idp:AdminGetUser", "cognito-idp:ListUsers"],
+                                resources=[cognito_user_pool_arn],
+                            )
+                        ),
+                    ],
+                    reserved_concurrency=10,
+                    provisioned_concurrency=None,
+                    timeout=aws_cdk.Duration.minutes(5),
+                    memory_size=1792,
+                    asynchronous=True,
+                    is_enabled=bool(app_config.environment_config.get("oidc-groups-enabled", False)),
+                ),
+                backend_app_entrypoints.AppEntryPoint(
                     name=app_config.format_resource_name(Entrypoint.API),
                     app_root="app",
                     lambda_root="app/projects",

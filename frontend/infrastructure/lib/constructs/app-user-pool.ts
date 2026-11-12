@@ -10,7 +10,9 @@ import {
   aws_wafv2,
   aws_lambda as lambda,
   aws_ssm as ssm,
+  aws_iam as iam,
   RemovalPolicy,
+  ArnFormat,
 } from 'aws-cdk-lib';
 import { ProviderAttribute, UserPoolIdentityProviderOidc } from 'aws-cdk-lib/aws-cognito';
 import { NagSuppressions } from 'cdk-nag';
@@ -164,6 +166,23 @@ export class WebUserPool extends Construct {
         parameterName: `/${this._appName}/oidc-groups-provider-name`,
         stringValue: provider.providerName,
       });
+      const targetName = `${this._appName}-group-membership`;
+      const trigger = new lambda_node.NodejsFunction(this, 'group-sign-in-trigger', {
+        entry: 'lib/constructs/app-user-pool.group-sign-in-trigger.ts',
+        runtime: lambda.Runtime.NODEJS_24_X,
+        environment: { GROUP_MEMBERSHIP_FUNCTION_NAME: targetName }, // eslint-disable-line
+      });
+      trigger.addToRolePolicy(new iam.PolicyStatement({
+        actions: ['lambda:InvokeFunction'],
+        resources: [Stack.of(this).formatArn({
+          service: 'lambda',
+          resource: 'function',
+          resourceName: targetName,
+          arnFormat: ArnFormat.COLON_RESOURCE_NAME,
+        })],
+      }));
+      this._userPool.addTrigger(cognito.UserPoolOperation.PRE_TOKEN_GENERATION, trigger);
+      this._postAuthenticationLoggingSuppressions(trigger);
     }
 
     return this;

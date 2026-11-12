@@ -1,10 +1,14 @@
+from app.projects.domain.command_handlers.users.reassign_user_command_handler import handle_reassign_user_command
 from app.projects.domain.commands.users import assign_user_command as command
+from app.projects.domain.commands.users.reassign_user_command import ReAssignUserCommand
 from app.projects.domain.events.users import user_assigned
 from app.projects.domain.exceptions import domain_exception
 from app.projects.domain.model import project_assignment, user
 from app.projects.domain.ports import projects_query_service, user_directory_service
+from app.projects.domain.value_objects import user_id_value_object
 from app.shared.adapters.message_bus import message_bus
 from app.shared.adapters.unit_of_work_v2 import unit_of_work
+from app.shared.identity import oidc_groups
 
 
 def handle_assign_user_command(
@@ -26,6 +30,21 @@ def handle_assign_user_command(
         project_id=cmd.project_id.value, user_id=to_be_assigned_user_id
     )
     if to_be_assigned_user_assignment:
+        if oidc_groups.provider_name() and to_be_assigned_user_assignment.source == "GROUP" and not cmd.group_ids:
+            handle_reassign_user_command(
+                ReAssignUserCommand(
+                    project_id=cmd.project_id,
+                    user_ids=[cmd.user_id],
+                    initiating_user_id=user_id_value_object.from_str(
+                        "membership", user_id_value_object.UserIdType.Service
+                    ),
+                    roles=cmd.roles,
+                ),
+                unit_of_work,
+                projects_query_service,
+                message_bus,
+            )
+            return
         raise domain_exception.DomainException(f"User with User ID {to_be_assigned_user_id} already exists.")
 
     assigned_roles = [role.value for role in cmd.roles]
@@ -40,6 +59,9 @@ def handle_assign_user_command(
         userId=to_be_assigned_user_id,
         projectId=cmd.project_id.value,
         roles=assigned_roles,
+        source="GROUP" if cmd.group_ids else "DIRECT",
+        groupIds=cmd.group_ids,
+        trustedGroupIds=cmd.trusted_group_ids,
         userEmail=user_email,
         activeDirectoryGroups=[],
         activeDirectoryGroupStatus=user.UserADStatus.PENDING,

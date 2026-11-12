@@ -5,6 +5,7 @@ from app.shared.adapters.message_bus import command_bus
 
 
 class UnAssignUserCommand(command_bus.Command):
+    group_only: bool = False
     project_id: project_id_value_object.ProjectIdValueObject
     user_ids: list[user_id_value_object.UserIdValueObject]
     model_config = ConfigDict(arbitrary_types_allowed=True)

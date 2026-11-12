@@ -150,6 +150,7 @@ const COLUMN_DEFINITIONS: TableProps.ColumnDefinition<GetProjectAssignmentsRespo
     cell: u => <SpaceBetween size={'xs'} direction='horizontal'>
       {/* eslint-disable-next-line @stylistic/max-len */}
       {u.roles?.map(r => <Badge color="blue" key={r}><b>{getRoleName((r || '').toUpperCase())}</b></Badge>) ?? []}
+      {u.source === 'GROUP' && u.groupIds?.map(id => <Badge key={id}>via group {id}</Badge>)}
     </SpaceBetween>,
     sortingComparator: (a, b) => {
       const rolesOfA = joinRoleNames(a.roles);
@@ -355,6 +356,11 @@ export function projectUsers({
       <li key={item.userId}><b>{item.userId} - {item.userEmail}</b></li>
     );
     return <>{i18n.unassignModalText1}<ul>{listUsersToOffboard}</ul>{i18n.unassignModalText2}
+      {collectionProps.selectedItems?.some(item => item.source === 'GROUP') && <p>
+        Group membership will be removed and workbenches and profiles will be cleaned up.
+        Membership returns at the next sign-in if a bound group still grants it.
+        Group-based access remains available. Remove the group binding to stop that access.
+      </p>}
       <p>{i18n.unassignModalText3}</p></>;
   }
 
@@ -364,6 +370,9 @@ export function projectUsers({
     return <>
       <SpaceBetween size='l'>
         <p>{i18n.reassignModalText1}<b>{membersLength}</b>{i18n.reassignModalText3}</p>
+        {collectionProps.selectedItems?.some(item => item.source === 'GROUP') && <p>
+          Updating roles makes these memberships direct. Later group changes will not change them.
+        </p>}
 
         <ProjectUserAssignmentRoles
           memberRoleLevel={memberRoleLevel}

@@ -10,6 +10,7 @@ from app.projects.domain.model import workbench_lifecycle
 from app.projects.entrypoints.s2s_api import bootstrapper
 from app.projects.entrypoints.s2s_api.model import api_model
 from app.projects.entrypoints.s2s_api.routers import access
+from app.shared.api import paging
 
 tracer = Tracer()
 
@@ -21,7 +22,12 @@ def init(dependencies: bootstrapper.Dependencies) -> Router:  # noqa: C901
     def get_projects() -> api_model.GetProjectsResponse:
         access.require_scope(router, "clients/projects/program.read")
         page_size = int(router.current_event.get_query_string_value("pageSize") or 10)
-        next_token = router.current_event.get_query_string_value("nextToken")
+        # nextToken is the JSON of the previous page's object; passed on as a string,
+        # page 2 failed.
+        try:
+            next_token = paging.decode_page_token(router.current_event.get_query_string_value("nextToken"))
+        except paging.PageTokenError as error:
+            raise BadRequestError(str(error)) from error
         projects, last_evaluated_key, _ = dependencies.projects_query_service.list_projects(page_size, next_token, None)
         return api_model.GetProjectsResponse(
             projects=[api_model.Project.model_validate(p.model_dump()) for p in projects],

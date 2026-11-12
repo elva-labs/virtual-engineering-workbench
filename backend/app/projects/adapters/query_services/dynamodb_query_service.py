@@ -1,4 +1,5 @@
 import enum
+import time
 from typing import Any, List, Optional, Tuple
 
 from boto3.dynamodb.conditions import Attr, ConditionBase, Key
@@ -32,6 +33,9 @@ class AccountType(enum.Enum):
 DDB_RESPONSE_PAGING_PARAM = "LastEvaluatedKey"
 DDB_REQUEST_PAGING_PARAM = "ExclusiveStartKey"
 DDB_PAGE_SIZE_PARAM = "Limit"
+# BatchGetItem takes at most 100 keys per request.
+BATCH_GET_MAX_KEYS = 100
+BATCH_GET_ATTEMPTS = 5
 
 
 class DynamoDBProjectsQueryService(projects_query_service.ProjectsQueryService):
@@ -242,46 +246,63 @@ class DynamoDBProjectsQueryService(projects_query_service.ProjectsQueryService):
         if not assignments:
             return [], None, []
 
-        # TODO: handle cases were a user have more than 100 different projects. Restriction coming from batch_get_item
-        raw_projects = self._dynamodb_client.batch_get_item(
-            RequestItems={
-                self._table_name: {
-                    "Keys": [
-                        {
-                            "PK": f"{dynamo_entity_config.DBPrefix.PROJECT.value}#{assignment.projectId}",
-                            "SK": f"{dynamo_entity_config.DBPrefix.PROJECT.value}#{assignment.projectId}",
-                        }
-                        for assignment in assignments
-                    ]
-                },
-            }
-        )
-
-        if "UnprocessedKeys" in raw_projects and raw_projects["UnprocessedKeys"]:
-            raise repository_exception.RepositoryException("failed to fetch all projects details for user")
-            # retry batch_get_item with exponential backup up to 3 times.
-            # throw Exception in case 3rd retry fails or contains unprocessed keys
-
-        projects = [project.Project.model_validate(item) for item in raw_projects["Responses"][self._table_name]]
+        projects = [
+            project.Project.model_validate(item)
+            for item in self._batch_get(
+                [
+                    {
+                        "PK": f"{dynamo_entity_config.DBPrefix.PROJECT.value}#{assignment.projectId}",
+                        "SK": f"{dynamo_entity_config.DBPrefix.PROJECT.value}#{assignment.projectId}",
+                    }
+                    for assignment in assignments
+                ]
+            )
+        ]
         if "LastEvaluatedKey" in result:
             return projects, result["LastEvaluatedKey"], assignments
         else:
             return projects, None, assignments
+
+    def _batch_get(self, keys: list[dict]) -> list[dict]:
+        """Every item of `keys`, in chunks of BatchGetItem's 100 keys, retrying the keys it leaves
+        unprocessed (a user in more than 100 programs failed here)."""
+        unique = list({(key["PK"], key["SK"]): key for key in keys}.values())
+        items: list[dict] = []
+        for start in range(0, len(unique), BATCH_GET_MAX_KEYS):
+            request = {self._table_name: {"Keys": unique[start : start + BATCH_GET_MAX_KEYS]}}
+            for attempt in range(BATCH_GET_ATTEMPTS):
+                response = self._dynamodb_client.batch_get_item(RequestItems=request)
+                items.extend(response.get("Responses", {}).get(self._table_name, []))
+                request = response.get("UnprocessedKeys") or {}
+                if not request:
+                    break
+                if attempt < BATCH_GET_ATTEMPTS - 1:
+                    time.sleep(min(0.05 * 2**attempt, 1.0))
+            if request:
+                raise repository_exception.RepositoryException("failed to fetch all projects details for user")
+        return items
 
     def list_projects(
         self, page_size: int, next_token: Any, user_id: Optional[str] = None
     ) -> Tuple[List[project.Project], Any, List[project_assignment.Assignment]]:
         """Returns a list of all projects in repository with paging after 1 MB."""
 
-        assignments_result = []
+        assignment_items: list[dict] = []
 
         if user_id:
-            assignments_result = self._dynamodb_client.query(
-                TableName=self._table_name,
-                Limit=page_size,
-                KeyConditionExpression=Key("PK").eq(f"{dynamo_entity_config.DBPrefix.USER.value}#{user_id}")
+            # All of the user's assignments, not the first page_size of them.
+            assignments_query = {
+                "TableName": self._table_name,
+                "Limit": page_size,
+                "KeyConditionExpression": Key("PK").eq(f"{dynamo_entity_config.DBPrefix.USER.value}#{user_id}")
                 & Key("SK").begins_with(f"{dynamo_entity_config.DBPrefix.PROJECT.value}#"),
-            )
+            }
+            while True:
+                assignments_result = self._dynamodb_client.query(**assignments_query)
+                assignment_items.extend(assignments_result.get("Items", []))
+                if DDB_RESPONSE_PAGING_PARAM not in assignments_result:
+                    break
+                assignments_query[DDB_REQUEST_PAGING_PARAM] = assignments_result[DDB_RESPONSE_PAGING_PARAM]
 
         if next_token:
             projects_result = self._dynamodb_client.query(
@@ -305,10 +326,7 @@ class DynamoDBProjectsQueryService(projects_query_service.ProjectsQueryService):
 
         projects = [project.Project.model_validate(item) for item in projects_result["Items"]]
 
-        if assignments_result:
-            assignments = [project_assignment.Assignment.model_validate(item) for item in assignments_result["Items"]]
-        else:
-            assignments = []
+        assignments = [project_assignment.Assignment.model_validate(item) for item in assignment_items]
 
         if "LastEvaluatedKey" in projects_result:
             return projects, projects_result["LastEvaluatedKey"], assignments
@@ -348,14 +366,18 @@ class DynamoDBProjectsQueryService(projects_query_service.ProjectsQueryService):
         return project_accounts
 
     def list_project_accounts_by_aws_account(self, aws_account_id: str) -> List[project_account.ProjectAccount]:
-        result = self._dynamodb_client.query(
-            TableName=self._table_name,
-            KeyConditionExpression=Key("awsAccountId").eq(aws_account_id),
-            IndexName=self._gsi_aws_accounts,
-        )
-
-        pas = [project_account.ProjectAccount.model_validate(item) for item in result["Items"]]
-        return pas
+        query_params = {
+            "TableName": self._table_name,
+            "KeyConditionExpression": Key("awsAccountId").eq(aws_account_id),
+            "IndexName": self._gsi_aws_accounts,
+        }
+        pas: list[project_account.ProjectAccount] = []
+        while True:
+            result = self._dynamodb_client.query(**query_params)
+            pas.extend(project_account.ProjectAccount.model_validate(item) for item in result["Items"])
+            if DDB_RESPONSE_PAGING_PARAM not in result:
+                return pas
+            query_params[DDB_REQUEST_PAGING_PARAM] = result[DDB_RESPONSE_PAGING_PARAM]
 
     def get_project_account_by_id(self, project_id: str, account_id: str) -> project_account.ProjectAccount | None:
         result = self._dynamodb_client.get_item(
@@ -596,17 +618,21 @@ class DynamoDBEnrolmentQueryService(enrolment_query_service.EnrolmentQueryServic
         self._gsi_qsk = gsi_qsk
 
     def get_enrolment_for_user(self, user_id: str, project_id: str) -> Optional[enrolment.Enrolment]:
-        result = self._dynamodb_client.query(
-            TableName=self._table_name,
-            KeyConditionExpression=Key("PK").eq(f"{dynamo_entity_config.DBPrefix.PROJECT}#{project_id}")
+        # Limit=1 with a filter read only the program's first enrolment, whoever's it was: page until a
+        # match.
+        query_params = {
+            "TableName": self._table_name,
+            "KeyConditionExpression": Key("PK").eq(f"{dynamo_entity_config.DBPrefix.PROJECT}#{project_id}")
             & Key("SK").begins_with(f"{dynamo_entity_config.DBPrefix.ENROLMENT}#"),
-            FilterExpression=Attr("userId").eq(f"{user_id}"),
-            Limit=1,
-        )
-
-        results = [enrolment.Enrolment.model_validate(item) for item in result["Items"]]
-
-        return results.pop() if results else None
+            "FilterExpression": Attr("userId").eq(f"{user_id}"),
+        }
+        while True:
+            result = self._dynamodb_client.query(**query_params)
+            if result.get("Items"):
+                return enrolment.Enrolment.model_validate(result["Items"][-1])
+            if DDB_RESPONSE_PAGING_PARAM not in result:
+                return None
+            query_params[DDB_REQUEST_PAGING_PARAM] = result[DDB_RESPONSE_PAGING_PARAM]
 
     def get_enrolment_by_id(self, enrolment_id: str, project_id: str) -> Optional[enrolment.Enrolment]:
         query_result = self._dynamodb_client.get_item(

@@ -28,9 +28,7 @@ def image_svc_mock():
 
 @pytest.fixture()
 def shared_amis_qry_svc_mock():
-    shared_amis_qry_svc_mock = mock.create_autospec(
-        spec=shared_amis_query_service.SharedAMIsQueryService
-    )
+    shared_amis_qry_svc_mock = mock.create_autospec(spec=shared_amis_query_service.SharedAMIsQueryService)
     shared_amis_qry_svc_mock.get_shared_amis.return_value = []
     return shared_amis_qry_svc_mock
 
@@ -58,9 +56,7 @@ def _version(region: str) -> version.Version:
     )
 
 
-def _shared_ami(
-    region: str, aws_account_id: str = "123456789012", copied_ami_id: str = "ami-copy"
-):
+def _shared_ami(region: str, aws_account_id: str = "123456789012", copied_ami_id: str = "ami-copy"):
     return shared_ami.SharedAmi(
         originalAmiId="ami-023c04780e65e723c",
         copiedAmiId=copied_ami_id,
@@ -99,9 +95,7 @@ def test_make_share_ami_decision_makes_correct_decision(
 ):
     # ARRANGE
     mock_version_repo.get.return_value = _version(region)
-    shared_amis_qry_svc_mock.get_shared_amis.return_value = (
-        [_shared_ami(region)] if is_ami_shared else []
-    )
+    shared_amis_qry_svc_mock.get_shared_amis.return_value = [_shared_ami(region)] if is_ami_shared else []
     domain_service = shared_amis_domain_query_service.SharedAMIsDomainQueryService(
         unit_of_work=mock_unit_of_work,
         image_svc=image_svc_mock,
@@ -110,22 +104,18 @@ def test_make_share_ami_decision_makes_correct_decision(
     )
 
     # ACT
-    mock_decision, fetched_region, original_ami_id, copied_ami_id = (
-        domain_service.make_share_ami_decision(
-            product_id=product_id_value_object.from_str("prod-11111111"),
-            version_id=version_id_value_object.from_str("vers-11111111"),
-            aws_account_id=aws_account_id_value_object.from_str("123456789012"),
-            stage=stage_value_object.from_str("DEV"),
-            product_type=product_type_value_object.from_str("WORKBENCH"),
-        )
+    mock_decision, fetched_region, original_ami_id, copied_ami_id = domain_service.make_share_ami_decision(
+        product_id=product_id_value_object.from_str("prod-11111111"),
+        version_id=version_id_value_object.from_str("vers-11111111"),
+        aws_account_id=aws_account_id_value_object.from_str("123456789012"),
+        stage=stage_value_object.from_str("DEV"),
+        product_type=product_type_value_object.from_str("WORKBENCH"),
     )
     # ASSERT
     assertpy.assert_that(mock_decision).is_equal_to(decision)
     assertpy.assert_that(fetched_region).is_equal_to(region)
     assertpy.assert_that(original_ami_id).is_equal_to("ami-023c04780e65e723c")
-    assertpy.assert_that(copied_ami_id).is_equal_to(
-        "ami-copy" if is_ami_shared else None
-    )
+    assertpy.assert_that(copied_ami_id).is_equal_to("ami-copy" if is_ami_shared else None)
 
 
 @pytest.mark.parametrize(
@@ -181,9 +171,7 @@ def test_make_share_ami_decision_matches_the_version_region(
     # ASSERT
     assertpy.assert_that(made_decision).is_equal_to(decision)
     assertpy.assert_that(copied_ami_id).is_equal_to(
-        "ami-euwest1"
-        if decision == shared_amis_domain_query_service.ShareAmiDecision.Done
-        else None
+        "ami-euwest1" if decision == shared_amis_domain_query_service.ShareAmiDecision.Done else None
     )
 
 
@@ -194,9 +182,7 @@ def test_make_share_ami_decision_matches_the_version_region(
         ("available", True),
     ],
 )
-def test_verify_copy_checks_if_copy_is_ready(
-    response, outcome, image_svc_mock, shared_amis_qry_svc_mock, uow_mock
-):
+def test_verify_copy_checks_if_copy_is_ready(response, outcome, image_svc_mock, shared_amis_qry_svc_mock, uow_mock):
     # ARRANGE
     image_svc_mock.get_copied_ami_status.return_value = response
     domain_service = shared_amis_domain_query_service.SharedAMIsDomainQueryService(
@@ -214,9 +200,7 @@ def test_verify_copy_checks_if_copy_is_ready(
     assertpy.assert_that(is_copy_ready).is_equal_to(outcome)
 
 
-def test_verify_copy_raises_exception_when_status_invalid(
-    image_svc_mock, shared_amis_qry_svc_mock, uow_mock
-):
+def test_verify_copy_raises_exception_when_status_invalid(image_svc_mock, shared_amis_qry_svc_mock, uow_mock):
     # ARRANGE
     image_svc_mock.get_copied_ami_status.return_value = "invalid"
     domain_service = shared_amis_domain_query_service.SharedAMIsDomainQueryService(
@@ -233,12 +217,8 @@ def test_verify_copy_raises_exception_when_status_invalid(
         )
 
 
-@pytest.mark.parametrize(
-    "response,outcome", [("InProgress", False), ("Completed", True)]
-)
-def test_verify_store_checks_if_store_is_done(
-    response, outcome, image_svc_mock, shared_amis_qry_svc_mock, uow_mock
-):
+@pytest.mark.parametrize("response,outcome", [("InProgress", False), ("Completed", True)])
+def test_verify_store_checks_if_store_is_done(response, outcome, image_svc_mock, shared_amis_qry_svc_mock, uow_mock):
     image_svc_mock.get_store_ami_status.return_value = response
     domain_service = shared_amis_domain_query_service.SharedAMIsDomainQueryService(
         unit_of_work=uow_mock,
@@ -276,9 +256,7 @@ def test_verify_distribution_checks_if_restore_is_done(
     assertpy.assert_that(is_restored).is_equal_to(outcome)
 
 
-def test_verify_store_and_distribution_raise_on_unknown_states(
-    image_svc_mock, shared_amis_qry_svc_mock, uow_mock
-):
+def test_verify_store_and_distribution_raise_on_unknown_states(image_svc_mock, shared_amis_qry_svc_mock, uow_mock):
     image_svc_mock.get_store_ami_status.return_value = "Failed"
     image_svc_mock.get_distributed_ami_status.return_value = "failed"
     domain_service = shared_amis_domain_query_service.SharedAMIsDomainQueryService(

@@ -24,7 +24,7 @@ GSI_NAME_INVERTED_PK = "gsi_inverted_primary_key"
 
 
 class Entrypoint(enum.StrEnum):
-    AUTHORIZER_REQUEST_EVENTS = "authorizer-request-events"
+    AUTHORIZER_REQUEST_EVENTS = constants.AUTH_BC_AUTHORIZER_ENTRYPOINT
     PROJECTS_EVENTS = "projects-events"
     SCHEDULED_JOBS = "scheduled-jobs"
 

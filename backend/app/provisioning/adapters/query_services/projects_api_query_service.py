@@ -5,7 +5,11 @@ from app.provisioning.adapters.exceptions import adapter_exception
 from app.provisioning.adapters.internal import constants
 from app.provisioning.domain.ports import projects_query_service
 from app.provisioning.domain.read_models import project, project_account, project_assignment
-from app.shared.api import aws_api
+from app.shared.api import aws_api, paging
+
+# Every list is read to its last page: the scheduled jobs and launches need every program,
+# not the first 100.
+PAGE_SIZE = "100"
 
 
 class ProjectsApiQueryService(projects_query_service.ProjectsQueryService):
@@ -22,7 +26,7 @@ class ProjectsApiQueryService(projects_query_service.ProjectsQueryService):
         account_type: typing.Optional[str] = None,
         stage: typing.Optional[str] = None,
     ) -> list[project_account.ProjectAccount]:
-        resp = self._get_accounts(project_id=project_id, account_type=account_type, account_stage=stage)
+        accounts = self._get_accounts(project_id=project_id, account_type=account_type, account_stage=stage)
         try:
             project_accounts = [
                 project_account.ProjectAccount(
@@ -31,7 +35,7 @@ class ProjectsApiQueryService(projects_query_service.ProjectsQueryService):
                     stage=pa["stage"],
                     region=pa.get("region", None),
                 )
-                for pa in resp["projectAccounts"]
+                for pa in accounts
                 if pa.get("accountStatus", "") in statuses
             ]
         except KeyError:
@@ -44,7 +48,7 @@ class ProjectsApiQueryService(projects_query_service.ProjectsQueryService):
         project_id: str,
         account_id: str,
     ) -> typing.Optional[project_account.ProjectAccount]:
-        resp = self._get_accounts(project_id=project_id)
+        accounts = self._get_accounts(project_id=project_id)
         try:
             account = next(
                 iter(
@@ -55,7 +59,7 @@ class ProjectsApiQueryService(projects_query_service.ProjectsQueryService):
                             stage=pa["stage"],
                             region=pa.get("region", None),
                         )
-                        for pa in resp["projectAccounts"]
+                        for pa in accounts
                         if pa["id"] == account_id
                     ]
                 ),
@@ -67,35 +71,25 @@ class ProjectsApiQueryService(projects_query_service.ProjectsQueryService):
         return account
 
     def get_projects(self) -> list[project.Project]:
-        resp = self._get_projects()
-        projects = [
-            project.Project(
-                projectId=proj["projectId"],
-                projectName=proj["projectName"],
-                projectDescription=proj["projectDescription"],
-                workbenchLifecycle=proj.get("workbenchLifecycle"),
-            )
-            for proj in resp["projects"]
-        ]
-        return projects
+        return [self._to_project(proj) for proj in self._iterate_projects()]
 
     def get_user_assignments_count(self, user_id: str) -> int:
-        resp = self._get_user_assignments(user_id)
-        return len(resp["assignments"]) if resp.get("assignments") else 0
+        return sum(
+            len(page.get("assignments") or [])
+            for page in paging.iterate_pages(
+                lambda query: self._aws_api.call_api(
+                    path="internal/user/assignments", http_method="GET", query_params=query
+                ),
+                {"pageSize": PAGE_SIZE, "userId": user_id},
+            )
+        )
 
     def get_project(self, project_id: str) -> project.Project:
-        resp = self._get_projects()
-        try:
-            proj = next(iter([proj for proj in resp["projects"] if proj["projectId"] == project_id]), None)
-        except KeyError:
+        # Stops at the page that holds the program: a launch doesn't need to read all of them.
+        proj = next((proj for proj in self._iterate_projects() if proj.get("projectId") == project_id), None)
+        if proj is None:
             raise adapter_exception.AdapterException(constants.NO_PROJECT_FOUND_ERROR.format(projectId=project_id))
-
-        return project.Project(
-            projectId=proj["projectId"],
-            projectName=proj["projectName"],
-            projectDescription=proj["projectDescription"],
-            workbenchLifecycle=proj.get("workbenchLifecycle"),
-        )
+        return self._to_project(proj)
 
     def get_project_assignment(self, project_id: str, user_id: str) -> project_assignment.ProjectAssignment | None:
         path_segments = [
@@ -117,13 +111,22 @@ class ProjectsApiQueryService(projects_query_service.ProjectsQueryService):
             else None
         )
 
+    @staticmethod
+    def _to_project(proj: dict) -> project.Project:
+        return project.Project(
+            projectId=proj["projectId"],
+            projectName=proj["projectName"],
+            projectDescription=proj["projectDescription"],
+            workbenchLifecycle=proj.get("workbenchLifecycle"),
+        )
+
     def _get_accounts(
         self,
         project_id: typing.Optional[str] = None,
         account_type: typing.Optional[str] = None,
         account_stage: typing.Optional[str] = None,
-    ) -> dict:
-        params = {"pageSize": "20"}
+    ) -> list[dict]:
+        params = {"pageSize": PAGE_SIZE}
 
         if project_id:
             params["projectId"] = project_id
@@ -132,27 +135,21 @@ class ProjectsApiQueryService(projects_query_service.ProjectsQueryService):
         if account_type:
             params["accountType"] = account_type
 
-        return self._aws_api.call_api(
-            path="internal/accounts",
-            http_method="GET",
-            query_params=params if params else None,
-        )
+        accounts: list[dict] = []
+        for page in paging.iterate_pages(
+            lambda query: self._aws_api.call_api(path="internal/accounts", http_method="GET", query_params=query),
+            params,
+        ):
+            if "projectAccounts" not in page:
+                raise adapter_exception.AdapterException(constants.NO_ACCOUNT_ASSIGNED)
+            accounts.extend(page["projectAccounts"] or [])
+        return accounts
 
-    def _get_projects(self) -> dict:
-        # Every program in one page: the lifecycle jobs need all of them (fewer than 100 for now).
-        params = {"pageSize": "100"}
-
-        return self._aws_api.call_api(
-            path="internal/projects",
-            http_method="GET",
-            query_params=params if params else None,
-        )
-
-    def _get_user_assignments(self, user_id: str) -> dict:
-        params = {"pageSize": "20", "userId": user_id}
-
-        return self._aws_api.call_api(
-            path="internal/user/assignments",
-            http_method="GET",
-            query_params=params if params else None,
-        )
+    def _iterate_projects(self) -> typing.Iterator[dict]:
+        for page in paging.iterate_pages(
+            lambda query: self._aws_api.call_api(path="internal/projects", http_method="GET", query_params=query),
+            {"pageSize": PAGE_SIZE},
+        ):
+            if "projects" not in page:
+                raise adapter_exception.AdapterException("The projects list answered no projects")
+            yield from page["projects"] or []

@@ -1,3 +1,4 @@
+import copy
 import datetime
 import uuid
 from typing import List, Optional
@@ -395,7 +396,11 @@ def test_can_return_error_on_unprocessed_keys_in_project_retrieval(
 ):
     # Arrange
     dynamodb_stub.add_response(method="query", service_response=sample_query_response)
-    dynamodb_stub.add_response(method="batch_get_item", service_response=sample_batch_get_item_unprocessed_response)
+    # Unprocessed keys are retried; it fails once every attempt left them unprocessed.
+    for _ in range(dynamodb_query_service.BATCH_GET_ATTEMPTS):
+        dynamodb_stub.add_response(
+            method="batch_get_item", service_response=copy.deepcopy(sample_batch_get_item_unprocessed_response)
+        )
     query_service = dynamodb_query_service.DynamoDBProjectsQueryService(
         table_name=test_table_name,
         dynamodb_client=dynamodb_stub.client,
@@ -404,7 +409,7 @@ def test_can_return_error_on_unprocessed_keys_in_project_retrieval(
         gsi_entities=gsi_entities,
     )
     # Act and Assert
-    with pytest.raises(repository_exception.RepositoryException):
+    with pytest.raises(repository_exception.RepositoryException), mock.patch.object(dynamodb_query_service.time, "sleep"):
         query_service.list_projects_by_user(user_id="u0", page_size=10, next_token=None)
 
 

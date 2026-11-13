@@ -158,7 +158,12 @@ class PackagingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
         )
 
         # DynamoDB
-        self._storage = backend_app_storage.BackendAppStorage(self, "PackagingAppStorage", app_config)
+        self._storage = backend_app_storage.BackendAppStorage(
+            self,
+            "PackagingAppStorage",
+            app_config,
+            enable_ttl=True,
+        )
 
         self._storage.table.add_global_secondary_index(
             index_name=GSI_NAME_CUSTOM_QUERY_BY_BUILD_VERSION_ARN,
@@ -640,6 +645,8 @@ class PackagingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                 else aws_apigateway.EndpointType.REGIONAL
             ),
             vpc_endpoint=vpc_endpoint if provision_private_endpoint else None,
+            # Component definitions can carry secrets; the handler logs metadata only.
+            payload_logging_enabled=False,
         )
 
         # Component version testing step function

@@ -20,6 +20,7 @@ import { useCommonProvisionedProduct, useCommonProvisionedProductState } from '.
 import useSWR from 'swr';
 import { useWorkbenchFailureNotifications } from '../workbench-failure.logic';
 import { statusRefreshInterval } from '../status-refresh';
+import { usePinnedProgramId } from './pinned-program';
 
 type FetcherProps = {
   projectId: string,
@@ -31,6 +32,7 @@ export const useProvisionedProductDetails = (
 ) => {
   const { id } = useParams();
   const selectedProject = useRecoilValue(selectedProjectState);
+  const projectId = usePinnedProgramId(id, selectedProject.projectId);
   const { showErrorNotification } = useNotifications();
   const [stopConfirmVisible, setStopConfirmVisible] = useState(false);
 
@@ -60,7 +62,7 @@ export const useProvisionedProductDetails = (
   } = useSWR(
     {
       key: `products/${props.productType}/provisioned/${id}`,
-      projectId: selectedProject.projectId!,
+      projectId: projectId!,
       provisionedProductId: id,
     },
     fetcherFactory(props.serviceAPI),

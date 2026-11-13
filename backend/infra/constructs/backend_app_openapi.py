@@ -12,7 +12,7 @@ from aws_cdk import Arn, ArnFormat, aws_apigateway, aws_ec2, aws_iam, aws_lambda
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from infra import config, constants
-from infra.constructs import backend_app_api_auth
+from infra.constructs import backend_app_api_auth, openapi_s3
 from infra.constructs.openapi_nullable import accept_null_in_nullable_fields
 
 
@@ -55,14 +55,18 @@ class BackendAppOpenApi(constructs.Construct):
 
         access_log_group = self._create_log_group(app_config, name)
         api_role = self._create_api_role(app_config, handler, authorization_bc_handler_arn, name)
-        handler_arn = handler.function_arn
+        # The definitions are deployed from S3, where nothing is resolved at deployment, so they name the handler,
+        # the authorizer and the API Gateway role by literal ARNs (infra/constructs/openapi_s3.py). The IAM policy
+        # above keeps its tokens.
+        handler_arn = openapi_s3.function_arn(handler, app_config.account, app_config.region)
+        api_role_arn = openapi_s3.role_arn(api_role, app_config.account, app_config.region)
 
         rendered_schema_dict = self._prepare_schema(
             schema_directory,
             schema,
             handler_arn,
-            authorization_bc_handler_arn,
-            api_role,
+            openapi_s3.authorizer_arn(app_config) if authorization_bc_handler_arn else None,
+            api_role_arn,
             app_config,
             custom_domain,
             base_path,
@@ -82,6 +86,8 @@ class BackendAppOpenApi(constructs.Construct):
             policy,
             name,
         )
+        # The literal ARNs in the definition carry no reference: keep the order the inline tokens implied.
+        self._api.node.default_child.node.add_dependency(handler, api_role)
 
         self._configure_vpc_endpoint(endpoint_type, vpc_endpoint)
 
@@ -97,8 +103,10 @@ class BackendAppOpenApi(constructs.Construct):
         if provision_iam_api and cedar_policy_config:
             self._iam_api = self._create_iam_api(
                 app_config,
+                handler,
                 handler_arn,
                 api_role,
+                api_role_arn,
                 api_version,
                 version_description,
                 cache_enabled,
@@ -144,7 +152,7 @@ class BackendAppOpenApi(constructs.Construct):
         schema,
         handler_arn,
         authorization_bc_handler_arn,
-        api_role,
+        api_role_arn,
         app_config,
         custom_domain,
         base_path,
@@ -157,7 +165,7 @@ class BackendAppOpenApi(constructs.Construct):
             self.template.render(
                 handler_arn=handler_arn,
                 authorization_bc_handler_arn=authorization_bc_handler_arn,
-                apigw_invocation_role_arn=api_role.role_arn,
+                apigw_invocation_role_arn=api_role_arn,
                 cors_origin=f"'{app_config.environment_config['rest-api-cors-origins']}'",
                 handler_region=Arn.split(handler_arn, ArnFormat.COLON_RESOURCE_NAME).region,
             )
@@ -249,8 +257,8 @@ class BackendAppOpenApi(constructs.Construct):
         return aws_apigateway.SpecRestApi(
             self,
             id,
-            api_definition=aws_apigateway.ApiDefinition.from_inline(
-                accept_null_in_nullable_fields(rendered_schema_dict)
+            api_definition=openapi_s3.asset_api_definition(
+                self, name, accept_null_in_nullable_fields(rendered_schema_dict)
             ),
             deploy=True,
             deploy_options=self._create_stage_options(
@@ -515,8 +523,10 @@ class BackendAppOpenApi(constructs.Construct):
     def _create_iam_api(
         self,
         app_config,
+        handler,
         handler_arn,
         api_role,
+        api_role_arn,
         api_version,
         version_description,
         cache_enabled,
@@ -530,7 +540,7 @@ class BackendAppOpenApi(constructs.Construct):
         iam_role_access,
     ):
         iam_schema_dict = self._prepare_iam_schema(
-            handler_arn, api_role, app_config, cedar_policy_config, iam_role_access
+            handler_arn, api_role_arn, app_config, cedar_policy_config, iam_role_access
         )
         iam_access_log_group = self._create_iam_log_group(app_config)
 
@@ -542,7 +552,9 @@ class BackendAppOpenApi(constructs.Construct):
         iam_api = aws_apigateway.SpecRestApi(
             self,
             "IAMApi",
-            api_definition=aws_apigateway.ApiDefinition.from_inline(accept_null_in_nullable_fields(iam_schema_dict)),
+            api_definition=openapi_s3.asset_api_definition(
+                self, "iam-api", accept_null_in_nullable_fields(iam_schema_dict)
+            ),
             deploy=True,
             deploy_options=self._create_stage_options(
                 iam_access_log_group,
@@ -557,6 +569,7 @@ class BackendAppOpenApi(constructs.Construct):
             policy=self.__get_resource_policy(policy, vpc_endpoint, endpoint_type),
             rest_api_name=app_config.format_resource_name("iam-api"),
         )
+        iam_api.node.default_child.node.add_dependency(handler, api_role)
 
         if endpoint_type == aws_apigateway.EndpointType.PRIVATE and vpc_endpoint:
             iam_api.node.default_child.add_property_override(
@@ -567,11 +580,11 @@ class BackendAppOpenApi(constructs.Construct):
         self._add_iam_api_suppressions(iam_access_log_group, iam_api, cache_enabled)
         return iam_api
 
-    def _prepare_iam_schema(self, handler_arn, api_role, app_config, cedar_policy_config, iam_role_access):
+    def _prepare_iam_schema(self, handler_arn, api_role_arn, app_config, cedar_policy_config, iam_role_access):
         iam_schema_dict = yaml.safe_load(
             self.template.render(
                 handler_arn=handler_arn,
-                apigw_invocation_role_arn=api_role.role_arn,
+                apigw_invocation_role_arn=api_role_arn,
                 cors_origin=f"'{app_config.environment_config['rest-api-cors-origins']}'",
             )
         )

@@ -31,9 +31,6 @@ class FakeProjectsQueryService(projects_query_service.ProjectsQueryService):
     def list_project_group_assignments(self, project_id: str, include_deleted: bool = False):
         return []
 
-    def list_service_client_assignments(self, project_id: str):
-        return []
-
     def get_service_client_assignment(
         self, project_id: str, client_id: str
     ) -> service_client_assignment.ServiceClientAssignment | None:

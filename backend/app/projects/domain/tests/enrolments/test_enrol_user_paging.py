@@ -18,7 +18,9 @@ def _pending(project_id: str) -> enrolment.Enrolment:
     return enrolment.Enrolment(projectId=project_id, userId="t001", status=enrolment.EnrolmentStatus.Pending)
 
 
-def test_pending_enrolment_on_a_later_page_is_found(mock_uow_2, mock_enrolments_repo, mock_projects_qs, message_bus_mock):
+def test_pending_enrolment_on_a_later_page_is_found(
+    mock_uow_2, mock_enrolments_repo, mock_projects_qs, message_bus_mock
+):
     pages = [[_pending(f"p-{i}") for i in range(start, start + 50)] for start in range(0, 300, 50)]
     tokens = [{"offset": 50 * (n + 1)} for n in range(5)] + [None]
     enrolment_service = mock.create_autospec(spec=enrolment_query_service.EnrolmentQueryService, instance=True)

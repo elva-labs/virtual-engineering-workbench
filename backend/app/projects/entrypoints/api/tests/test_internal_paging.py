@@ -22,7 +22,9 @@ class PagedProjectsQueryService(fake_classes.FakeProjectsQueryService):
     """Pages like DynamoDB: a dict token, and refuses anything else as ExclusiveStartKey."""
 
     def __init__(self):
-        self.projects = [project.Project(projectId=f"proj-{i:04d}", projectName=f"P{i}", isActive=True) for i in range(PROGRAMS)]
+        self.projects = [
+            project.Project(projectId=f"proj-{i:04d}", projectName=f"P{i}", isActive=True) for i in range(PROGRAMS)
+        ]
         self.tokens: list = []
 
     def _page(self, items, page_size, next_token):

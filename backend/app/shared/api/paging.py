@@ -18,22 +18,25 @@ class PageTokenError(ValueError):
     """The nextToken query parameter is not a page token."""
 
 
+def _parse_page_token(candidate: str) -> dict | None:
+    """One candidate form of a token: a JSON object, or a JSON string of one."""
+    try:
+        token = json.loads(candidate)
+        if isinstance(token, str):
+            # A token the route answered as a JSON string of the object.
+            token = json.loads(token)
+    except ValueError:
+        return None
+    return token if isinstance(token, dict) else None
+
+
 def decode_page_token(raw: str | None) -> dict | None:
     """The page token a caller sent in the query string: JSON, possibly percent-encoded once more."""
     if not raw:
         return None
     for candidate in (raw, unquote(raw)):
-        try:
-            token = json.loads(candidate)
-        except ValueError:
-            continue
-        if isinstance(token, str):
-            # A token the route answered as a JSON string of the object.
-            try:
-                token = json.loads(token)
-            except ValueError:
-                continue
-        if isinstance(token, dict):
+        token = _parse_page_token(candidate)
+        if token is not None:
             return token
     raise PageTokenError("nextToken is not a page token")
 

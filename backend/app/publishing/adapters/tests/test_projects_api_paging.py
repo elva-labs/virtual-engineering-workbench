@@ -44,9 +44,7 @@ def test_get_project_finds_a_program_past_100_and_stops_at_its_page():
 def test_get_project_raises_for_an_unknown_program_after_every_page():
     api = PagedProjectsApi(projects=300)
 
-    assertpy.assert_that(_srv(api).get_project).raises(adapter_exception.AdapterException).when_called_with(
-        "proj-9999"
-    )
+    assertpy.assert_that(_srv(api).get_project).raises(adapter_exception.AdapterException).when_called_with("proj-9999")
     assertpy.assert_that(api.calls_to("internal/projects")).is_length(3)
 
 

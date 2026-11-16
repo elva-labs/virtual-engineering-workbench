@@ -25,8 +25,17 @@ def _fill(table, user_id: str, count: int):
     with table.batch_writer() as batch:
         for i in range(count):
             proj = project.Project(projectId=f"proj-{i:04d}", projectName=f"P{i}", isActive=True)
-            batch.put_item(Item={"PK": f"PROJECT#{proj.projectId}", "SK": f"PROJECT#{proj.projectId}", "entity": "PROJECT", **proj.model_dump()})
-            assignment = project_assignment.Assignment(userId=user_id, projectId=proj.projectId, roles=["PLATFORM_USER"])
+            batch.put_item(
+                Item={
+                    "PK": f"PROJECT#{proj.projectId}",
+                    "SK": f"PROJECT#{proj.projectId}",
+                    "entity": "PROJECT",
+                    **proj.model_dump(),
+                }
+            )
+            assignment = project_assignment.Assignment(
+                userId=user_id, projectId=proj.projectId, roles=["PLATFORM_USER"]
+            )
             batch.put_item(Item={"PK": f"USER#{user_id}", "SK": f"PROJECT#{proj.projectId}", **assignment.model_dump()})
 
 
@@ -64,9 +73,14 @@ def test_list_projects_by_user_pages_through_300_programs(
 def test_batch_get_retries_unprocessed_keys(test_table_name, gsi_name, gsi_aws_accounts, gsi_entities):
     item = {"PK": "PROJECT#p1", "SK": "PROJECT#p1", "projectId": "p1", "projectName": "P1", "isActive": True}
     client = mock.MagicMock()
-    client.query.return_value = {"Items": [{"PK": "USER#U1", "SK": "PROJECT#p1", "userId": "U1", "projectId": "p1", "roles": []}]}
+    client.query.return_value = {
+        "Items": [{"PK": "USER#U1", "SK": "PROJECT#p1", "userId": "U1", "projectId": "p1", "roles": []}]
+    }
     client.batch_get_item.side_effect = [
-        {"Responses": {test_table_name: []}, "UnprocessedKeys": {test_table_name: {"Keys": [{"PK": "PROJECT#p1", "SK": "PROJECT#p1"}]}}},
+        {
+            "Responses": {test_table_name: []},
+            "UnprocessedKeys": {test_table_name: {"Keys": [{"PK": "PROJECT#p1", "SK": "PROJECT#p1"}]}},
+        },
         {"Responses": {test_table_name: [item]}, "UnprocessedKeys": {}},
     ]
     srv = _projects_service(None, test_table_name, gsi_name, gsi_aws_accounts, gsi_entities, client=client)
@@ -78,12 +92,24 @@ def test_batch_get_retries_unprocessed_keys(test_table_name, gsi_name, gsi_aws_a
     assertpy.assert_that(client.batch_get_item.call_count).is_equal_to(2)
 
 
-def test_list_project_accounts_by_aws_account_reads_every_page(test_table_name, gsi_name, gsi_aws_accounts, gsi_entities):
+def test_list_project_accounts_by_aws_account_reads_every_page(
+    test_table_name, gsi_name, gsi_aws_accounts, gsi_entities
+):
     def account(i):
         return {
-            "PK": "PROJECT#p1", "SK": f"ACCOUNT#a{i}", "id": f"a{i}", "projectId": "p1", "awsAccountId": "123456789012",
-            "accountType": "USER", "accountName": "n", "accountDescription": "d", "createDate": "2026-01-01",
-            "lastUpdateDate": "2026-01-01", "accountStatus": "Active", "stage": "dev", "technologyId": "t",
+            "PK": "PROJECT#p1",
+            "SK": f"ACCOUNT#a{i}",
+            "id": f"a{i}",
+            "projectId": "p1",
+            "awsAccountId": "123456789012",
+            "accountType": "USER",
+            "accountName": "n",
+            "accountDescription": "d",
+            "createDate": "2026-01-01",
+            "lastUpdateDate": "2026-01-01",
+            "accountStatus": "Active",
+            "stage": "dev",
+            "technologyId": "t",
             "region": "eu-north-1",
         }
 

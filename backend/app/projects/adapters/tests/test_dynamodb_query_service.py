@@ -409,7 +409,9 @@ def test_can_return_error_on_unprocessed_keys_in_project_retrieval(
         gsi_entities=gsi_entities,
     )
     # Act and Assert
-    with pytest.raises(repository_exception.RepositoryException), mock.patch.object(dynamodb_query_service.time, "sleep"):
+    with pytest.raises(repository_exception.RepositoryException), mock.patch.object(
+        dynamodb_query_service.time, "sleep"
+    ):
         query_service.list_projects_by_user(user_id="u0", page_size=10, next_token=None)
 
 

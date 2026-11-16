@@ -28,7 +28,9 @@ class PagedProjectsApi:
             ]
             for i, project in enumerate(self.projects)
         }
-        self.user_assignments = [{"projectId": f"proj-{i:04d}", "roles": ["PLATFORM_USER"]} for i in range(user_assignments)]
+        self.user_assignments = [
+            {"projectId": f"proj-{i:04d}", "roles": ["PLATFORM_USER"]} for i in range(user_assignments)
+        ]
         self.calls: list[tuple[str, dict]] = []
 
     def call_api(self, path: str, http_method: str, query_params: dict | None = None, **_) -> dict:

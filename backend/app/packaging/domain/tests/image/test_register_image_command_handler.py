@@ -521,3 +521,70 @@ def test_register_image_command_handler_should_always_publish_automated_image_re
     assertpy.assert_that(second_event.osVersion).is_equal_to(mock_recipe_object.recipeOsVersion)
     assertpy.assert_that(second_event.platform).is_equal_to(mock_recipe_object.recipePlatform)
     assertpy.assert_that(second_event.architecture).is_equal_to(mock_recipe_object.recipeArchitecture)
+
+
+@freeze_time(TEST_DATE)
+def test_a_released_base_image_is_not_retired_by_a_newer_build_of_its_recipe_version(
+    component_version_query_service_mock,
+    generic_repo_mock,
+    get_image_entity,
+    get_pipeline_entity,
+    get_register_image_command,
+    get_test_component_version,
+    image_query_service_mock,
+    message_bus_mock,
+    mock_recipe_version_object,
+    pipeline_query_service_mock,
+    recipe_version_query_service_mock,
+    uow_mock,
+    recipe_query_service_mock,
+    mock_recipe_object,
+):
+    """2026-11-01: the base pipeline's monthly build of recipe 1.20.0 retired image-tii1ikm0, which the test
+    channel released, and its prod release was refused. A released build stays CREATED; others are retired."""
+    component_version_query_service_mock.get_component_version.return_value = get_test_component_version
+    recipe_version_query_service_mock.get_recipe_version.return_value = mock_recipe_version_object
+    command = get_register_image_command(image_build_version=3, image_status=image.ImageStatus.Created)
+    pipeline_entity = get_pipeline_entity(status=pipeline.PipelineStatus.Created)
+    released = get_image_entity(
+        image_id="image-released",
+        image_build_version=1,
+        image_upstream_id="ami-released",
+        status=image.ImageStatus.Created,
+    )
+    released.baseChannels = ["test"]
+    unreleased = get_image_entity(
+        image_id="image-unreleased",
+        image_build_version=2,
+        image_upstream_id="ami-unreleased",
+        status=image.ImageStatus.Created,
+    )
+    new = get_image_entity(image_id="image-new", image_build_version=3, status=image.ImageStatus.Creating)
+    image_query_service_mock.get_image_by_image_build_version_arn.return_value = new
+    image_query_service_mock.get_images_by_recipe_id_and_version_name.return_value = [released, unreleased, new]
+    pipeline_query_service_mock.get_pipeline_by_pipeline_id.return_value = pipeline_entity
+    recipe_query_service_mock.get_recipe.return_value = mock_recipe_object
+
+    register_image_command_handler.handle(
+        command=command,
+        component_version_qry_srv=component_version_query_service_mock,
+        image_qry_srv=image_query_service_mock,
+        message_bus=message_bus_mock,
+        pipeline_qry_srv=pipeline_query_service_mock,
+        recipe_version_qry_srv=recipe_version_query_service_mock,
+        uow=uow_mock,
+        recipe_qry_srv=recipe_query_service_mock,
+    )
+
+    retired = [
+        c.args[0].imageId
+        for c in generic_repo_mock.update_attributes.call_args_list
+        if c.kwargs.get("status") == image.ImageStatus.Retired
+    ]
+    assertpy.assert_that(retired).is_equal_to(["image-unreleased"])
+    event = next(
+        c.args[0]
+        for c in message_bus_mock.publish.call_args_list
+        if isinstance(c.args[0], image_registration_completed.ImageRegistrationCompleted)
+    )
+    assertpy.assert_that(event.retiredAmiIds).is_equal_to(["ami-unreleased"])

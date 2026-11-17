@@ -136,6 +136,61 @@ describe('ALB Lambda Target', () => {
     // ASSERT
     expect(response.multiValueHeaders?.['Content-Type'][0]).toBe('text/html');
   });
+
+  it('revalidates index.html on every load', async () => {
+    // ACT
+    const response = await lambdaHandler(sampleRequest, ctx);
+
+    // ASSERT
+    expect(response.multiValueHeaders?.['Cache-Control']).toEqual(['no-cache']);
+  });
+
+  it('revalidates the index.html served for an unknown path', async () => {
+    // ACT
+    const response = await lambdaHandler({ ...sampleRequest, path: 'bla' }, ctx);
+
+    // ASSERT
+    expect(response.statusCode).toBe(200);
+    expect(response.multiValueHeaders?.['Cache-Control']).toEqual(['no-cache']);
+  });
+
+  it('lets browsers keep a hashed asset', async () => {
+    // ARRANGE
+    const stream = new Readable();
+    stream.push('export {}');
+    stream.push(null);
+    s3Mock.on(GetObjectCommand, {
+      Bucket: APP_BUCKET_NAME,
+      Key: 'assets/main-abc123.js',
+    }).resolves({
+      Body: sdkStreamMixin(stream),
+      ContentType: 'text/javascript',
+    });
+
+    // ACT
+    const response = await lambdaHandler({ ...sampleRequest, path: '/assets/main-abc123.js' }, ctx);
+
+    // ASSERT
+    expect(response.statusCode).toBe(200);
+    expect(response.multiValueHeaders?.['Content-Type']).toEqual(['text/javascript']);
+    expect(response.multiValueHeaders?.['Cache-Control']).toEqual(['public, max-age=31536000, immutable']);
+  });
+
+  it('answers a previous build\'s asset with 404, not index.html', async () => {
+    // ARRANGE
+    s3Mock.on(GetObjectCommand, {
+      Bucket: APP_BUCKET_NAME,
+      Key: 'assets/main-old.js',
+    }).rejects('NoSuchKey');
+
+    // ACT
+    const response = await lambdaHandler({ ...sampleRequest, path: '/assets/main-old.js' }, ctx);
+
+    // ASSERT
+    expect(response.statusCode).toBe(404);
+    expect(response.multiValueHeaders?.['Cache-Control']).toEqual(['no-store']);
+    expect(s3Mock.calls()).toHaveLength(1);
+  });
 });
 
 describe('ALB Lambda Target Cognito Middleware', () => {

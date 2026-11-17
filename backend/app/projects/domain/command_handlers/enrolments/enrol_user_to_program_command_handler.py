@@ -23,11 +23,17 @@ def handle_enrol_user_to_program_command(
         )
     current_time = datetime.now(timezone.utc).isoformat()
 
-    existing_enrolments, _ = enrolment_qry_srv.list_enrolments_by_user(
-        user_id=cmd.user_id.value, page_size=50, next_token=None, status=enrolment.EnrolmentStatus.Pending
-    )
-
-    existing_enrolment = next((e for e in existing_enrolments if e.projectId == cmd.project_id.value), None)
+    # Every page of the user's pending enrolments: with the first 50 only, a pending
+    # enrolment further on was not found and a duplicate was created.
+    existing_enrolment = None
+    next_token = None
+    while existing_enrolment is None:
+        existing_enrolments, next_token = enrolment_qry_srv.list_enrolments_by_user(
+            user_id=cmd.user_id.value, page_size=50, next_token=next_token, status=enrolment.EnrolmentStatus.Pending
+        )
+        existing_enrolment = next((e for e in existing_enrolments if e.projectId == cmd.project_id.value), None)
+        if not next_token:
+            break
 
     if existing_enrolment:
         return existing_enrolment.id

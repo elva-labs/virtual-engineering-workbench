@@ -43,6 +43,9 @@ class Image(unit_of_work.Entity):
     recipeVersionName: Optional[str] = Field(None, title="RecipeVersionName")
     status: ImageStatus = Field(..., title="Status")
     imageUpstreamId: Optional[str] = Field(None, title="ImageUpstreamId")
+    # Saab base images (release_base_image_command_handler): every channel this build was released to. A later
+    # build of the same recipe version never retires it (register_image_command_handler).
+    baseChannels: Optional[list[str]] = Field(None, title="BaseChannels")
     createDate: str = Field(..., title="CreateDate")
     lastUpdateDate: str = Field(..., title="LastUpdateDate")
     imageSource: ImageSource = Field(ImageSource.PIPELINE, title="ImageSource")

@@ -12,6 +12,7 @@ from app.packaging.domain.exceptions import domain_exception
 from app.packaging.domain.model.image import image
 from app.packaging.domain.model.recipe import base_image_channels
 from app.packaging.domain.ports import base_image_release_service, image_query_service, recipe_query_service
+from app.shared.adapters.unit_of_work_v2 import unit_of_work
 
 
 def _releasable_ami(
@@ -19,7 +20,7 @@ def _releasable_ami(
     channels: base_image_channels.BaseImageChannels,
     image_qry_srv: image_query_service.ImageQueryService,
     recipe_qry_srv: recipe_query_service.RecipeQueryService,
-) -> tuple[str, str]:
+) -> tuple[str, str, image.Image]:
     project_id, image_id = command.projectId.value, command.imageId.value
     build = image_qry_srv.get_image(project_id, image_id)
     if build is None:
@@ -39,7 +40,19 @@ def _releasable_ami(
         raise domain_exception.DomainException(
             f"Image {image_id} is built on {recipe.recipeOsVersion}; a base image is built on the raw OS."
         )
-    return build.imageUpstreamId, f"{build.recipeName} {build.recipeVersionName}"
+    return build.imageUpstreamId, f"{build.recipeName} {build.recipeVersionName}", build
+
+
+def _record_channel(build: image.Image, channel: str, uow: unit_of_work.UnitOfWork | None) -> None:
+    """Released: a later build of the same recipe version must not retire it (register_image_command_handler)."""
+    if uow is None or channel in (build.baseChannels or []):
+        return
+    with uow:
+        uow.get_repository(image.ImagePrimaryKey, image.Image).update_attributes(
+            image.ImagePrimaryKey(projectId=build.projectId, imageId=build.imageId),
+            baseChannels=sorted({*(build.baseChannels or []), channel}),
+        )
+        uow.commit()
 
 
 def handle(
@@ -50,6 +63,7 @@ def handle(
     parameter_srv: base_image_release_service.BaseImageParameterService,
     image_tag_srv: base_image_release_service.ImageTagService,
     logger: logging.Logger,
+    uow: unit_of_work.UnitOfWork | None = None,
 ) -> None:
     if not channels.enabled or command.projectId.value != channels.releasing_project_id:
         raise domain_exception.ReleasingProjectOnly("Only the releasing project releases base images.")
@@ -59,7 +73,7 @@ def handle(
     if parameter_name is None:
         raise domain_exception.DomainException(f"There is no {channel} base image channel for {arch}.")
 
-    ami_id, source = _releasable_ami(command, channels, image_qry_srv, recipe_qry_srv)
+    ami_id, source, build = _releasable_ami(command, channels, image_qry_srv, recipe_qry_srv)
     required = base_image_channels.REQUIRES.get(channel)
     if required and ami_id not in parameter_srv.get_parameter_history(parameters[(required, arch)]):
         raise domain_exception.BaseImageNotReleasedToRequiredChannel(
@@ -83,6 +97,8 @@ def handle(
             for (c, a), name in parameters.items()
             if a == arch and (ami_id if name == parameter_name else parameter_srv.get_parameter_value(name)) == ami
         }
+
+    _record_channel(build, channel, uow)
 
     image_tag_srv.set_base_channels(ami_id, channels_of(ami_id))
     if current and current != ami_id:

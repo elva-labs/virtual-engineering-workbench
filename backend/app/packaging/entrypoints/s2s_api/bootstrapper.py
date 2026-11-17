@@ -487,6 +487,7 @@ def bootstrap(app_config: config.AppConfig, logger: logging.Logger) -> Dependenc
             parameter_srv=base_image_parameters,
             image_tag_srv=ec2_image_tag_service.EC2ImageTagService(ami_factory_client),
             logger=safe_logger,
+            uow=uow,
         ),
     )
 

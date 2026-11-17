@@ -59,7 +59,12 @@ def __retire_previous_images(
     retired_amis_ids = []
     current_time = datetime.now(timezone.utc).isoformat()
 
-    for retired_image_entity in [img for img in image_entities if img.status == image.ImageStatus.Created]:
+    # A Saab base image a channel released stays CREATED (2026-11-01: the base pipeline's monthly build of recipe
+    # 1.20.0 retired image-tii1ikm0, which the test channel released, and its prod release was refused). Retiring
+    # a released base image is a manual step, once no channel and no program builds on it.
+    for retired_image_entity in [
+        img for img in image_entities if img.status == image.ImageStatus.Created and not img.baseChannels
+    ]:
         retired_amis_ids.append(retired_image_entity.imageUpstreamId)
 
         with uow:

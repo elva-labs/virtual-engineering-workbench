@@ -232,3 +232,41 @@ def test_nothing_is_released_while_the_deployment_has_no_releasing_project():
             logger=logging.getLogger("test"),
         )
     assert world.parameters.values == {}
+
+
+def test_a_release_records_the_channel_on_the_build_so_a_later_build_never_retires_it():
+    """register_image_command_handler skips images with baseChannels: a later build must not retire a released one."""
+    world = World()
+    world.images["image-arm1"].baseChannels = ["test"]
+    uow = mock.MagicMock()
+    repo = uow.get_repository.return_value
+    images = mock.Mock()
+    images.get_image.side_effect = lambda project_id, iid: world.images.get(iid)
+    recipes = mock.Mock()
+    recipes.get_recipe.side_effect = lambda project_id, rid: world.recipes.get(rid)
+
+    def release(image_id, channel):
+        release_base_image_command_handler.handle(
+            release_base_image_command.ReleaseBaseImageCommand(
+                projectId=project_id_value_object.from_str(PLATFORM),
+                imageId=image_id_value_object.from_str(image_id),
+                architecture="arm64",
+                channel=channel,
+                releasedBy=user_id_value_object.from_str("service:terraform"),
+            ),
+            channels=CHANNELS,
+            image_qry_srv=images,
+            recipe_qry_srv=recipes,
+            parameter_srv=world.parameters,
+            image_tag_srv=world.tags,
+            logger=logging.getLogger("test"),
+            uow=uow,
+        )
+
+    release("image-arm1", "test")  # already recorded: nothing written
+    repo.update_attributes.assert_not_called()
+    release("image-arm1", "prod")
+    repo.update_attributes.assert_called_once_with(
+        image.ImagePrimaryKey(projectId=PLATFORM, imageId="image-arm1"), baseChannels=["prod", "test"]
+    )
+    uow.commit.assert_called_once()

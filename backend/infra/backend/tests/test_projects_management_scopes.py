@@ -29,9 +29,7 @@ def test_project_management_scopes_and_isolated_bootstrap_grant():
     template = Template.from_stack(stack)
     servers = template.find_resources("AWS::Cognito::UserPoolResourceServer")
     projects = next(
-        value["Properties"]
-        for value in servers.values()
-        if value["Properties"]["Identifier"] == "clients/projects"
+        value["Properties"] for value in servers.values() if value["Properties"]["Identifier"] == "clients/projects"
     )
     scopes = {entry["ScopeName"] for entry in projects["Scopes"]}
     assert {
@@ -41,21 +39,21 @@ def test_project_management_scopes_and_isolated_bootstrap_grant():
         "client_assignment.bootstrap",
     } <= scopes
     clients = template.find_resources("AWS::Cognito::UserPoolClient")
-    sample = next(
-        value
-        for key, value in clients.items()
-        if "PlatformProjectsBootstrap" not in key
+    assert len(clients) == 2
+    sample = next(value for value in clients.values() if "sample-s2s" in value["Properties"]["ClientName"])
+    management = next(
+        value for value in clients.values() if "projects-assignment-management" in value["Properties"]["ClientName"]
     )
-    bootstrap = next(
-        value for key, value in clients.items() if "PlatformProjectsBootstrap" in key
+    assert all("bootstrap" not in value["Properties"]["ClientName"] for value in clients.values())
+    assert all(
+        "client_assignment.bootstrap" not in json.dumps(value["Properties"]["AllowedOAuthScopes"])
+        for value in clients.values()
     )
     sample_scopes = json.dumps(sample["Properties"]["AllowedOAuthScopes"])
-    bootstrap_scopes = json.dumps(bootstrap["Properties"]["AllowedOAuthScopes"])
-    assert "client_assignment.bootstrap" not in sample_scopes
-    assert (
-        "program.write" in sample_scopes and "group_assignment.write" in sample_scopes
-    )
-    assert "client_assignment.bootstrap" in bootstrap_scopes
-    assert "client_assignment.read" in bootstrap_scopes
-    assert "client_assignment.write" in bootstrap_scopes
-    assert "program.write" not in bootstrap_scopes
+    management_scopes = json.dumps(management["Properties"]["AllowedOAuthScopes"])
+    assert "program.write" in sample_scopes and "group_assignment.write" in sample_scopes
+    assert "client_assignment.write" not in sample_scopes
+    assert "client_assignment.read" in management_scopes
+    assert "client_assignment.write" in management_scopes
+    assert "group_assignment.read" not in management_scopes
+    assert "group_assignment.write" not in management_scopes

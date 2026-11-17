@@ -31,7 +31,7 @@ def test_get_user_assignments_returns_correct_assignments(mock_api):
     mock_api.call_api.assert_called_once_with(
         path="internal/user/assignments",
         http_method="GET",
-        query_params={"pageSize": "20", "userId": "user1", "nextToken": None},
+        query_params={"pageSize": "100", "userId": "user1", "nextToken": None},
     )
 
     assertpy.assert_that(assignments).is_not_none()
@@ -60,7 +60,7 @@ def test_get_user_assignments_returns_empty_list_when_no_assignments(mock_api):
     mock_api.call_api.assert_called_once_with(
         path="internal/user/assignments",
         http_method="GET",
-        query_params={"pageSize": "20", "userId": "user1", "nextToken": None},
+        query_params={"pageSize": "100", "userId": "user1", "nextToken": None},
     )
     assertpy.assert_that(assignments).is_not_none()
     assertpy.assert_that(assignments).is_empty()
@@ -79,7 +79,7 @@ def test_get_user_assignments_handles_missing_assignments_key(mock_api):
     mock_api.call_api.assert_called_once_with(
         path="internal/user/assignments",
         http_method="GET",
-        query_params={"pageSize": "20", "userId": "user1", "nextToken": None},
+        query_params={"pageSize": "100", "userId": "user1", "nextToken": None},
     )
     assertpy.assert_that(assignments).is_not_none()
     assertpy.assert_that(assignments).is_empty()

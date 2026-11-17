@@ -480,7 +480,6 @@ def mocked_list_constraints_for_portfolio_response():
                 "PortfolioId": "string",
             },
         ],
-        "NextPageToken": "string",
     }
 
 

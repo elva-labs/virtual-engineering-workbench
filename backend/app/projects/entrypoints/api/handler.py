@@ -7,7 +7,7 @@ from urllib.parse import unquote
 
 from aws_lambda_powertools import logging, tracing
 from aws_lambda_powertools.event_handler import api_gateway, content_types
-from aws_lambda_powertools.event_handler.exceptions import ForbiddenError, NotFoundError
+from aws_lambda_powertools.event_handler.exceptions import BadRequestError, ForbiddenError, NotFoundError
 from aws_lambda_powertools.event_handler.openapi.models import Server
 from aws_lambda_powertools.event_handler.openapi.params import Query
 from aws_lambda_powertools.utilities import typing
@@ -52,6 +52,7 @@ from app.projects.domain.value_objects import (
 from app.projects.entrypoints.api import bootstrapper, config, group_access, user_profiles
 from app.projects.entrypoints.api.model import api_model
 from app.shared.adapters.boto import paging_utils
+from app.shared.api import paging
 from app.shared.identity.entra_groups import effective_roles, trusted_group_ids
 from app.shared.logging.helpers import clear_auth_headers
 from app.shared.middleware import authorization, exception_handler, externally_managed
@@ -235,12 +236,19 @@ def get_projects(
     ]
     last_evaluated_key = {"offset": offset + requested_size} if offset + requested_size < len(project_ids) else None
 
-    enrolments, _ = dependencies.enrolment_query_service.list_enrolments_by_user(
-        user_id=user_principal_name,
-        page_size=50,
-        next_token=None,
-        status=enrolment.EnrolmentStatus.Pending,
-    )
+    # All of the user's pending enrolments, not the first page.
+    enrolments = []
+    enrolments_token = None
+    while True:
+        enrolments_page, enrolments_token = dependencies.enrolment_query_service.list_enrolments_by_user(
+            user_id=user_principal_name,
+            page_size=50,
+            next_token=enrolments_token,
+            status=enrolment.EnrolmentStatus.Pending,
+        )
+        enrolments.extend(enrolments_page)
+        if not enrolments_token:
+            break
 
     projects_parsed = [api_model.Project.model_validate(p.model_dump()) for p in projects]
     assignments_parsed = [api_model.ProjectAssignment.model_validate(a.model_dump()) for a in assignments]
@@ -864,6 +872,15 @@ def list_enrolments_by_project(
     )
 
 
+def _page_token() -> dict | None:
+    """The nextToken query parameter of an internal list route: the JSON of the token the previous page
+    answered. The routes passed it on as a string before, so no caller got past page 1."""
+    try:
+        return paging.decode_page_token(app.current_event.get_query_string_value("nextToken"))
+    except paging.PageTokenError as error:
+        raise BadRequestError(str(error)) from error
+
+
 @tracer.capture_method
 @app.get("/internal/accounts")
 def get_project_accounts_internal() -> dict:
@@ -876,7 +893,7 @@ def get_project_accounts_internal() -> dict:
     technology_id = app.current_event.get_query_string_value("technologyId")
 
     page_size = int(app.current_event.get_query_string_value("pageSize") or 10)
-    next_token = app.current_event.get_query_string_value("nextToken")
+    next_token = _page_token()
 
     if project_id:
         project_accounts = dependencies.projects_query_service.list_project_accounts(
@@ -888,7 +905,7 @@ def get_project_accounts_internal() -> dict:
     else:
         project_accounts, last_evaluated_key = dependencies.projects_query_service.list_all_accounts(
             page_size=page_size,
-            next_token=json.loads(next_token) if next_token else None,
+            next_token=next_token,
             account_type=account_type,
             stage=account_stage,
             technology_id=technology_id,
@@ -905,7 +922,7 @@ def get_project_accounts_internal() -> dict:
 def get_project_internal() -> dict:
     """Returns a list of projects."""
     page_size = int(app.current_event.get_query_string_value("pageSize"))
-    next_token = app.current_event.get_query_string_value("nextToken")
+    next_token = _page_token()
 
     projects, last_evaluated_key, assignments = dependencies.projects_query_service.list_projects(
         page_size=page_size,
@@ -1059,7 +1076,7 @@ def get_technology_internal(
 def get_user_assignments_internal() -> dict:
     """Returns a list of user projects and assignments."""
     page_size = int(app.current_event.get_query_string_value("pageSize"))
-    next_token = app.current_event.get_query_string_value("nextToken")
+    next_token = _page_token()
     user_id = app.current_event.get_query_string_value("userId")
 
     projects, last_evaluated_key, assignments = dependencies.projects_query_service.list_projects_by_user(

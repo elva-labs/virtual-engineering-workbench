@@ -274,8 +274,9 @@ class ServiceCatalogService(catalog_service.CatalogService):
             # Call the service catalog api
             principal_arns: str = []
             args = {"PortfolioId": sc_portfolio_id}
+            # Every page: each page used to replace the ones before it.
             while "Principals" in (response := sc_client.list_principals_for_portfolio(**args)):
-                principal_arns = [
+                principal_arns += [
                     r.get("PrincipalARN") for r in response.get("Principals", []) if r.get("PrincipalType") == "IAM"
                 ]
                 if (next_token := response.get("NextPageToken", None)) is not None:

@@ -31,9 +31,6 @@ class FakeProjectsQueryService(projects_query_service.ProjectsQueryService):
     def list_project_group_assignments(self, project_id: str, include_deleted: bool = False):
         return []
 
-    def list_service_client_assignments(self, project_id: str):
-        return []
-
     def get_service_client_assignment(
         self, project_id: str, client_id: str
     ) -> service_client_assignment.ServiceClientAssignment | None:
@@ -344,10 +341,11 @@ class FakeEnrolmentsQueryService(enrolment_query_service.EnrolmentQueryService):
         status: Optional[str] = None,
         project_id: Optional[str] = None,
     ) -> Tuple[List[enrolment.Enrolment], Any]:
+        # Two pages: callers that need every enrolment must follow the token.
         enrolments = []
         new_enrolment = enrolment.Enrolment(projectId="P1", userId="U1", status="Approved")
         enrolments.append(new_enrolment)
-        return enrolments, {"PK": str(uuid.uuid4()), "SK": str(uuid.uuid4())}
+        return enrolments, ({"PK": str(uuid.uuid4()), "SK": str(uuid.uuid4())} if next_token is None else None)
 
     def update_enrolments_by_project(self, project_id: str, items_to_update: List[dict]) -> List[enrolment.Enrolment]:
         approved_enrolment = enrolment.Enrolment(projectId="P1", userId="U1", status="Approved")

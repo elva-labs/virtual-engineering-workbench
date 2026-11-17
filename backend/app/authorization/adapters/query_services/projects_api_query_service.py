@@ -8,7 +8,7 @@ from app.authorization.domain.read_models import (
     project_group_assignment,
 )
 from app.shared.adapters.boto import paging_utils
-from app.shared.api import aws_api
+from app.shared.api import aws_api, paging
 
 
 # has to be refactored: user assignments should move to this BC
@@ -44,10 +44,12 @@ class ProjectsApiQueryService(projects_query_service.ProjectsQueryService):
 
     def get_projects(self, page: paging_utils.PageInfo) -> paging_utils.PagedResponse[project.Project]:
 
+        # The route answers nextToken as an object; it goes back as JSON. Sent as is,
+        # requests would split the object into one parameter per key and page 2 would fail.
         get_projects_resp = self._aws_api.call_api(
             path="internal/projects",
             http_method="GET",
-            query_params={"pageSize": page.page_size, "nextToken": page.page_token},
+            query_params={"pageSize": page.page_size, "nextToken": paging.encode_page_token(page.page_token)},
         )
 
         return paging_utils.PagedResponse[project.Project](
@@ -77,7 +79,7 @@ class ProjectsApiQueryService(projects_query_service.ProjectsQueryService):
         )
 
     def _get_user_assignments(self, user_id: str, next_token: Any) -> dict:
-        params = {"pageSize": "20", "userId": user_id, "nextToken": next_token}
+        params = {"pageSize": "100", "userId": user_id, "nextToken": paging.encode_page_token(next_token)}
 
         return self._aws_api.call_api(
             path="internal/user/assignments",

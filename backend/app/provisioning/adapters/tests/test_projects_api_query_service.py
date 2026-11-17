@@ -62,7 +62,7 @@ def test_get_aws_account_by_id_returns_correct_account(mock_api):
     mock_api.call_api.assert_called_once_with(
         path="internal/accounts",
         http_method="GET",
-        query_params={"pageSize": "20", "projectId": "proj-id-1"},
+        query_params={"pageSize": "100", "projectId": "proj-id-1"},
     )
     assertpy.assert_that(account).is_not_none()
     assertpy.assert_that(account.model_dump()).is_equal_to(
@@ -106,7 +106,7 @@ def test_get_aws_accounst_by_status_returns_correct_account(mock_api):
         path="internal/accounts",
         http_method="GET",
         query_params={
-            "pageSize": "20",
+            "pageSize": "100",
             "projectId": "proj-id-1",
         },
     )
@@ -144,7 +144,7 @@ def test_get_user_assignments_count_return_assignments_count(mock_api):
     mock_api.call_api.assert_called_once_with(
         path="internal/user/assignments",
         http_method="GET",
-        query_params={"pageSize": "20", "userId": "user-1"},
+        query_params={"pageSize": "100", "userId": "user-1"},
     )
     assertpy.assert_that(assignments_count).is_not_none()
     assertpy.assert_that(assignments_count).is_equal_to(1)

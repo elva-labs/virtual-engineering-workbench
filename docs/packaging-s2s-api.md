@@ -2,7 +2,7 @@
 
 The Packaging S2S API is a thin proof of concept over the existing UI commands for
 project-scoped components, recipes, pipelines, and image builds. All resources use
-the existing internal IDs and request field names. There are no external-ID
+the existing internal IDs. There are no external-ID
 mappings, ETags, or separate reconciliation operations. This document describes
 the local contract; it does not claim deployed AWS availability.
 
@@ -47,6 +47,12 @@ Send the token as `Authorization: Bearer $ACCESS_TOKEN` on every API request.
 
 For recipes and pipelines, request the explicitly granted scopes described below.
 Poll each resource's GET endpoint for lifecycle status.
+
+Lifecycle status values are explicit in the OpenAPI contract: components and
+recipes use `CREATED`/`ARCHIVED`; component and recipe versions use
+`CREATING`, `CREATED`, `TESTING`, `VALIDATED`, `UPDATING`, `RELEASED`, `RETIRED`,
+or `FAILED`; pipelines use `CREATING`, `CREATED`, `UPDATING`, `RETIRED`, or
+`FAILED`; images use `CREATED`, `CREATING`, `FAILED`, `RETIRED`, or `DELETED`.
 
 ## OAuth clients and project access
 
@@ -193,14 +199,58 @@ requests. `PUT /components/{componentId}` accepts only `componentDescription`.
 Update and archive return `200` with `{}`. GET returns `{component: ...}`; list
 returns `{components: [...]}`.
 
-Create a version with `POST /components/{componentId}/versions` using the existing
-UI fields:
+Every managed create (`POST /components`, component versions, recipes, recipe
+versions, and pipelines) requires an RFC 4122 UUID `Idempotency-Key` header.
+Missing or malformed keys return `400 INVALID_IDEMPOTENCY_KEY`.
+
+Each key is scoped to `(clientId, projectId, operation, parentResourceId?, key)`.
+The optional parent is the component or recipe for a version create. The same key
+can be used independently in another scope. After request defaults are applied,
+object-key order is ignored when comparing bodies; array order is significant.
+
+An exact same-body retry replays the stored status and body for at least 24 hours
+after completion. Once that retention period expires, key reuse can create a new
+resource, even if DynamoDB has not physically deleted the expired record.
+Reusing an active key with a different body returns non-retryable
+`409 IDEMPOTENCY_KEY_REUSED`. A matching request with a live lease returns
+retryable `409 IDEMPOTENCY_REQUEST_IN_PROGRESS` with `Retry-After: 5`.
+
+Reservations use a 60-second lease and retain the reserved resource ID. After a
+lease expires, a retry acquires recovery ownership and checks that ID. An
+attempt that fails without an answer (an unexpected `500` or a retryable error)
+ends its lease at once, so a same-key retry recovers immediately instead of
+receiving `409 IDEMPOTENCY_REQUEST_IN_PROGRESS` until the lease expires. If the
+resource does not exist, creation is retried using the same ID. If it exists,
+synchronous component/recipe creation reconstructs the successful response;
+component-version, recipe-version, and pipeline creation resumes workflow
+publication while still `CREATING` before completing the reservation. Resources
+that have already progressed are not restarted. Publication is at least once,
+consistent with EventBridge delivery; retryable publication failures leave the
+reservation recoverable. Validation and authorization failures before reservation
+do not consume the key.
+
+Create a version with `POST /components/{componentId}/versions` using a structured
+component definition:
 
 ```json
 {
   "componentVersionDescription": "Install the build agent",
   "componentVersionReleaseType": "MAJOR",
-  "componentVersionYamlDefinition": "<valid Image Builder component YAML>",
+  "componentVersionDefinition": {
+    "schemaVersion": "1.0",
+    "phases": [
+      {
+        "name": "build",
+        "steps": [
+          {
+            "name": "install",
+            "action": "ExecuteBash",
+            "inputs": {"commands": ["echo hello"]}
+          }
+        ]
+      }
+    ]
+  },
   "componentVersionDependencies": [],
   "softwareVendor": "Example Corp",
   "softwareVersion": "1.0.0"
@@ -213,11 +263,18 @@ use the UI's `componentId`, `componentName`, `componentVersionId`,
 use internal IDs for dependencies too. Dependencies must be available in the
 authorized project.
 
+Component-version create and update validate the body in Lambda so invalid
+`componentVersionDefinition` values return non-retryable
+`422 INVALID_COMPONENT_DEFINITION`. Definitions require at least one phase and
+at least one step per phase. Other request validation failures return
+`400 INVALID_REQUEST`. The S2S response returns the canonical structured
+definition; the user API continues accepting and returning its original YAML.
+
 Create/update/retire returns `202` with `componentVersionId` and `Retry-After: 5`.
 Poll the version GET and inspect `component_version.status`: wait for
 `VALIDATED` or `FAILED` after create/update, or `RETIRED` or `FAILED` after
-retirement. The response includes `yaml_definition` and `yaml_definition_b64`
-when a stored definition is available. Version lists return `{component_versions: [...]}`.
+retirement. The response includes `componentVersionDefinition` when a stored
+definition is available. Version lists return `{component_versions: [...]}`.
 
 Version update accepts the same fields except `componentVersionReleaseType`,
 which is creation-only. Once validated, send a bodyless POST to the release
@@ -226,10 +283,11 @@ workflow assigns the final semantic version. Released content is immutable:
 create a new version for further edits. DELETE archives the base or retires a
 version through the existing lifecycle; it does not physically delete records.
 
-Component POST requests are non-idempotent. If a response is lost, inspect the
-component/version lists before retrying. There are no external-ID, conditional
-update, or reconciliation deduplication guarantees in this POC. No existing
-component/version IDs need migration.
+All five managed creates—component, component version, recipe, recipe version, and
+pipeline—require the `Idempotency-Key`. Updates, archives, releases, and retirements
+do not require it and retain their existing synchronous/asynchronous lifecycle
+semantics. There are no external-ID or conditional-update guarantees in this POC.
+No existing component/version IDs need migration.
 
 ## Recipe POC
 
@@ -241,7 +299,7 @@ scopes:
 - `clients/packaging/recipe.release` for release
 
 Existing clients are not automatically granted recipe scopes. The POC keeps the
-existing UI request field names and uses internal IDs; it does not accept or create
+existing domain commands and uses internal IDs; it does not accept or create
 external recipe/version IDs, ETags, or recipe mapping records.
 
 The routes are:
@@ -256,9 +314,9 @@ The routes are:
 
 Recipe creation uses the UI fields `recipeName`, `recipeDescription`,
 `recipePlatform`, `recipeArchitecture`, and `recipeOsVersion`. Version requests use
-the UI fields `recipeVersionDescription`, `recipeVersionReleaseType`,
+`recipeVersionDescription`, `recipeVersionReleaseType`,
 `recipeVersionVolumeSize`, `recipeVersionIntegrations`, and
-`recipeComponentsVersions`; each component entry must include the internal IDs,
+`configuredComponentsVersions`; each component entry must include the internal IDs,
 the UI names, `componentVersionType`, and `order`:
 
 ```json
@@ -267,7 +325,7 @@ the UI names, `componentVersionType`, and `order`:
   "recipeVersionReleaseType": "MINOR",
   "recipeVersionVolumeSize": "30",
   "recipeVersionIntegrations": [],
-  "recipeComponentsVersions": [
+  "configuredComponentsVersions": [
     {
       "componentId": "comp-0001",
       "componentName": "build-agent",
@@ -279,6 +337,12 @@ the UI names, `componentVersionType`, and `order`:
   ]
 }
 ```
+
+Recipe-version reads expose both views: `configuredComponentsVersions` is the
+client-supplied selection, while `effectiveComponentsVersions` is the resolved
+selection after mandatory components and ordering have been applied.
+Historical versions without saved configured state omit
+`configuredComponentsVersions` entirely and still return the effective list.
 
 Components are sorted by `order`; existing mandatory components are added by the
 domain workflow. `recipeVersionReleaseType` is accepted only when the
@@ -296,11 +360,10 @@ whose component versions are all released, and returns the `recipeVersionId`
 synchronously. Released content is immutable. This POC reuses the existing build
 and test workflows without adding a separate recipe operation reconciler.
 
-Retry caveat: recipe `POST` requests are non-idempotent. If the response is lost,
-check the recipe/version list first and inspect the returned internal IDs before
-submitting another create. There are no external IDs, ETags, or operation-reconciler
-deduplication guarantees for recipes in this POC. Use the stable problem `code` and
-`retryable` fields for errors, but do not blindly replay a non-idempotent create.
+Recipe and recipe-version creates require `Idempotency-Key`; replaying a request
+with the same key returns the original result. There are no external IDs, ETags,
+or operation-reconciler deduplication guarantees for recipes in this POC. Use the
+stable problem `code` and `retryable` fields for errors.
 
 ## Pipeline and image-build POC
 
@@ -339,27 +402,35 @@ recipe architecture. The schedule is a six-field expression, without a `cron(...
 wrapper, matching the UI. Optional `productId` retains the UI's automatic product
 version association behavior.
 
-Create/update/retire returns `202` with `pipelineId`. Poll the pipeline GET until
+Create/update/retire returns `202` with `pipelineId` and `Retry-After: 5`. Poll the pipeline GET until
 `pipeline.status` is `CREATED` or `FAILED` after create/update, or `RETIRED` or
 `FAILED` after retirement. Updates accept `buildInstanceTypes`, `pipelineSchedule`,
 `recipeVersionId`, and `productId`; the recipe itself, pipeline name, and description
 are not mutable through the existing command. As in the UI, omitting `productId`
 on update clears the product association.
 
-Once the pipeline is `CREATED`, send this to `POST /images`:
+Pipeline and image-build creates require an RFC 4122 UUID `Idempotency-Key`. Retain
+the same key for every retry of one logical build. Once the pipeline is `CREATED`,
+send this to `POST /images`:
 
 ```json
 {"pipelineId": "pipe-example"}
 ```
 
-The response is `202` with the existing internal `imageId`. Poll `GET /images/{imageId}`
+For example, generate a UUID once (`8f57d638-5589-4e80-a1c7-90c5a8a2f906`) and
+send it as `Idempotency-Key`; do not generate a new key for a retry. A new key
+intentionally starts a new build.
+
+The response is `202 Accepted` with the reserved internal `imageId`. The same key
+and request replays the original accepted response during the at-least-24-hour
+replay window. The reservation uses a 60-second lease while a request is being
+processed. A conflicting request using the same key with a different request
+returns `409 Conflict`; a concurrent request while the lease is active also
+returns `409 Conflict` indicating the operation is in progress. Poll
+`GET /images/{imageId}`
 with `pipeline.read` until `image.status` becomes `CREATED` or `FAILED`.
 `image.imageUpstreamId` is the resulting AMI ID when available. Builds still run
 through the existing Image Builder and event-processing workflow.
-
-Pipeline creates and image-build requests are not deduplicated. After a lost response,
-inspect the project pipeline/image lists before retrying; repeating `POST /images`
-can launch another billable build.
 
 ## Errors
 

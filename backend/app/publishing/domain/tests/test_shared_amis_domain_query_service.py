@@ -277,6 +277,7 @@ def test_marketplace_decision_separates_the_registered_and_regional_ami(
         product_id=product_id_value_object.from_str("prod-11111111"),
         version_id=version_id_value_object.from_str("vers-11111111"),
         aws_account_id=aws_account_id_value_object.from_str("123456789012"),
+        stage=stage_value_object.from_str("DEV"),
         product_type=product_type_value_object.from_str("WORKBENCH"),
     )
 
@@ -310,6 +311,7 @@ def test_marketplace_decision_falls_back_to_the_registered_ami_for_an_unlisted_r
         product_id=product_id_value_object.from_str("prod-11111111"),
         version_id=version_id_value_object.from_str("vers-11111111"),
         aws_account_id=aws_account_id_value_object.from_str("123456789012"),
+        stage=stage_value_object.from_str("DEV"),
         product_type=product_type_value_object.from_str("WORKBENCH"),
     )
 
@@ -340,6 +342,7 @@ def _external_decision(lm_service, image_svc_mock, shared_amis_qry_svc_mock, moc
         product_id=product_id_value_object.from_str("prod-11111111"),
         version_id=version_id_value_object.from_str("vers-11111111"),
         aws_account_id=aws_account_id_value_object.from_str("123456789012"),
+        stage=stage_value_object.from_str("DEV"),
         product_type=product_type_value_object.from_str("WORKBENCH"),
     )
 
@@ -412,6 +415,7 @@ def test_vew_managed_subscription_is_not_affected_by_the_upgrade(
         product_id=product_id_value_object.from_str("prod-11111111"),
         version_id=version_id_value_object.from_str("vers-11111111"),
         aws_account_id=aws_account_id_value_object.from_str("123456789012"),
+        stage=stage_value_object.from_str("DEV"),
         product_type=product_type_value_object.from_str("WORKBENCH"),
     )
 
@@ -442,6 +446,7 @@ def test_external_subscription_without_create_grant_stays_verify_only_when_accou
         product_id=product_id_value_object.from_str("prod-11111111"),
         version_id=version_id_value_object.from_str("vers-11111111"),
         aws_account_id=aws_account_id_value_object.from_str("123456789012"),
+        stage=stage_value_object.from_str("DEV"),
         product_type=product_type_value_object.from_str("WORKBENCH"),
     )
 

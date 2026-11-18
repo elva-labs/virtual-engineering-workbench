@@ -61,6 +61,7 @@ def test_fail_ami_sharing_command_handler_stores_the_reason(mock_unit_of_work, l
         productId=product_id_value_object.from_str("prod-12345abc"),
         versionId=version_id_value_object.from_str("vers-12345abc"),
         awsAccountId=aws_account_id_value_object.from_str("123456789012"),
+        stage=stage_value_object.from_str("DEV"),
         statusReason="LaunchPermissionDenied: The target account cannot launch the regional Marketplace AMI.",
     )
 
@@ -69,7 +70,7 @@ def test_fail_ami_sharing_command_handler_stores_the_reason(mock_unit_of_work, l
 
     # ASSERT
     mock_version_repo.update_attributes.assert_called_once_with(
-        version.VersionPrimaryKey(productId="prod-12345abc", versionId="vers-12345abc", awsAccountId="123456789012"),
+        version.VersionPrimaryKey(productId="prod-12345abc", versionId="vers-12345abc", awsAccountId="123456789012", stage="DEV"),
         status=version.VersionStatus.Failed,
         statusReason="LaunchPermissionDenied: The target account cannot launch the regional Marketplace AMI.",
         lastUpdateDate="2023-07-31T00:00:00+00:00",

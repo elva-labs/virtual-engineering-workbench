@@ -31,7 +31,7 @@ class ProductStage(StrEnum):
     PROD = "PROD"
 
 
-class ProductScope(str, Enum):
+class ProductScope(StrEnum):
     """Who sees a product (docs/platform-products.md).
 
     PROGRAM: the owning program only (upstream VEW). PLATFORM: built, tested and promoted once by the

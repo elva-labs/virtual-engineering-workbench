@@ -19,6 +19,7 @@ class UpdateDeploymentTest(unittest.TestCase):
         self.root = Path(self.temp.name)
         for name in (
             "deploy.sh", "scripts/deploy-regions.sh", "scripts/diff-summary.py",
+            "scripts/license-manager-readiness.sh",
             "backend/infra/config.py", "backend/infra/constants.py", "backend/cdk-backend.json",
             "frontend/infrastructure/cdk.json",
         ):

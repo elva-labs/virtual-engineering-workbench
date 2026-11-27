@@ -12,6 +12,14 @@ from jsii import implements, member
 from infra import constants
 from infra.constructs.bundling import DOCKER_STRIP_CMD, strip_bundle, uv_target_args
 
+# Part of every function's description. Lambda publishes a version only when $LATEST differs from the last one
+# ("A version for this Lambda function exists ... Modify the function to create a new version", AlreadyExists).
+# When the hash of CDK's currentVersion changes while the function does not, CloudFormation asks for a new version
+# and the stack rolls back. Turning on @aws-cdk/aws-lambda:recognizeLayerVersion (cdk-backend.json) adds the layers
+# to that hash. Bump this with any such change: a flag, a CDK upgrade that changes the version hash, or a new
+# property in it.
+VERSION_EPOCH = "v2"
+
 
 def _validate_path(path: str) -> None:
     if ".." in Path(path).parts:
@@ -258,7 +266,9 @@ class BackendAppFunction(constructs.Construct):
             dead_letter_queue_enabled=asynchronous,
             dead_letter_queue=self._dlq,
             retry_attempts=asynchronous_retries if asynchronous else None,
-            description=f"{asset_hash[:5]}",
+            # VERSION_EPOCH changes every function once, so each can publish the version its alias moves to
+            # when the version's hash changes without the function (see VERSION_EPOCH).
+            description=f"{asset_hash[:5]} {VERSION_EPOCH}",
             security_groups=[security_group] if security_group else None,
             vpc=vpc,
             vpc_subnets={"subnets": vpc.private_subnets} if vpc else None,

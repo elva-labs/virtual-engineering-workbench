@@ -5,6 +5,7 @@ from aws_lambda_powertools.event_handler import api_gateway
 
 from app.packaging.domain.exceptions.s2s_exception import InsufficientScope, InvalidIdempotencyKey
 from app.shared.domain.ports.idempotency_service import IdempotencyScope
+from app.shared.middleware import read_only_clients
 
 NO_STORE = {"Cache-Control": "no-store"}
 api_metrics = Metrics(service="PackagingS2S")
@@ -19,6 +20,18 @@ def require_scope(router: api_gateway.Router, required_scope: str) -> None:
     granted_scopes = set(str(claims.get("scope", "")).split())
     if required_scope not in granted_scopes:
         raise InsufficientScope(required_scope)
+
+
+def authorize(router: api_gateway.Router, dependencies, project_id: str, required_scope: str) -> str:
+    """Project assignment first, then the exact scope - before any resource is looked up."""
+    current_client_id = client_id(router)
+    # A configured read-only platform client reads every project without an assignment (GET, read scope).
+    if not read_only_clients.admits_without_assignment(
+        router.context.get("user_principal"), router.current_event, required_scope
+    ):
+        dependencies.project_access_service.require_access(current_client_id, project_id)
+    require_scope(router, required_scope)
+    return current_client_id
 
 
 def idempotency_scope(

@@ -9,7 +9,7 @@ from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities import typing
 
 from app.packaging.domain.exceptions import domain_exception
-from app.packaging.domain.exceptions.s2s_exception import InvalidComponentDefinition, S2SException
+from app.packaging.domain.exceptions.s2s_exception import InvalidComponentDefinition, ReadOnlyClient, S2SException
 from app.packaging.entrypoints.s2s_api import bootstrapper, config, problem_details
 from app.packaging.entrypoints.s2s_api.routers import (
     base_images,
@@ -20,7 +20,7 @@ from app.packaging.entrypoints.s2s_api.routers import (
     pipelines,
     recipes,
 )
-from app.shared.middleware import authorization
+from app.shared.middleware import authorization, read_only_clients
 from app.shared.middleware.metric import metric_handlers
 from app.shared.middleware.metric.types import MetricDimensionNames
 
@@ -35,7 +35,9 @@ app = api_gateway.APIGatewayRestResolver(
     strip_prefixes=app_config.get_strip_prefixes(),
     enable_validation=True,
 )
-app.use(middlewares=[authorization.require_auth_context])
+# A configured read-only platform client may only read (read_only_clients); off unless configured.
+# A configured read-only platform client may only read (read_only_clients); off unless configured.
+app.use(middlewares=[authorization.require_auth_context, read_only_clients.refuse_writes(ReadOnlyClient)])
 app.include_router(components.init(dependencies))
 app.include_router(component_versions.init(dependencies))
 app.include_router(recipes.init(dependencies))

@@ -186,6 +186,11 @@ _dev_env_config = {
     "cognito-userpool-client-ids-ssm-param": f"{SSM_PARAM_COGNITO_PREFIX}/user-pool-client-ids",
     "cognito-url-ssm-param": f"{SSM_PARAM_COGNITO_PREFIX}/user-pool-domain",
     "cognito-region": "us-east-1",
+    # S2S read-only platform clients (infra.backend.s2s_read_only_clients), off by default: SSM parameters, each
+    # holding the id of a Cognito app client that reads every project without a client assignment and may never
+    # write, for example the client of a plan-only Terraform run. The parameters must exist before the S2S
+    # stacks deploy (their values are resolved at deployment).
+    "s2s-read-only-platform-client-id-params": [],
     "enabled-workbench-regions": ["us-east-1"],
     "spoke-account-vpc-id-param-name": "/workbench/vpc/vpc-id",
     "spoke-account-vpc-tag": "onboarding:enabled",

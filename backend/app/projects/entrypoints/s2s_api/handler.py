@@ -19,7 +19,7 @@ from app.projects.entrypoints.s2s_api.routers import (
     technologies,
 )
 from app.shared.logging.helpers import clear_auth_headers
-from app.shared.middleware import authorization, exception_handler
+from app.shared.middleware import authorization, exception_handler, read_only_clients
 from app.shared.middleware.metric import metric_handlers
 from app.shared.middleware.metric.types import MetricDimensionNames
 
@@ -40,7 +40,8 @@ app = api_gateway.APIGatewayRestResolver(
     strip_prefixes=app_config.get_strip_prefixes(),
     enable_validation=True,
 )
-app.use(middlewares=[authorization.require_auth_context])
+# A configured read-only platform client may only read (read_only_clients); off unless configured.
+app.use(middlewares=[authorization.require_auth_context, read_only_clients.refuse_writes(s2s_exception.ReadOnlyClient)])
 app.include_router(assignments.init(dependencies=dependencies))
 app.include_router(accounts.init(dependencies=dependencies))
 app.include_router(projects.init(dependencies=dependencies))

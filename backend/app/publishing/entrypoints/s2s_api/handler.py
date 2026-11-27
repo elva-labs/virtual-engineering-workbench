@@ -11,7 +11,7 @@ from app.publishing.domain.exceptions import domain_exception, s2s_exception
 from app.publishing.entrypoints.s2s_api import bootstrapper, config, problem_details
 from app.publishing.entrypoints.s2s_api.routers import products, retirements, versions
 from app.shared.logging.helpers import clear_auth_headers
-from app.shared.middleware import authorization
+from app.shared.middleware import authorization, read_only_clients
 from app.shared.middleware.metric import metric_handlers
 from app.shared.middleware.metric.types import MetricDimensionNames
 
@@ -32,7 +32,9 @@ app = api_gateway.APIGatewayRestResolver(
     strip_prefixes=app_config.get_strip_prefixes(),
     enable_validation=True,
 )
-app.use(middlewares=[authorization.require_auth_context])
+# A configured read-only platform client may only read (read_only_clients); off unless configured.
+# A configured read-only platform client may only read (read_only_clients); off unless configured.
+app.use(middlewares=[authorization.require_auth_context, read_only_clients.refuse_writes(s2s_exception.ReadOnlyClient)])
 app.include_router(products.init(dependencies=dependencies))
 app.include_router(versions.init(dependencies=dependencies))
 app.include_router(retirements.init(dependencies=dependencies))

@@ -23,6 +23,8 @@ The client must also be assigned to every project it accesses (see
 [Assign the client to a project](packaging-s2s-api.md#assign-the-client-to-a-project)). A request
 for an unassigned project returns `403 PROJECT_ACCESS_DENIED` before Publishing looks up the
 requested resource.
+A configured read-only platform client reads every project without an assignment and is refused every
+write ([Read-only platform clients](packaging-s2s-api.md#read-only-platform-clients)).
 
 Paths below are relative to `/clients/publishing/projects/{projectId}`.
 

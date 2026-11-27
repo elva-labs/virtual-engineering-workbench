@@ -1,6 +1,7 @@
 from aws_lambda_powertools.event_handler.exceptions import ForbiddenError
 
 from app.projects.domain.model.service_client_assignment import ServiceClientAssignmentStatus
+from app.shared.middleware import read_only_clients
 
 
 def require_scope(router, scope: str):
@@ -11,7 +12,11 @@ def require_scope(router, scope: str):
 
 def require_project_access(router, query_service, project_id: str, scope: str):
     require_scope(router, scope)
-    client_id = router.context["user_principal"].user_name
+    principal = router.context["user_principal"]
+    # A configured read-only platform client reads every project without an assignment (GET, read scope).
+    if read_only_clients.admits_without_assignment(principal, router.current_event, scope):
+        return
+    client_id = principal.user_name
     assignment = query_service.get_service_client_assignment(project_id, client_id)
     if assignment is None or assignment.status != ServiceClientAssignmentStatus.ACTIVE:
         raise ForbiddenError("Client is not assigned to project")

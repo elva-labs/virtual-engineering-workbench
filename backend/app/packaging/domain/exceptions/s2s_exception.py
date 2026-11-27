@@ -87,6 +87,15 @@ class InsufficientScope(S2SException):
         )
 
 
+class ReadOnlyClient(InsufficientScope):
+    """A read-only platform client's write (app.shared.middleware.read_only_clients): 403, refused before any route."""
+
+    def __init__(self) -> None:
+        S2SException.__init__(
+            self, "This client is read-only: it may only read.", code="READ_ONLY_CLIENT", retryable=False
+        )
+
+
 class ReleasingProjectOnly(S2SException):
     def __init__(self) -> None:
         super().__init__(

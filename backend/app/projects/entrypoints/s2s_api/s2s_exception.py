@@ -31,6 +31,13 @@ class InsufficientScope(S2SException):
     retryable = False
 
 
+class ReadOnlyClient(InsufficientScope):
+    """A read-only platform client's write (app.shared.middleware.read_only_clients): 403, refused before any route."""
+
+    code = "READ_ONLY_CLIENT"
+    detail = "This client is read-only: it may only read."
+
+
 class ProjectAccessDenied(S2SException):
     code = "PROJECT_ACCESS_DENIED"
     detail = "The client is not assigned to this project."

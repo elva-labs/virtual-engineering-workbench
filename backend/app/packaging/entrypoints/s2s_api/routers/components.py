@@ -31,10 +31,7 @@ def init(dependencies: bootstrapper.Dependencies) -> api_gateway.Router:  # noqa
     router = api_gateway.Router()
 
     def authorize(project_id: str, scope: str) -> str:
-        current_client_id = common.client_id(router)
-        dependencies.project_access_service.require_access(current_client_id, project_id)
-        common.require_scope(router, scope)
-        return current_client_id
+        return common.authorize(router, dependencies, project_id, scope)
 
     def require_component(project_id: str, component_id: str) -> None:
         dependencies.component_domain_qry_srv.require_component_in_project(

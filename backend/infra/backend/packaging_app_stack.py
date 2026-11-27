@@ -22,7 +22,7 @@ from app.packaging.domain.model.recipe import base_image_channels
 from app.shared.api import bounded_contexts
 from infra import config, constants
 from infra.auth import packaging_auth, packaging_auth_schema
-from infra.backend import vew_bounded_context_stack
+from infra.backend import s2s_read_only_clients, vew_bounded_context_stack
 from infra.constructs import (
     backend_app_api_auth,
     backend_app_entrypoints,
@@ -358,6 +358,8 @@ class PackagingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                         "AUDIT_LOGGING_KEY_NAME": audit_logging_key_name,
                         "API_BASE_PATH": constants.CUSTOM_DNS_S2S_API_PATH_PACKAGING,
                         "STRIP_PREFIXES": constants.CUSTOM_DNS_S2S_API_PATH_PACKAGING,
+                        # Read-only platform clients: every project's reads, no writes (off by default).
+                        **s2s_read_only_clients.environment(self, app_config),
                         "DOMAIN_EVENT_BUS_ARN": self._event_bus.event_bus_arn,
                         "GSI_NAME_CUSTOM_QUERY_BY_STATUS_KEY": GSI_NAME_CUSTOM_QUERY_BY_STATUS_KEY,
                         "GSI_NAME_CUSTOM_QUERY_BY_BUILD_VERSION_ARN": GSI_NAME_CUSTOM_QUERY_BY_BUILD_VERSION_ARN,

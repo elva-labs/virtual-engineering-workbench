@@ -7,6 +7,7 @@ from aws_lambda_powertools.event_handler import api_gateway
 
 from app.projects.entrypoints.s2s_api import s2s_exception
 from app.shared.domain.ports.idempotency_service import IdempotencyScope
+from app.shared.middleware import read_only_clients
 
 NO_STORE = {"Cache-Control": "no-store"}
 
@@ -27,6 +28,10 @@ def require_access_and_scope(
     scope: str,
 ) -> None:
     """Verify assignment and the exact OAuth scope before any resource lookup."""
+    # A configured read-only platform client reads every project without an assignment (GET, read scope).
+    if read_only_clients.admits_without_assignment(router.context.get("user_principal"), router.current_event, scope):
+        require_scope(router, scope)
+        return
     try:
         assignment = dependencies.projects_query_service.get_service_client_assignment(project_id, client_id)
     except Exception as error:

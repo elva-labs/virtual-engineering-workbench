@@ -19,7 +19,7 @@ from app.publishing import domain
 from app.shared.api import bounded_contexts
 from infra import config, constants
 from infra.auth import publishing_auth, publishing_auth_schema
-from infra.backend import vew_bounded_context_stack
+from infra.backend import s2s_read_only_clients, vew_bounded_context_stack
 from infra.constructs import (
     backend_app_api_auth,
     backend_app_entrypoints,
@@ -250,6 +250,8 @@ class PublishingAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                         "AUDIT_LOGGING_KEY_NAME": audit_logging_key_name,
                         "API_BASE_PATH": constants.CUSTOM_DNS_S2S_API_PATH_PUBLISHING,
                         "STRIP_PREFIXES": constants.CUSTOM_DNS_S2S_API_PATH_PUBLISHING,
+                        # Read-only platform clients: every project's reads, no writes (off by default).
+                        **s2s_read_only_clients.environment(self, app_config),
                     },
                     permissions=[
                         lambda lambda_f: lambda_f.add_to_role_policy(

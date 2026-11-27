@@ -16,6 +16,23 @@ The OAuth client needs these scopes:
 
 An administrator must also assign the client to every project it may access. OAuth scopes grant an action; a project assignment grants access to a particular project. Requests need both.
 
+### Read-only platform clients
+
+A deployment can name read-only platform clients: Cognito app clients that read every project without an
+assignment, for example the client of a plan-only Terraform run that refreshes the state of every project.
+They are off by default. To enable them, list in `s2s-read-only-platform-client-id-params` (the environment
+configuration in `backend/infra/config.py`) the SSM parameters that hold their client IDs; the Projects,
+Packaging and Publishing S2S stacks resolve them at deployment, so the parameters must exist first.
+
+Such a client gets:
+
+- every project route that is a `GET` or `HEAD` and needs a read scope (`<server>/<resource>.read`), with no
+  assignment; its token must still hold that scope (`403 INSUFFICIENT_SCOPE` otherwise);
+- `403 READ_ONLY_CLIENT` for every other request (`POST`, `PUT`, `PATCH`, `DELETE`), before any route runs,
+  whatever scopes its token holds.
+
+Every other client still needs its `ACTIVE` assignment. Grant a read-only platform client only read scopes.
+
 The examples use these placeholders:
 
 ```bash

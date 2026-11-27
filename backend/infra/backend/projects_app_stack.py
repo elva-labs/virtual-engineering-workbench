@@ -19,7 +19,7 @@ from aws_cdk import (
 from app.projects import domain
 from infra import config, constants
 from infra.auth import projects_auth, projects_auth_schema
-from infra.backend import vew_bounded_context_stack
+from infra.backend import s2s_read_only_clients, vew_bounded_context_stack
 from infra.backend.projects_s2s_permissions import permissions as projects_s2s_permissions
 from infra.backend.projects_s2s_runtime_config import account_onboarding_environment
 from infra.backend.workbench_lifecycle_runtime_config import lifecycle_environment
@@ -301,6 +301,8 @@ class ProjectsAppStack(vew_bounded_context_stack.VEWBoundedContextStack):
                         "API_BASE_PATH": constants.CUSTOM_DNS_S2S_API_PATH_PROJECTS,
                         "STRIP_PREFIXES": constants.CUSTOM_DNS_S2S_API_PATH_PROJECTS,
                         "COGNITO_USER_POOL_ID": cognito_user_pool_id,
+                        # Read-only platform clients: every project's reads, no writes (off by default).
+                        **s2s_read_only_clients.environment(self, app_config),
                         **account_onboarding_environment(
                             app_config,
                             image_service_account_id,
